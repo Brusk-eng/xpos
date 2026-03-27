@@ -12,9 +12,9 @@ def get_cashiers(
 	doctype: str,
 	txt: str,
 	searchfield: str | None,
-	start: int | 0,
-	page_len: int | 20,
-	filters: dict | None,
+	start: int = 0,
+	page_len: int = 20,
+	filters: dict | None = None,
 ):
 	cashiers_list = frappe.get_all("POS Profile User", filters=filters, fields=["user"])
 	result = []

@@ -8,6 +8,15 @@ from frappe import Any, _
 from frappe.utils import cint, flt, now_datetime, nowdate
 
 
+def _resolve_invoice_doctype(pos_profile: str) -> str:
+	"""Return 'POS Invoice' or 'Sales Invoice' based on POS Profile setting."""
+	if pos_profile and cint(
+		frappe.db.get_value("POS Profile", pos_profile, "create_pos_invoice_instead_of_sales_invoice")
+	):
+		return "POS Invoice"
+	return "Sales Invoice"
+
+
 def _row_value(row: dict | object, key: str, default: Any | None = None):
 	if isinstance(row, dict):
 		return row.get(key, default)
@@ -137,14 +146,19 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	closing_details = json.loads(closing_details) if isinstance(closing_details, str) else closing_details
 
 	opening = frappe.get_doc("XPOS Opening Shift", opening_shift)
+	doctype = _resolve_invoice_doctype(opening.pos_profile)
+
+	filters = {
+		"pos_opening_shift": opening.name,
+		"docstatus": 1,
+		"is_pos": 1,
+	}
+	if doctype == "POS Invoice":
+		filters["consolidated_invoice"] = ["in", ["", None]]
 
 	invoices = frappe.get_all(
-		"Sales Invoice",
-		filters={
-			"pos_opening_shift": opening.name,
-			"docstatus": 1,
-			"is_pos": 1,
-		},
+		doctype,
+		filters=filters,
 		fields=[
 			"name",
 			"posting_date",
@@ -157,17 +171,22 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	)
 
 	if not invoices:
+		fallback_filters = {
+			"pos_profile": opening.pos_profile,
+			"posting_date": [">=", opening.posting_date],
+			"docstatus": 1,
+			"is_pos": 1,
+			"owner": opening.user,
+		}
+		if doctype == "POS Invoice":
+			fallback_filters["consolidated_invoice"] = ["in", ["", None]]
+
 		invoices = frappe.get_all(
-			"Sales Invoice",
-			filters={
-				"pos_profile": opening.pos_profile,
-				"posting_date": [">=", opening.posting_date],
-				"docstatus": 1,
-				"is_pos": 1,
-				"owner": opening.user,
-			},
+			doctype,
+			filters=fallback_filters,
 			fields=[
 				"name",
+				"posting_date",
 				"grand_total",
 				"net_total",
 				"total_taxes_and_charges",
@@ -212,7 +231,7 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 				},
 			)
 
-	tax_summary = _get_shift_tax_summary(invoices)
+	tax_summary = _get_shift_tax_summary(invoices, doctype)
 	for tax in tax_summary:
 		try:
 			closing_shift.append(
@@ -226,16 +245,15 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 		except Exception:
 			pass
 
+	invoice_link_field = "pos_invoice" if doctype == "POS Invoice" else "sales_invoice"
 	for inv in invoices:
-		closing_shift.append(
-			"pos_transactions",
-			{
-				"sales_invoice": _row_value(inv, "name"),
-				"posting_date": _row_value(inv, "posting_date"),
-				"customer": _row_value(inv, "customer"),
-				"grand_total": _row_value(inv, "grand_total", 0),
-			},
-		)
+		row = {
+			invoice_link_field: _row_value(inv, "name"),
+			"posting_date": _row_value(inv, "posting_date"),
+			"customer": _row_value(inv, "customer"),
+			"grand_total": _row_value(inv, "grand_total", 0),
+		}
+		closing_shift.append("pos_transactions", row)
 
 	closing_shift.insert(ignore_permissions=True)
 	closing_shift.submit()
@@ -257,14 +275,19 @@ def get_shift_summary(opening_shift: str):
 	Enhanced version with tax breakdown and return info.
 	"""
 	opening = frappe.get_doc("XPOS Opening Shift", opening_shift)
+	doctype = _resolve_invoice_doctype(opening.pos_profile)
+
+	filters = {
+		"pos_opening_shift": opening.name,
+		"docstatus": 1,
+		"is_pos": 1,
+	}
+	if doctype == "POS Invoice":
+		filters["consolidated_invoice"] = ["in", ["", None]]
 
 	invoices = frappe.get_all(
-		"Sales Invoice",
-		filters={
-			"pos_opening_shift": opening.name,
-			"docstatus": 1,
-			"is_pos": 1,
-		},
+		doctype,
+		filters=filters,
 		fields=[
 			"name",
 			"grand_total",
@@ -278,15 +301,19 @@ def get_shift_summary(opening_shift: str):
 	)
 
 	if not invoices:
+		fallback_filters = {
+			"pos_profile": opening.pos_profile,
+			"posting_date": [">=", opening.posting_date],
+			"docstatus": 1,
+			"is_pos": 1,
+			"owner": opening.user,
+		}
+		if doctype == "POS Invoice":
+			fallback_filters["consolidated_invoice"] = ["in", ["", None]]
+
 		invoices = frappe.get_all(
-			"Sales Invoice",
-			filters={
-				"pos_profile": opening.pos_profile,
-				"posting_date": [">=", opening.posting_date],
-				"docstatus": 1,
-				"is_pos": 1,
-				"owner": opening.user,
-			},
+			doctype,
+			filters=fallback_filters,
 			fields=[
 				"name",
 				"grand_total",
@@ -307,7 +334,7 @@ def get_shift_summary(opening_shift: str):
 	for inv in invoices:
 		payments = frappe.get_all(
 			"Sales Invoice Payment",
-			filters={"parent": _row_value(inv, "name")},
+			filters={"parent": _row_value(inv, "name"), "parenttype": doctype},
 			fields=["mode_of_payment", "amount"],
 		)
 		for p in payments:
@@ -321,7 +348,7 @@ def get_shift_summary(opening_shift: str):
 		mode = detail.mode_of_payment
 		opening_balances[mode] = flt(detail.amount)
 
-	tax_summary = _get_shift_tax_summary(invoices)
+	tax_summary = _get_shift_tax_summary(invoices, doctype)
 
 	return {
 		"total_invoices": len(invoices),
@@ -396,7 +423,7 @@ def _enrich_shift_data(data: dict, pos_profile: str):
 	}
 
 
-def _get_shift_tax_summary(invoices: list) -> list:
+def _get_shift_tax_summary(invoices: list, doctype: str = "Sales Invoice") -> list:
 	"""Aggregate tax info across all shift invoices."""
 	if not invoices:
 		return []
@@ -407,7 +434,7 @@ def _get_shift_tax_summary(invoices: list) -> list:
 
 	taxes = frappe.get_all(
 		"Sales Taxes and Charges",
-		filters={"parent": ["in", inv_names], "parenttype": "Sales Invoice"},
+		filters={"parent": ["in", inv_names], "parenttype": doctype},
 		fields=["account_head", "rate", "SUM(tax_amount) AS amount"],
 		group_by="account_head, rate",
 		order_by="account_head",

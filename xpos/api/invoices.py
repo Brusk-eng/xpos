@@ -9,6 +9,32 @@ from frappe import _
 from frappe.utils import cint, flt, getdate, now_datetime, nowdate
 from frappe.utils.background_jobs import enqueue
 
+from xpos.api.utilities import get_profile_setting
+
+
+def _resolve_invoice_doctype(pos_profile: str):
+	"""Return 'POS Invoice' or 'Sales Invoice' based on POS Profile setting."""
+	if pos_profile:
+		use_pos = cint(
+			frappe.db.get_value(
+				"POS Profile",
+				pos_profile,
+				"create_pos_invoice_instead_of_sales_invoice",
+			)
+		)
+		if use_pos:
+			return "POS Invoice"
+	return "Sales Invoice"
+
+
+def _detect_invoice_doctype(invoice_name: str):
+	"""Detect whether an invoice name belongs to Sales Invoice or POS Invoice."""
+	if frappe.db.exists("Sales Invoice", invoice_name):
+		return "Sales Invoice"
+	if frappe.db.exists("POS Invoice", invoice_name):
+		return "POS Invoice"
+	frappe.throw(_("Invoice {0} not found").format(invoice_name))
+
 
 @frappe.whitelist()
 def create_invoice(data: str | dict):
@@ -442,6 +468,24 @@ def save_draft_invoice(data: str | dict):
 	if pos.taxes_and_charges:
 		invoice_doc.taxes_and_charges = pos.taxes_and_charges
 
+	payments = data.get("payments", [])
+	if payments:
+		invoice_doc.set("payments", [])
+		for payment in payments:
+			pay_amount = flt(payment.get("amount", 0), 2)
+			invoice_doc.append(
+				"payments",
+				{
+					"mode_of_payment": payment.get("mode_of_payment"),
+					"amount": pay_amount,
+					"account": payment.get("account"),
+					"type": payment.get("type"),
+				},
+			)
+	elif use_pos_invoice and not is_update:
+		default_mop = pos.payments[0].mode_of_payment if pos.payments else "Cash"
+		invoice_doc.append("payments", {"mode_of_payment": default_mop, "amount": 0})
+
 	if pos_opening_shift:
 		try:
 			invoice_doc.pos_opening_shift = pos_opening_shift
@@ -467,15 +511,20 @@ def save_draft_invoice(data: str | dict):
 
 
 @frappe.whitelist()
-def get_draft_invoices(pos_opening_shift: str, doctype: str = "Sales Invoice"):
+def get_draft_invoices(pos_opening_shift: str):
 	"""Get draft invoices for the current shift."""
 	filters = {"docstatus": 0, "is_pos": 1}
 
 	if pos_opening_shift:
-		try:
-			filters["pos_opening_shift"] = pos_opening_shift
-		except Exception:
-			filters["owner"] = frappe.session.user
+		filters["pos_opening_shift"] = pos_opening_shift
+
+	doctype = (
+		"POS Invoice"
+		if get_profile_setting(
+			pos_opening_shift, "create_pos_invoice_instead_of_sales_invoice", "POS Invoice"
+		)
+		else "Sales Invoice"
+	)
 
 	invoices = frappe.get_list(
 		doctype,
@@ -664,14 +713,17 @@ def get_past_orders(
 
 	order_clause = ", ".join(order_parts) if order_parts else "si.posting_date DESC, si.posting_time DESC"
 
+	doctype = _resolve_invoice_doctype(pos_profile)
+	table = f"`tab{doctype}`"
+
 	total = frappe.db.sql(
-		"""SELECT COUNT(*) FROM `tabSales Invoice` si WHERE """ + conditions,
+		f"""SELECT COUNT(*) FROM {table} si WHERE """ + conditions,
 		values,
 		as_list=True,
 	)[0][0]
 
 	orders = frappe.db.sql(
-		"""SELECT
+		f"""SELECT
 			si.name,
 			si.customer,
 			si.customer_name,
@@ -687,7 +739,7 @@ def get_past_orders(
 			si.return_against,
 			si.owner,
 			si.modified
-		FROM `tabSales Invoice` si
+		FROM {table} si
 		WHERE """
 		+ conditions
 		+ """
@@ -704,8 +756,14 @@ def get_past_orders(
 
 
 @frappe.whitelist()
-def get_invoices(pos_opening_shift: str | None = None, is_return: int | None = None, limit: int = 50):
+def get_invoices(
+	pos_opening_shift: str | None = None,
+	is_return: int | None = None,
+	limit: int = 50,
+	pos_profile: str = "",
+):
 	"""Return POS invoices filtered by opening shift and optional return flag."""
+	doctype = _resolve_invoice_doctype(pos_profile)
 	filters = {"docstatus": 1, "is_pos": 1}
 	if pos_opening_shift:
 		filters["pos_opening_shift"] = pos_opening_shift
@@ -713,7 +771,7 @@ def get_invoices(pos_opening_shift: str | None = None, is_return: int | None = N
 		filters["is_return"] = cint(is_return)
 
 	return frappe.get_all(
-		"Sales Invoice",
+		doctype,
 		filters=filters,
 		fields=[
 			"name",
@@ -734,8 +792,10 @@ def get_invoices(pos_opening_shift: str | None = None, is_return: int | None = N
 
 
 @frappe.whitelist()
-def get_invoice_details(invoice_name: str, doctype: str = "Sales Invoice"):
+def get_invoice_details(invoice_name: str, doctype: str = ""):
 	"""Get full invoice details including items and payments."""
+	if not doctype:
+		doctype = _detect_invoice_doctype(invoice_name)
 	doc = frappe.get_doc(doctype, invoice_name)
 
 	return {
@@ -805,8 +865,10 @@ def get_invoice_details(invoice_name: str, doctype: str = "Sales Invoice"):
 
 
 @frappe.whitelist()
-def delete_draft_invoice(invoice_name: str, doctype: str = "Sales Invoice"):
+def delete_draft_invoice(invoice_name: str, doctype: str = ""):
 	"""Delete a draft invoice."""
+	if not doctype:
+		doctype = _detect_invoice_doctype(invoice_name)
 	doc = frappe.get_doc(doctype, invoice_name)
 	if doc.docstatus != 0:
 		frappe.throw(_("Only draft invoices can be deleted"))

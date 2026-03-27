@@ -143,6 +143,14 @@ def get_active_pos_profile(user: str | None = None):
 	return None
 
 
+def get_profile_setting(profile: str, setting: str, default=None):
+	"""Helper to get a setting from POS Profile."""
+	try:
+		return frappe.get_cached_value("POS Profile", profile, setting) or default
+	except Exception:
+		return default
+
+
 @frappe.whitelist()
 def get_default_warehouse(company: str | None = None):
 	"""Returns default warehouse for a company."""

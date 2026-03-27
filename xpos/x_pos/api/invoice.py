@@ -305,6 +305,8 @@ def apply_tax_inclusive(doc):
 
 
 def validate_shift(doc):
+	if getattr(doc, "is_consolidated", None):
+		return
 	if getattr(doc, "pos_opening_shift", None) and doc.pos_profile and doc.is_pos:
 		shift = frappe.get_cached_doc("XPOS Opening Shift", doc.pos_opening_shift)
 		if shift.status != "Open":
