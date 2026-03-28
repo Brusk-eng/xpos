@@ -860,19 +860,14 @@ async function submitPayment(withPrint: boolean = true) {
 
 async function printInvoice(invoiceName: string) {
 	try {
-		const printFormat = posStore.printSettings?.print_format || "POS Invoice";
+		const printFormat = posStore?.defaultPrintFormat || "XPOS Thermal Receipt";
 		const letterHead = posStore.printSettings?.letter_head || "";
 
 		const usePosInvoice = posStore.posProfile?.create_pos_invoice_instead_of_sales_invoice;
 		const doctype = usePosInvoice ? "POS Invoice" : "Sales Invoice";
 
 		const baseUrl = window.location.origin;
-		const printUrl = `${baseUrl}/printview?doctype=${encodeURIComponent(
-			doctype,
-		)}&name=${encodeURIComponent(invoiceName)}&format=${encodeURIComponent(
-			printFormat,
-		)}&no_letterhead=${letterHead ? "0" : "1"}&trigger_print=1`;
-
+		const printUrl = `${baseUrl}/printview?doctype=${doctype}&name=${invoiceName}&format=${printFormat}&no_letterhead=${letterHead ? "0" : "1"}&trigger_print=1`;
 		const printWindow = window.open(printUrl, "_blank", "width=800,height=600");
 
 		if (printWindow) {

@@ -639,9 +639,7 @@ async function viewOrder(order: Invoice) {
 }
 
 function printInvoice(name: string) {
-	const url = `/printview?doctype=Sales+Invoice&name=${encodeURIComponent(
-		name,
-	)}&format=XPOS+Thermal+Receipt&no_letterhead=0&trigger_print=1`;
+	const url = `/printview?doctype=${posStore.invoiceType}&name=${name}&format=${posStore.defaultPrintFormat}&no_letterhead=0&trigger_print=1`;
 	window.open(get_full_url(url), "_blank");
 }
 

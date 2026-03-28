@@ -324,9 +324,7 @@ async function handleCloseShift() {
 function printShiftSummary() {
 	const name = closedShiftName.value;
 	if (!name) return;
-	const url = `/printview?doctype=POS+Closing+Entry&name=${encodeURIComponent(
-		name,
-	)}&no_letterhead=0&trigger_print=1`;
+	const url = `/printview?doctype=POS+Closing+Entry&name=${name}&no_letterhead=0&trigger_print=1`;
 	window.open(url, "_blank");
 }
 

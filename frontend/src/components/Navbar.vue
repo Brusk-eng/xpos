@@ -332,9 +332,7 @@ function printLastInvoice() {
 	if (!name) return;
 	window.open(
 		get_full_url(
-			`/printview?doctype=Sales+Invoice&name=${encodeURIComponent(
-				name,
-			)}&format=POS+Invoice&no_letterhead=0&trigger_print=1`,
+			`/printview?doctype=${posStore.invoiceType}&name=${name}&format=${posStore.defaultPrintFormat}&no_letterhead=0&trigger_print=1`,
 		),
 		"_blank",
 	);
