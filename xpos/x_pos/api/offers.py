@@ -7,7 +7,7 @@ from frappe.utils import cstr, flt, getdate, nowdate
 from xpos.x_pos.doctype.delivery_charges.delivery_charges import (
 	get_applicable_delivery_charges as _get_applicable_delivery_charges,
 )
-from xpos.x_pos.doctype.xpos_coupon.xpos_coupon import check_coupon_code
+from xpos.x_pos.doctype.pos_coupon.pos_coupon import check_coupon_code
 
 
 @frappe.whitelist()
@@ -21,7 +21,7 @@ def get_active_gift_coupons(customer: str, company: str):
 	coupons = []
 	today = getdate(nowdate())
 	coupons_data = frappe.get_all(
-		"XPOS Coupon",
+		"POS Coupon",
 		filters={
 			"company": company,
 			"coupon_type": "Gift Card",

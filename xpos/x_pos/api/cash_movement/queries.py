@@ -38,7 +38,7 @@ def get_shift_movements(
 		]
 
 	return frappe.get_all(
-		"XPOS Cash Movement",
+		"POS Cash Movement",
 		filters=filters,
 		or_filters=or_filters,
 		fields=[

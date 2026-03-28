@@ -4,7 +4,7 @@ from xpos.x_pos.api.invoice import validate_shift
 
 
 class CustomPOSInvoice(ERPNextPOSInvoice):
-	"""Override ERPNext POS Invoice to respect XPOS opening shifts."""
+	"""Override ERPNext POS Invoice to respect POS opening shifts."""
 
 	def validate_pos_opening_entry(self):
 		"""Allow POS invoices when a XPOS shift is open.

@@ -2,7 +2,6 @@
 # For license information, please see license.txt
 
 import unittest
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from xpos.api import shifts
@@ -147,8 +146,6 @@ class TestCheckOpenShift(unittest.TestCase):
 		mock_shift_doc.as_dict.return_value = {"name": "POS-OPEN-003"}
 		mock_frappe.get_doc.return_value = mock_shift_doc
 
-		result = shifts.check_open_shift(user="manager@test.com")
-
 		mock_frappe.db.get_all.assert_called_once()
 		call_args = mock_frappe.db.get_all.call_args
 		self.assertEqual(call_args.kwargs["filters"]["user"], "manager@test.com")
@@ -159,7 +156,7 @@ class TestCloseShift(unittest.TestCase):
 
 	@patch("xpos.api.shifts.frappe")
 	def test_close_shift_creates_closing_shift(self, mock_frappe):
-		"""Test that close_shift creates XPOS Closing Shift."""
+		"""Test that close_shift creates POS Closing Shift."""
 		# Setup mocks
 		mock_opening_doc = MagicMock()
 		mock_opening_doc.name = "POS-OPEN-001"
@@ -174,7 +171,7 @@ class TestCloseShift(unittest.TestCase):
 		mock_closing_doc.as_dict.return_value = {"name": "POS-CLOSE-001"}
 
 		def get_doc_side_effect(*args, **kwargs):
-			if args[0] == "XPOS Opening Shift":
+			if args[0] == "POS Opening Shift":
 				return mock_opening_doc
 			return mock_closing_doc
 
@@ -214,7 +211,7 @@ class TestCloseShift(unittest.TestCase):
 		mock_closing_doc.as_dict.return_value = {"name": "POS-CLOSE-002"}
 
 		def get_doc_side_effect(*args, **kwargs):
-			if args[0] == "XPOS Opening Shift":
+			if args[0] == "POS Opening Shift":
 				return mock_opening_doc
 			return mock_closing_doc
 

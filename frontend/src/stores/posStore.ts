@@ -43,7 +43,7 @@ export const usePosStore = defineStore("pos", () => {
 	const currency = computed(() => posProfile.value?.currency);
 
 	const currencySymbol = computed(() => {
-		const _currency = xpos.boot?.currencies.find((c: any) => c.name === posProfile.value?.currency);
+		const _currency = xpos.boot?.currencies?.find((c: any) => c.name === posProfile.value?.currency);
 		if (_currency) {
 			return _currency.symbol || _currency.name;
 		}

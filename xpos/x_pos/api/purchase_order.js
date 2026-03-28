@@ -1,4 +1,4 @@
-// XPOS Purchase Order Client Script
+// POS Purchase Order Client Script
 // Adds stock-in-hand, transit stock, packing calculations, and grid focus
 
 frappe.ui.form.on("Purchase Order", {

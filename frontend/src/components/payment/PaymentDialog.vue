@@ -82,7 +82,12 @@
 							</p>
 						</div>
 						<div
-							v-if="cartStore.calculatedTaxes.length > 0"
+							v-if="
+								cartStore.calculatedTaxes.length > 0 ||
+								cartStore.offerItemDiscountTotal > 0 ||
+								cartStore.offerGrandTotalDiscountPct > 0 ||
+								cartStore.appliedCoupon
+							"
 							class="px-4 pb-3 pt-1 border-t border-border/50"
 						>
 							<div class="flex items-center justify-between text-xs text-muted-foreground mb-1">
@@ -109,6 +114,38 @@
 									{{ tax.included_in_print_rate ? "" : "+" }}{{ posStore.currencySymbol
 									}}{{ formatPrice(tax.amount) }}
 								</span>
+							</div>
+							<div
+								v-if="cartStore.offerItemDiscountTotal > 0"
+								class="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400"
+							>
+								<span>{{ __("Offer Discount") }}</span>
+								<span
+									>-{{ posStore.currencySymbol
+									}}{{ formatPrice(cartStore.offerItemDiscountTotal) }}</span
+								>
+							</div>
+							<div
+								v-if="cartStore.offerGrandTotalDiscountPct > 0"
+								class="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400"
+							>
+								<span>{{ __("Offer") }} ({{ cartStore.offerGrandTotalDiscountPct }}%)</span>
+								<span
+									>-{{ posStore.currencySymbol
+									}}{{ formatPrice(paymentOfferGrandDiscount) }}</span
+								>
+							</div>
+							<div
+								v-if="cartStore.appliedCoupon"
+								class="flex items-center justify-between text-xs text-violet-600 dark:text-violet-400"
+							>
+								<span
+									>{{ __("Coupon") }}:
+									{{
+										cartStore.appliedCoupon.coupon_code || cartStore.appliedCoupon.name
+									}}</span
+								>
+								<span class="text-[10px]">{{ __("Applied") }}</span>
 							</div>
 						</div>
 					</div>
@@ -497,6 +534,15 @@ const quickAmounts = computed(() => {
 });
 
 const splitTotal = computed(() => splitPayments.value.reduce((sum, p) => sum + (p.amount || 0), 0));
+
+const paymentOfferGrandDiscount = computed(() => {
+	if (cartStore.offerGrandTotalDiscountPct <= 0) return 0;
+	const taxAmt = cartStore.calculatedTaxes
+		.filter((t) => !t.included_in_print_rate)
+		.reduce((s, t) => s + t.amount, 0);
+	const base = cartStore.subtotal + taxAmt - cartStore.offerItemDiscountTotal;
+	return (base * cartStore.offerGrandTotalDiscountPct) / 100;
+});
 
 const effectiveTendered = computed(() => (isSplitPayment.value ? splitTotal.value : tenderedAmount.value));
 

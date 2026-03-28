@@ -49,28 +49,28 @@ msgstr ""
 msgid "About"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Allowed Expense Account'
-#. Label of a Link field in DocType 'XPOS Allowed Source Account'
+#. Label of a Link field in DocType 'POS Allowed Expense Account'
+#. Label of a Link field in DocType 'POS Allowed Source Account'
 #: xpos/x_pos/doctype/xpos_allowed_expense_account/xpos_allowed_expense_account.json
 #: xpos/x_pos/doctype/xpos_allowed_source_account/xpos_allowed_source_account.json
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:95
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:95
 msgid "Account"
 msgstr "അക്കൗണ്ട്"
 
-#. Label of a Link field in DocType 'XPOS Closing Shift Taxes'
+#. Label of a Link field in DocType 'POS Closing Shift Taxes'
 #: xpos/x_pos/doctype/xpos_closing_shift_taxes/xpos_closing_shift_taxes.json
 msgid "Account Head"
 msgstr "അക്കൗണ്ട് ഹെഡ്"
 
 #. Name of a role
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Accounts Manager"
 msgstr "അക്കൗണ്ടുകൾ മാനേജർ"
 
 #. Name of a role
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Accounts User"
 msgstr "ഉപയോക്തൃ അക്കൗണ്ടുകൾ"
 
@@ -131,7 +131,7 @@ msgstr ""
 msgid "Add to Cart"
 msgstr "കാർട്ടിലേക്ക് ചേർക്കുക"
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.js:40
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.js:40
 msgid "Add/Edit Coupon Conditions"
 msgstr "കൂപ്പൺ നിബന്ധനകൾ ചേർക്കുക / എഡിറ്റുചെയ്യുക"
 
@@ -149,12 +149,12 @@ msgid "Admin User"
 msgstr ""
 
 #. Name of a role
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Administrator"
 msgstr "അഡ്മിനിസ്ട്രേറ്റർ"
 
-#. Label of a Data field in DocType 'XPOS Cash Movement'
+#. Label of a Data field in DocType 'POS Cash Movement'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Against Name"
 msgstr ""
@@ -207,19 +207,19 @@ msgstr ""
 msgid "Allocation amount for payment {0} exceeds outstanding invoices"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
-#. Label of a Link field in DocType 'XPOS Closing Shift'
-#. Label of a Link field in DocType 'XPOS Opening Shift'
+#. Label of a Link field in DocType 'POS Cash Movement'
+#. Label of a Link field in DocType 'POS Closing Shift'
+#. Label of a Link field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Amended From"
 msgstr "നിന്ന് ഭേദഗതി"
 
 #. Label of a Currency field in DocType 'Sales Invoice Reference'
-#. Label of a Currency field in DocType 'XPOS Cash Movement'
-#. Label of a Currency field in DocType 'XPOS Closing Shift Taxes'
-#. Label of a Currency field in DocType 'XPOS Payment Entry Reference'
+#. Label of a Currency field in DocType 'POS Cash Movement'
+#. Label of a Currency field in DocType 'POS Closing Shift Taxes'
+#. Label of a Currency field in DocType 'POS Payment Entry Reference'
 #: frontend/src/components/cart/ReturnDialog.vue:63
 #: frontend/src/components/purchase/PurchaseCart.vue:67
 #: frontend/src/components/shift/CashMovementDialog.vue:60
@@ -228,8 +228,8 @@ msgstr "നിന്ന് ഭേദഗതി"
 #: frontend/src/views/PurchaseOrderListView.vue:363
 #: xpos/x_pos/doctype/sales_invoice_reference/sales_invoice_reference.json
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:59
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:97
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:59
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:97
 #: xpos/x_pos/doctype/xpos_closing_shift_taxes/xpos_closing_shift_taxes.json
 #: xpos/x_pos/doctype/xpos_payment_entry_reference/xpos_payment_entry_reference.json
 msgid "Amount"
@@ -261,7 +261,7 @@ msgstr ""
 msgid "Amount must be greater than zero."
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Coupon Detail'
+#. Label of a Check field in DocType 'POS Coupon Detail'
 #: xpos/x_pos/doctype/xpos_coupon_detail/xpos_coupon_detail.json
 msgid "Applied"
 msgstr "അപ്ലൈഡ്"
@@ -275,8 +275,8 @@ msgstr "അപേക്ഷിക്കുക"
 msgid "Apply Discount"
 msgstr ""
 
-#. Label of a Section Break field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Section Break field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Apply For"
 msgstr ""
 
@@ -285,28 +285,28 @@ msgstr ""
 msgid "Apply For POS Profiles"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Offer Detail'
+#. Label of a Data field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Apply On"
 msgstr "പുരട്ടുക"
 
-#. Label of a Link field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Link field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Apply Rule On Brand"
 msgstr "ബ്രാൻഡിൽ റൂൾ പ്രയോഗിക്കുക"
 
-#. Label of a Link field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Link field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Apply Rule On Item Code"
 msgstr "ഇനം കോഡിൽ റൂൾ പ്രയോഗിക്കുക"
 
-#. Label of a Link field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Link field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Apply Rule On Item Group"
 msgstr "ഇനം ഗ്രൂപ്പിൽ റൂൾ പ്രയോഗിക്കുക"
 
-#. Label of a Select field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Select field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Apply Type"
 msgstr ""
 
@@ -326,8 +326,8 @@ msgstr ""
 msgid "Auto"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Check field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Auto Apply"
 msgstr ""
 
@@ -434,8 +434,8 @@ msgid "Birthday (DD-MM-YYYY)"
 msgstr ""
 
 #. Option for the 'Qualifying Transaction / Item' (Select) field in DocType
-#. 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Brand"
 msgstr "ബ്രാൻഡ്"
 
@@ -449,9 +449,9 @@ msgid "Buying Price"
 msgstr ""
 
 #. Label of a Link field in DocType 'Referral Code'
-#. Label of a Link field in DocType 'XPOS Coupon'
+#. Label of a Link field in DocType 'POS Coupon'
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Campaign"
 msgstr "കാമ്പെയ്ൻ"
 
@@ -470,7 +470,7 @@ msgstr "കാമ്പെയ്ൻ"
 msgid "Cancel"
 msgstr "റദ്ദാക്കുക"
 
-#. Option for the 'Status' (Select) field in DocType 'XPOS Opening Shift'
+#. Option for the 'Status' (Select) field in DocType 'POS Opening Shift'
 #: frontend/src/components/orders/ListFilters.vue:21
 #: frontend/src/views/PurchaseOrderListView.vue:69
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
@@ -556,9 +556,9 @@ msgstr ""
 msgid "Cash movement {0} not found"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Closing Shift'
-#. Label of a Link field in DocType 'XPOS Opening Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Link field in DocType 'POS Closing Shift'
+#. Label of a Link field in DocType 'POS Opening Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Cashier"
 msgstr "കാഷ്യയർ"
@@ -636,7 +636,7 @@ msgstr ""
 msgid "Click to select customer"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Cash Movement'
+#. Label of a Data field in DocType 'POS Cash Movement'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Client Request ID"
 msgstr ""
@@ -661,7 +661,7 @@ msgstr ""
 msgid "Close Shift"
 msgstr ""
 
-#. Option for the 'Status' (Select) field in DocType 'XPOS Opening Shift'
+#. Option for the 'Status' (Select) field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Closed"
 msgstr "അടച്ചു"
@@ -670,7 +670,7 @@ msgstr "അടച്ചു"
 msgid "Closing"
 msgstr ""
 
-#. Label of a Currency field in DocType 'XPOS Closing Shift Detail'
+#. Label of a Currency field in DocType 'POS Closing Shift Detail'
 #: xpos/x_pos/doctype/xpos_closing_shift_detail/xpos_closing_shift_detail.json
 msgid "Closing Amount"
 msgstr "അടയ്ക്കുന്ന തുക"
@@ -693,11 +693,11 @@ msgstr ""
 
 #. Label of a Link field in DocType 'Delivery Charges'
 #. Label of a Link field in DocType 'Referral Code'
-#. Label of a Link field in DocType 'XPOS Cash Movement'
-#. Label of a Link field in DocType 'XPOS Closing Shift'
-#. Label of a Link field in DocType 'XPOS Coupon'
-#. Label of a Link field in DocType 'XPOS Offer'
-#. Label of a Link field in DocType 'XPOS Opening Shift'
+#. Label of a Link field in DocType 'POS Cash Movement'
+#. Label of a Link field in DocType 'POS Closing Shift'
+#. Label of a Link field in DocType 'POS Coupon'
+#. Label of a Link field in DocType 'POS Offer'
+#. Label of a Link field in DocType 'POS Opening Shift'
 #: frontend/src/components/AboutDialog.vue:37
 #: frontend/src/components/purchase/SupplierSelector.vue:173
 #: frontend/src/components/purchase/dialogs/CreateSupplierDialog.vue:86
@@ -708,9 +708,9 @@ msgstr ""
 #: xpos/x_pos/doctype/delivery_charges/delivery_charges.json
 #: xpos/x_pos/doctype/referral_code/referral_code.json
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Company"
 msgstr "കമ്പനി"
@@ -795,8 +795,8 @@ msgstr "ചെലവ് കേന്ദ്രം"
 msgid "Cost Center is not set in pos profile {0}"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Coupon Detail'
-#. Label of a Link field in DocType 'XPOS Offer Detail'
+#. Label of a Link field in DocType 'POS Coupon Detail'
+#. Label of a Link field in DocType 'POS Offer Detail'
 #: frontend/src/components/cart/Cart.vue:119
 #: frontend/src/components/cart/CartSummary.vue:101
 #: frontend/src/views/OrdersView.vue:141
@@ -805,35 +805,35 @@ msgstr ""
 msgid "Coupon"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Offer Detail'
+#. Label of a Check field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Coupon Based"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Coupon'
-#. Label of a Data field in DocType 'XPOS Coupon Detail'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Data field in DocType 'POS Coupon'
+#. Label of a Data field in DocType 'POS Coupon Detail'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 #: xpos/x_pos/doctype/xpos_coupon_detail/xpos_coupon_detail.json
 msgid "Coupon Code"
 msgstr "കൂപ്പൺ കോഡ്"
 
-#. Label of a Check field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Check field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Coupon Code Based"
 msgstr "കൂപ്പൺ കോഡ് അടിസ്ഥാനമാക്കിയുള്ളത്"
 
-#. Label of a Text Editor field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Text Editor field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Coupon Description"
 msgstr "കൂപ്പൺ വിവരണം"
 
-#. Label of a Data field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Data field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Coupon Name"
 msgstr "കൂപ്പൺ നാമം"
 
-#. Label of a Select field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Select field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Coupon Type"
 msgstr "കൂപ്പൺ തരം"
 
@@ -975,22 +975,22 @@ msgstr ""
 
 #. Label of a Link field in DocType 'Referral Code'
 #. Label of a Link field in DocType 'Sales Invoice Reference'
-#. Label of a Link field in DocType 'XPOS Coupon'
-#. Label of a Link field in DocType 'XPOS Coupon Detail'
-#. Label of a Link field in DocType 'XPOS Payment Entry Reference'
+#. Label of a Link field in DocType 'POS Coupon'
+#. Label of a Link field in DocType 'POS Coupon Detail'
+#. Label of a Link field in DocType 'POS Payment Entry Reference'
 #: frontend/src/components/orders/ListFilters.vue:198
 #: frontend/src/views/OrdersView.vue:114
 #: xpos/x_pos/api/payment_processing/data.py:67
 #: xpos/x_pos/api/payment_processing/data.py:167
 #: xpos/x_pos/doctype/referral_code/referral_code.json
 #: xpos/x_pos/doctype/sales_invoice_reference/sales_invoice_reference.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 #: xpos/x_pos/doctype/xpos_coupon_detail/xpos_coupon_detail.json
 #: xpos/x_pos/doctype/xpos_payment_entry_reference/xpos_payment_entry_reference.json
 msgid "Customer"
 msgstr "കസ്റ്റമർ"
 
-#. Label of a Link field in DocType 'XPOS Print Format Rule'
+#. Label of a Link field in DocType 'POS Print Format Rule'
 #: xpos/x_pos/doctype/xpos_print_format_rule/xpos_print_format_rule.json
 msgid "Customer Group"
 msgstr "കസ്റ്റമർ ഗ്രൂപ്പ്"
@@ -1000,10 +1000,10 @@ msgid "Customer Group *"
 msgstr ""
 
 #. Label of a Data field in DocType 'Referral Code'
-#. Label of a Data field in DocType 'XPOS Coupon'
+#. Label of a Data field in DocType 'POS Coupon'
 #: frontend/src/components/orders/ListFilters.vue:199
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Customer Name"
 msgstr "ഉപഭോക്താവിന്റെ പേര്"
 
@@ -1035,7 +1035,7 @@ msgstr ""
 #: xpos/api/customers.py:582 xpos/api/customers.py:639 xpos/api/invoices.py:32
 #: xpos/x_pos/api/payment_processing/processor.py:27
 #: xpos/x_pos/api/payment_processing/reconciliation.py:23
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:68
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:68
 msgid "Customer is required"
 msgstr "കസ്റ്റമർ ആവശ്യമാണ്"
 
@@ -1097,7 +1097,7 @@ msgid "Database reconnected successfully"
 msgstr ""
 
 #. Label of a Date field in DocType 'Sales Invoice Reference'
-#. Label of a Date field in DocType 'XPOS Payment Entry Reference'
+#. Label of a Date field in DocType 'POS Payment Entry Reference'
 #: frontend/src/views/PurchaseInvoiceView.vue:475
 #: frontend/src/views/PurchaseOrderListView.vue:335
 #: xpos/x_pos/doctype/sales_invoice_reference/sales_invoice_reference.json
@@ -1117,8 +1117,8 @@ msgstr ""
 msgid "Date (Oldest)"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Link field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Default Loyalty Program"
 msgstr ""
 
@@ -1178,7 +1178,7 @@ msgstr ""
 msgid "Department"
 msgstr ""
 
-#. Option for the 'Movement Type' (Select) field in DocType 'XPOS Cash
+#. Option for the 'Movement Type' (Select) field in DocType 'POS Cash
 #. Movement'
 #: frontend/src/components/Navbar.vue:49
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
@@ -1193,10 +1193,10 @@ msgstr ""
 msgid "Dept"
 msgstr ""
 
-#. Label of a Small Text field in DocType 'XPOS Offer'
+#. Label of a Small Text field in DocType 'POS Offer'
 #: frontend/src/views/BankDropView.vue:95
 #: frontend/src/views/ExpenseView.vue:103
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Description"
 msgstr "വിവരണം"
 
@@ -1208,12 +1208,12 @@ msgstr ""
 msgid "Desktop App"
 msgstr ""
 
-#. Label of a Section Break field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Section Break field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Details"
 msgstr "വിശദാംശങ്ങൾ"
 
-#. Label of a Currency field in DocType 'XPOS Closing Shift Detail'
+#. Label of a Currency field in DocType 'POS Closing Shift Detail'
 #: frontend/src/components/shift/ClosingDialog.vue:92
 #: xpos/x_pos/doctype/xpos_closing_shift_detail/xpos_closing_shift_detail.json
 msgid "Difference"
@@ -1231,8 +1231,8 @@ msgstr ""
 msgid "Digits before decimal. Example: for 1.000, use 1 (or 2 if your scale encodes 01.000)."
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Check field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Disable"
 msgstr "അപ്രാപ്തമാക്കുക"
 
@@ -1260,20 +1260,20 @@ msgstr "ഡിസ്കൗണ്ട്"
 msgid "Discount %"
 msgstr ""
 
-#. Option for the 'Discount Type' (Select) field in DocType 'XPOS Offer'
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Option for the 'Discount Type' (Select) field in DocType 'POS Offer'
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Discount Amount"
 msgstr "കിഴിവും തുക"
 
-#. Option for the 'Discount Type' (Select) field in DocType 'XPOS Offer'
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Option for the 'Discount Type' (Select) field in DocType 'POS Offer'
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Discount Percentage"
 msgstr "കിഴിവും ശതമാനം"
 
-#. Label of a Select field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Select field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Discount Type"
 msgstr "കിഴിവ് തരം"
 
@@ -1294,7 +1294,7 @@ msgstr ""
 msgid "Download installer from:"
 msgstr ""
 
-#. Option for the 'Status' (Select) field in DocType 'XPOS Opening Shift'
+#. Option for the 'Status' (Select) field in DocType 'POS Opening Shift'
 #: frontend/src/components/cart/DraftInvoiceDialog.vue:45
 #: frontend/src/views/PurchaseOrderListView.vue:64
 #: frontend/src/views/PurchaseOrderListView.vue:238
@@ -1347,9 +1347,9 @@ msgid "Email Address"
 msgstr "ഈ - മെയില് വിലാസം"
 
 #. Label of a Data field in DocType 'Referral Code'
-#. Label of a Data field in DocType 'XPOS Coupon'
+#. Label of a Data field in DocType 'POS Coupon'
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Email ID"
 msgstr "ഇ - മെയിൽ ഐഡി"
 
@@ -1442,19 +1442,19 @@ msgstr "നിങ്ങളുടെ പാസ്വേഡ് നൽകുക"
 msgid "Expected"
 msgstr ""
 
-#. Label of a Currency field in DocType 'XPOS Closing Shift Detail'
+#. Label of a Currency field in DocType 'POS Closing Shift Detail'
 #: xpos/x_pos/doctype/xpos_closing_shift_detail/xpos_closing_shift_detail.json
 msgid "Expected Amount"
 msgstr "പ്രതീക്ഷിക്കുന്ന തുക"
 
-#. Option for the 'Movement Type' (Select) field in DocType 'XPOS Cash
+#. Option for the 'Movement Type' (Select) field in DocType 'POS Cash
 #. Movement'
 #: frontend/src/components/Navbar.vue:41
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Expense"
 msgstr "ചിലവേറിയ"
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
+#. Label of a Link field in DocType 'POS Cash Movement'
 #: frontend/src/components/shift/CashMovementDialog.vue:31
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Expense Account"
@@ -1624,28 +1624,28 @@ msgstr ""
 msgid "Get Items"
 msgstr ""
 
-#. Option for the 'Coupon Type' (Select) field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Option for the 'Coupon Type' (Select) field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Gift Card"
 msgstr "ഗിഫ്റ്റ് കാർഡ്"
 
-#. Label of a Link field in DocType 'XPOS Offer Detail'
+#. Label of a Link field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Give Item"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Offer Detail'
+#. Label of a Data field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Give Item Row ID"
 msgstr ""
 
-#. Option for the 'Promo Type' (Select) field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Option for the 'Promo Type' (Select) field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Give Product"
 msgstr ""
 
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Given Quantity"
 msgstr ""
 
@@ -1681,17 +1681,17 @@ msgstr ""
 msgid "Godown"
 msgstr ""
 
-#. Label of a Currency field in DocType 'XPOS Closing Shift'
-#. Option for the 'Promo Type' (Select) field in DocType 'XPOS Offer'
+#. Label of a Currency field in DocType 'POS Closing Shift'
+#. Option for the 'Promo Type' (Select) field in DocType 'POS Offer'
 #: frontend/src/components/orders/ListFilters.vue:200
 #: frontend/src/components/shift/ClosingDialog.vue:25
 #: frontend/src/views/OrdersView.vue:218
 #: frontend/src/views/PurchaseInvoiceView.vue:664
 #: frontend/src/views/PurchaseOrderListView.vue:387
 #: frontend/src/views/PurchaseOrderView.vue:550
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:15
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:15
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Grand Total"
 msgstr "ആകെ തുക"
 
@@ -1789,15 +1789,15 @@ msgstr ""
 msgid "Inv. Size"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.py:85
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.py:85
 msgid "Invalid Opening Entry"
 msgstr "ഓപ്പണിംഗ് എൻട്രി അസാധുവാണ്"
 
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_processing/overview.py:40
+#: xpos/x_pos/doctype/pos_closing_shift/closing_processing/overview.py:40
 msgid "Invalid POS Opening Shift data provided."
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.py:79
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.py:79
 msgid "Invalid Period"
 msgstr "അസാധുവായ കാലയളവ്"
 
@@ -1923,12 +1923,12 @@ msgid "Item"
 msgstr "ഇനം"
 
 #. Option for the 'Qualifying Transaction / Item' (Select) field in DocType
-#. 'XPOS Offer'
-#. Option for the 'Apply Type' (Select) field in DocType 'XPOS Offer'
-#. Label of a Link field in DocType 'XPOS Offer'
+#. 'POS Offer'
+#. Option for the 'Apply Type' (Select) field in DocType 'POS Offer'
+#. Label of a Link field in DocType 'POS Offer'
 #: frontend/src/components/purchase/PurchaseItemList.vue:257
 #: frontend/src/components/purchase/dialogs/CreateItemDialog.vue:100
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Item Code"
 msgstr "ഇനം കോഡ്"
 
@@ -1945,12 +1945,12 @@ msgid "Item Discounts"
 msgstr ""
 
 #. Option for the 'Qualifying Transaction / Item' (Select) field in DocType
-#. 'XPOS Offer'
-#. Option for the 'Apply Type' (Select) field in DocType 'XPOS Offer'
-#. Label of a Link field in DocType 'XPOS Offer'
+#. 'POS Offer'
+#. Option for the 'Apply Type' (Select) field in DocType 'POS Offer'
+#. Label of a Link field in DocType 'POS Offer'
 #: frontend/src/components/purchase/PurchaseItemList.vue:274
 #: frontend/src/components/purchase/dialogs/CreateItemDialog.vue:112
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Item Group"
 msgstr "ഇനം ഗ്രൂപ്പ്"
 
@@ -1960,8 +1960,8 @@ msgstr "ഇനം ഗ്രൂപ്പ്"
 msgid "Item Name"
 msgstr ""
 
-#. Option for the 'Promo Type' (Select) field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Option for the 'Promo Type' (Select) field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Item Price"
 msgstr "ഇനം വില"
 
@@ -1969,8 +1969,8 @@ msgstr "ഇനം വില"
 msgid "Item Price has been added or updated"
 msgstr ""
 
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Item Rate Should Less Then"
 msgstr ""
 
@@ -2031,7 +2031,7 @@ msgstr ""
 msgid "Item {0}: Rate cannot be negative"
 msgstr ""
 
-#. Label of a Small Text field in DocType 'XPOS Offer Detail'
+#. Label of a Small Text field in DocType 'POS Offer Detail'
 #: frontend/src/views/OrdersView.vue:147
 #: frontend/src/views/PurchaseInvoiceView.vue:658
 #: frontend/src/views/PurchaseOrderListView.vue:348
@@ -2042,7 +2042,7 @@ msgstr ""
 msgid "Items"
 msgstr "ഇനങ്ങൾ"
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
+#. Label of a Link field in DocType 'POS Cash Movement'
 #: xpos/x_pos/api/payment_processing/data.py:271
 #: xpos/x_pos/api/payment_processing/data.py:354
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
@@ -2078,8 +2078,8 @@ msgstr ""
 msgid "Last sync:"
 msgstr ""
 
-#. Label of a Section Break field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Section Break field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Linked Invoices"
 msgstr "ലിങ്ക് ചെയ്ത ഇൻവോയ്സുകൾ"
 
@@ -2126,19 +2126,19 @@ msgstr ""
 msgid "Loyalty Information"
 msgstr ""
 
-#. Option for the 'Promo Type' (Select) field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Option for the 'Promo Type' (Select) field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Loyalty Point"
 msgstr ""
 
-#. Label of a Section Break field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Section Break field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Loyalty Point Scheme"
 msgstr ""
 
-#. Label of a Int field in DocType 'XPOS Offer'
+#. Label of a Int field in DocType 'POS Offer'
 #: frontend/src/components/payment/PaymentDialog.vue:166
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Loyalty Points"
 msgstr "ലോയൽറ്റി പോയിന്റുകൾ"
 
@@ -2187,18 +2187,18 @@ msgstr ""
 msgid "Material transfers awaiting receipt at your warehouse"
 msgstr ""
 
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Max Amount"
 msgstr "പരമാവധി തുക"
 
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Max Quantity"
 msgstr ""
 
-#. Label of a Int field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Int field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Maximum Use"
 msgstr "പരമാവധി ഉപയോഗം"
 
@@ -2211,13 +2211,13 @@ msgstr ""
 msgid "Method"
 msgstr "രീതിയുടെ"
 
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Min Amount"
 msgstr "കുറഞ്ഞ തുക"
 
-#. Label of a Float field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Float field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Min Quantity"
 msgstr ""
 
@@ -2239,9 +2239,9 @@ msgid "Mobile"
 msgstr "മൊബൈൽ"
 
 #. Label of a Data field in DocType 'Referral Code'
-#. Label of a Data field in DocType 'XPOS Coupon'
+#. Label of a Data field in DocType 'POS Coupon'
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Mobile NO"
 msgstr ""
 
@@ -2254,27 +2254,27 @@ msgstr ""
 msgid "Mode"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Payment Entry Reference'
+#. Label of a Data field in DocType 'POS Payment Entry Reference'
 #: xpos/x_pos/doctype/xpos_payment_entry_reference/xpos_payment_entry_reference.json
 msgid "Mode Of Payment"
 msgstr "അടക്കേണ്ട മോഡ്"
 
-#. Label of a Link field in DocType 'XPOS Closing Shift Detail'
-#. Label of a Link field in DocType 'XPOS Opening Shift Detail'
+#. Label of a Link field in DocType 'POS Closing Shift Detail'
+#. Label of a Link field in DocType 'POS Opening Shift Detail'
 #: frontend/src/views/BankDropView.vue:85 frontend/src/views/ExpenseView.vue:93
 #: xpos/x_pos/api/payment_processing/data.py:170
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:58
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:58
 #: xpos/x_pos/doctype/xpos_closing_shift_detail/xpos_closing_shift_detail.json
 #: xpos/x_pos/doctype/xpos_opening_shift_detail/xpos_opening_shift_detail.json
 msgid "Mode of Payment"
 msgstr "പേയ്മെന്റ് മോഡ്"
 
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:53
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:53
 msgid "Mode of Payments"
 msgstr "പേയ്മെന്റ് മോഡ്"
 
-#. Label of a Section Break field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Section Break field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Modes of Payment"
 msgstr "പണമടയ്ക്കൽ മോഡുകൾ"
 
@@ -2286,7 +2286,7 @@ msgstr ""
 msgid "Move up"
 msgstr ""
 
-#. Label of a Select field in DocType 'XPOS Cash Movement'
+#. Label of a Select field in DocType 'POS Cash Movement'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Movement Type"
 msgstr ""
@@ -2303,12 +2303,12 @@ msgstr ""
 msgid "Navigation"
 msgstr ""
 
-#. Label of a Currency field in DocType 'XPOS Closing Shift'
+#. Label of a Currency field in DocType 'POS Closing Shift'
 #: frontend/src/components/orders/ListFilters.vue:201
 #: frontend/src/components/shift/ClosingDialog.vue:35
 #: frontend/src/views/OrdersView.vue:193
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:28
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:28
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Net Total"
 msgstr "നെറ്റ് ആകെ"
 
@@ -2573,17 +2573,17 @@ msgstr ""
 msgid "Numpad"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Offer Detail'
+#. Label of a Data field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Offer"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Offer Detail'
+#. Label of a Check field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Offer Applied"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Offer Detail'
+#. Label of a Link field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Offer Name"
 msgstr ""
@@ -2606,8 +2606,8 @@ msgstr ""
 msgid "Online"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Check field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Only One Use Per Customer"
 msgstr ""
 
@@ -2655,7 +2655,7 @@ msgstr ""
 msgid "Op"
 msgstr ""
 
-#. Option for the 'Status' (Select) field in DocType 'XPOS Opening Shift'
+#. Option for the 'Status' (Select) field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Open"
 msgstr "തുറക്കുക"
@@ -2672,14 +2672,14 @@ msgstr ""
 msgid "Opening"
 msgstr "തുറക്കുന്നു"
 
-#. Label of a Currency field in DocType 'XPOS Closing Shift Detail'
-#. Label of a Currency field in DocType 'XPOS Opening Shift Detail'
+#. Label of a Currency field in DocType 'POS Closing Shift Detail'
+#. Label of a Currency field in DocType 'POS Opening Shift Detail'
 #: xpos/x_pos/doctype/xpos_closing_shift_detail/xpos_closing_shift_detail.json
 #: xpos/x_pos/doctype/xpos_opening_shift_detail/xpos_opening_shift_detail.json
 msgid "Opening Amount"
 msgstr "തുറക്കുന്ന തുക"
 
-#. Label of a Table field in DocType 'XPOS Opening Shift'
+#. Label of a Table field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Opening Balance Details"
 msgstr "ബാലൻസ് വിശദാംശങ്ങൾ തുറക്കുന്നു"
@@ -2771,7 +2771,7 @@ msgstr ""
 msgid "POS Cash Movement"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Opening Shift'
+#. Label of a Data field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "POS Closing Shift"
 msgstr ""
@@ -2795,24 +2795,24 @@ msgstr ""
 msgid "POS Invoice"
 msgstr "POS ഇൻവോയ്സ്"
 
-#. Label of a Link field in DocType 'XPOS Coupon'
-#. Label of a Link field in DocType 'XPOS Coupon Detail'
+#. Label of a Link field in DocType 'POS Coupon'
+#. Label of a Link field in DocType 'POS Coupon Detail'
 #. Label of a Link in the X POS Workspace
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 #: xpos/x_pos/doctype/xpos_coupon_detail/xpos_coupon_detail.json
 #: xpos/x_pos/workspace/x_pos/x_pos.json
 msgid "POS Offer"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:60
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:60
 msgid "POS Offer is disabled."
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
-#. Label of a Link field in DocType 'XPOS Closing Shift'
+#. Label of a Link field in DocType 'POS Cash Movement'
+#. Label of a Link field in DocType 'POS Closing Shift'
 #. Label of a Link in the X POS Workspace
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/workspace/x_pos/x_pos.json
 msgid "POS Opening Shift"
 msgstr ""
@@ -2822,7 +2822,7 @@ msgstr ""
 msgid "POS Opening Shift is required"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_processing/overview.py:16
+#: xpos/x_pos/doctype/pos_closing_shift/closing_processing/overview.py:16
 msgid "POS Opening Shift is required to compute the overview."
 msgstr ""
 
@@ -2847,24 +2847,24 @@ msgstr ""
 msgid "POS Opening Shift {0} is not for the same company"
 msgstr ""
 
-#. Label of a Table field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Table field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "POS Payments"
 msgstr ""
 
 #. Label of a Link field in DocType 'Delivery Charges POS Profile'
-#. Label of a Link field in DocType 'XPOS Cash Movement'
-#. Label of a Link field in DocType 'XPOS Closing Shift'
-#. Label of a Link field in DocType 'XPOS Offer'
-#. Label of a Link field in DocType 'XPOS Opening Shift'
+#. Label of a Link field in DocType 'POS Cash Movement'
+#. Label of a Link field in DocType 'POS Closing Shift'
+#. Label of a Link field in DocType 'POS Offer'
+#. Label of a Link field in DocType 'POS Opening Shift'
 #. Label of a Link in the X POS Workspace
 #: frontend/src/views/OrdersView.vue:129
 #: frontend/src/views/SettingsView.vue:114
 #: xpos/x_pos/api/payment_processing/data.py:70
 #: xpos/x_pos/doctype/delivery_charges_pos_profile/delivery_charges_pos_profile.json
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 #: xpos/x_pos/workspace/x_pos/x_pos.json
 msgid "POS Profile"
@@ -2917,8 +2917,8 @@ msgstr ""
 msgid "POS Shift {0} is not open"
 msgstr ""
 
-#. Label of a Table field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Table field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "POS Transactions"
 msgstr "POS ഇടപാടുകൾ"
 
@@ -2969,7 +2969,7 @@ msgstr ""
 msgid "Payment"
 msgstr "പേയ്മെന്റ്"
 
-#. Label of a Link field in DocType 'XPOS Payment Entry Reference'
+#. Label of a Link field in DocType 'POS Payment Entry Reference'
 #: xpos/x_pos/doctype/xpos_payment_entry_reference/xpos_payment_entry_reference.json
 msgid "Payment Entry"
 msgstr "പേയ്മെന്റ് എൻട്രി"
@@ -2986,9 +2986,9 @@ msgstr ""
 msgid "Payment Gateway Account not found"
 msgstr ""
 
-#. Label of a Table field in DocType 'XPOS Closing Shift'
+#. Label of a Table field in DocType 'POS Closing Shift'
 #: frontend/src/components/shift/ClosingDialog.vue:76
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Payment Reconciliation"
 msgstr "പേയ്മെന്റ് അനുരഞ്ജനം"
 
@@ -3024,16 +3024,16 @@ msgstr "തീർച്ചപ്പെടുത്തിയിട്ടില്
 msgid "Pending records:"
 msgstr ""
 
-#. Label of a Datetime field in DocType 'XPOS Closing Shift'
-#. Label of a Date field in DocType 'XPOS Opening Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Datetime field in DocType 'POS Closing Shift'
+#. Label of a Date field in DocType 'POS Opening Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Period End Date"
 msgstr "കാലാവധി അവസാനിക്കുന്ന തീയതി"
 
-#. Label of a Datetime field in DocType 'XPOS Closing Shift'
-#. Label of a Datetime field in DocType 'XPOS Opening Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Datetime field in DocType 'POS Closing Shift'
+#. Label of a Datetime field in DocType 'POS Opening Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Period Start Date"
 msgstr "ആരംഭ തീയതി കാലാവധി"
@@ -3059,7 +3059,7 @@ msgstr ""
 msgid "Please enter the phone number first"
 msgstr "ആദ്യം ഫോൺ നമ്പർ നൽകുക"
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:58
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:58
 msgid "Please select Coupon Code Based POS Offer."
 msgstr ""
 
@@ -3088,11 +3088,11 @@ msgstr ""
 msgid "Please select a supplier before saving a draft."
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:56
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:56
 msgid "Please select the correct POS Offer with the same company."
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:53
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:53
 msgid "Please select the customer."
 msgstr "ഉപഭോക്താവിനെ തിരഞ്ഞെടുക്കുക."
 
@@ -3148,11 +3148,11 @@ msgstr ""
 msgid "Positions are 1-indexed and counted on the full barcode. Example: 3310100010009 => prefix 331, item code 3310100, weight 1.000, check digit 9."
 msgstr ""
 
-#. Label of a Date field in DocType 'XPOS Cash Movement'
-#. Label of a Date field in DocType 'XPOS Closing Shift'
-#. Label of a Date field in DocType 'XPOS Opening Shift'
+#. Label of a Date field in DocType 'POS Cash Movement'
+#. Label of a Date field in DocType 'POS Closing Shift'
+#. Label of a Date field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Posting Date"
 msgstr "പോസ്റ്റിംഗ് തീയതി"
@@ -3183,8 +3183,8 @@ msgstr ""
 msgid "Price"
 msgstr "വില"
 
-#. Label of a Section Break field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Section Break field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Price Discount Scheme "
 msgstr ""
 
@@ -3225,7 +3225,7 @@ msgstr "അച്ചടിക്കുക"
 msgid "Print Bal"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Print Format Rule'
+#. Label of a Link field in DocType 'POS Print Format Rule'
 #: xpos/x_pos/doctype/xpos_print_format_rule/xpos_print_format_rule.json
 msgid "Print Format"
 msgstr "പ്രിന്റ് ഫോർമാറ്റ്"
@@ -3270,8 +3270,8 @@ msgstr ""
 msgid "Processing..."
 msgstr "പ്രോസസ്സ് ചെയ്യുന്നു ..."
 
-#. Label of a Section Break field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Section Break field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Product Discount Scheme"
 msgstr "ഉൽപ്പന്ന കിഴിവ് പദ്ധതി"
 
@@ -3293,13 +3293,13 @@ msgstr ""
 msgid "Program"
 msgstr "പ്രോഗ്രാം"
 
-#. Label of a Select field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Select field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Promo Type"
 msgstr ""
 
-#. Option for the 'Coupon Type' (Select) field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Option for the 'Coupon Type' (Select) field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Promotional"
 msgstr "പ്രമോഷണൽ"
 
@@ -3422,13 +3422,13 @@ msgstr ""
 msgid "Qty"
 msgstr "Qty"
 
-#. Label of a Select field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Select field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Qualifying Transaction / Item"
 msgstr ""
 
-#. Label of a Section Break field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Section Break field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Quantity and Amount Conditions"
 msgstr ""
 
@@ -3441,17 +3441,17 @@ msgid "Quotation name is required"
 msgstr ""
 
 #. Label of a Currency field in DocType 'Delivery Charges POS Profile'
-#. Label of a Percent field in DocType 'XPOS Closing Shift Taxes'
-#. Option for the 'Discount Type' (Select) field in DocType 'XPOS Offer'
-#. Label of a Float field in DocType 'XPOS Offer'
+#. Label of a Percent field in DocType 'POS Closing Shift Taxes'
+#. Option for the 'Discount Type' (Select) field in DocType 'POS Offer'
+#. Label of a Float field in DocType 'POS Offer'
 #: frontend/src/components/purchase/PurchaseCart.vue:65
 #: frontend/src/components/purchase/PurchaseItemList.vue:227
 #: frontend/src/views/OrdersView.vue:160
 #: frontend/src/views/PurchaseOrderListView.vue:360
 #: xpos/x_pos/doctype/delivery_charges_pos_profile/delivery_charges_pos_profile.json
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:96
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:96
 #: xpos/x_pos/doctype/xpos_closing_shift_taxes/xpos_closing_shift_taxes.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Rate"
 msgstr "റേറ്റ്"
 
@@ -3534,24 +3534,24 @@ msgstr ""
 
 #. Name of a DocType
 #. Label of a Data field in DocType 'Referral Code'
-#. Label of a Link field in DocType 'XPOS Coupon'
+#. Label of a Link field in DocType 'POS Coupon'
 #. Label of a Link in the X POS Workspace
 #: frontend/src/components/customer/CustomerSelect.vue:104
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 #: xpos/x_pos/workspace/x_pos/x_pos.json
 msgid "Referral Code"
 msgstr "റഫറൽ കോഡ്"
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:70
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:70
 msgid "Referral Code is required"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:78
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:78
 msgid "Referral Code {0} does not exist"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:80
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:80
 msgid "Referral Code {0} is disabled"
 msgstr ""
 
@@ -3590,7 +3590,7 @@ msgstr "അവശേഷിക്കുന്ന"
 msgid "Remaining outstanding: {0} across {1} invoice(s)."
 msgstr ""
 
-#. Label of a Small Text field in DocType 'XPOS Cash Movement'
+#. Label of a Small Text field in DocType 'POS Cash Movement'
 #: frontend/src/views/OrdersView.vue:275
 #: frontend/src/views/PurchaseInvoiceView.vue:515
 #: frontend/src/views/PurchaseOrderView.vue:438
@@ -3636,13 +3636,13 @@ msgstr ""
 msgid "Repeat Last Invoice"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Check field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Replace Cheapest Item"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Check field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Replace Same Item"
 msgstr ""
 
@@ -3744,7 +3744,7 @@ msgstr ""
 msgid "Row #{0}: The batch {1} has only {2} qty. Please select another batch which has {3} qty available or split the row into multiple rows, to deliver/issue from multiple batches"
 msgstr "വരി # {0}: ബാച്ച് {1} മാത്രമേ {2} അളവ് ഉണ്ട്. ഉണ്ട് {3} ലഭ്യമായ അളവ് മറ്റൊരു ബാച്ച് തിരഞ്ഞെടുക്കുക അല്ലെങ്കിൽ ഒന്നിലധികം ബാച്ചുകൾ നിന്ന് / പ്രശ്നം വിടുവിപ്പാൻ, ഒന്നിലധികം വരികൾ കയറി വരി വേർതിരിക്കുക"
 
-#. Label of a Data field in DocType 'XPOS Offer Detail'
+#. Label of a Data field in DocType 'POS Offer Detail'
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
 msgid "Row ID"
 msgstr ""
@@ -3770,15 +3770,15 @@ msgstr ""
 #. Name of a role
 #: xpos/x_pos/doctype/referral_code/referral_code.json
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Sales Manager"
 msgstr "സെയിൽസ് മാനേജർ"
 
 #. Name of a role
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Sales Master Manager"
 msgstr "സെയിൽസ് മാസ്റ്റർ മാനേജർ"
 
@@ -3802,18 +3802,18 @@ msgstr ""
 msgid "Sales Partner"
 msgstr "സെയിൽസ് പങ്കാളി"
 
-#. Label of a Link field in DocType 'XPOS Sales Person Filter'
+#. Label of a Link field in DocType 'POS Sales Person Filter'
 #: xpos/x_pos/doctype/xpos_sales_person_filter/xpos_sales_person_filter.json
 msgid "Sales Person"
 msgstr "സെയിൽസ് പേഴ്‌സൺ"
 
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:8
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:8
 msgid "Sales Summary"
 msgstr "സെയിൽസ് സംഗ്രഹം"
 
 #. Name of a role
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Sales User"
 msgstr "സെയിൽസ് ഉപയോക്താവ്"
 
@@ -3993,7 +3993,7 @@ msgstr ""
 msgid "Selected"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.py:84
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.py:84
 msgid "Selected POS Opening Shift should be open."
 msgstr ""
 
@@ -4043,7 +4043,7 @@ msgstr ""
 msgid "Set (has value)"
 msgstr ""
 
-#. Label of a Check field in DocType 'XPOS Opening Shift'
+#. Label of a Check field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Set Posting Date"
 msgstr "പോസ്റ്റിംഗ് തീയതി സജ്ജമാക്കുക"
@@ -4123,38 +4123,38 @@ msgstr ""
 msgid "Some items have zero quantity. Set 'Zero Qty' to 'Yes' to keep them, or remove them."
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:141
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:141
 msgid "Sorry, this coupon code cannot be used by this company"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:137
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:137
 msgid "Sorry, this coupon code cannot be used by this customer"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:120
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:124
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:120
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:124
 msgid "Sorry, this coupon code is no longer valid"
 msgstr "ക്ഷമിക്കണം, ഈ കൂപ്പൺ കോഡ് മേലിൽ സാധുവല്ല"
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:105
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:105
 msgid "Sorry, this coupon code not exists"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:117
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:132
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:117
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:132
 msgid "Sorry, this coupon code's validity has expired"
 msgstr "ക്ഷമിക്കണം, ഈ കൂപ്പൺ കോഡിന്റെ സാധുത കാലഹരണപ്പെട്ടു"
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:113
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:128
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:113
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:128
 msgid "Sorry, this coupon code's validity has not started"
 msgstr "ക്ഷമിക്കണം, ഈ കൂപ്പൺ കോഡിന്റെ സാധുത ആരംഭിച്ചിട്ടില്ല"
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:155
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:155
 msgid "Sorry, {0} have used this coupon before"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
+#. Label of a Link field in DocType 'POS Cash Movement'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Source Account"
 msgstr ""
@@ -4198,7 +4198,7 @@ msgstr ""
 msgid "Starting position (1-indexed) of the price segment."
 msgstr ""
 
-#. Label of a Select field in DocType 'XPOS Opening Shift'
+#. Label of a Select field in DocType 'POS Opening Shift'
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "Status"
 msgstr "അവസ്ഥ"
@@ -4353,14 +4353,14 @@ msgstr ""
 #: xpos/x_pos/doctype/referral_code/referral_code.json
 #: xpos/x_pos/doctype/scale_barcode_settings/scale_barcode_settings.json
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "System Manager"
 msgstr "സിസ്റ്റം മാനേജർ"
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
+#. Label of a Link field in DocType 'POS Cash Movement'
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "Target Account"
 msgstr ""
@@ -4392,9 +4392,9 @@ msgstr ""
 msgid "Tax ID"
 msgstr "നികുതി ഐഡി"
 
-#. Label of a Table field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:90
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Table field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:90
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Taxes"
 msgstr "നികുതികൾ"
 
@@ -4479,8 +4479,8 @@ msgstr ""
 msgid "Till ID"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Data field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Title"
 msgstr "ശീർഷകം"
 
@@ -4530,9 +4530,9 @@ msgstr ""
 msgid "Total Qty"
 msgstr ""
 
-#. Label of a Float field in DocType 'XPOS Closing Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_shift_details.html:41
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Float field in DocType 'POS Closing Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/closing_shift_details.html:41
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 msgid "Total Quantity"
 msgstr "ആകെ അളവ്"
 
@@ -4547,8 +4547,8 @@ msgid "Total item code digits to extract. Example: item code 3310100 => digits 7
 msgstr ""
 
 #. Option for the 'Qualifying Transaction / Item' (Select) field in DocType
-#. 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. 'POS Offer'
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Transaction"
 msgstr "ഇടപാട്"
 
@@ -4572,7 +4572,7 @@ msgstr ""
 msgid "Try again"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Coupon Detail'
+#. Label of a Data field in DocType 'POS Coupon Detail'
 #: frontend/src/components/purchase/SupplierSelector.vue:170
 #: frontend/src/components/purchase/dialogs/CreateSupplierDialog.vue:83
 #: frontend/src/views/PurchaseView.vue:128
@@ -4619,7 +4619,7 @@ msgstr ""
 msgid "Unable to load Payment Entry {0}: {1}"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_closing_shift/closing_processing/overview.py:44
+#: xpos/x_pos/doctype/pos_closing_shift/closing_processing/overview.py:44
 msgid "Unable to resolve POS Opening Shift."
 msgstr ""
 
@@ -4651,12 +4651,12 @@ msgstr ""
 msgid "Use these keyboard shortcuts to navigate faster"
 msgstr ""
 
-#. Label of a Int field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Int field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Used"
 msgstr "ഉപയോഗിച്ചു"
 
-#. Label of a Link field in DocType 'XPOS Cash Movement'
+#. Label of a Link field in DocType 'POS Cash Movement'
 #: frontend/src/components/Navbar.vue:122
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
 msgid "User"
@@ -4676,22 +4676,22 @@ msgstr ""
 msgid "Username"
 msgstr ""
 
-#. Label of a Date field in DocType 'XPOS Coupon'
-#. Label of a Date field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Date field in DocType 'POS Coupon'
+#. Label of a Date field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Valid From"
 msgstr "മുതൽ സാധുവാണ്"
 
-#. Label of a Date field in DocType 'XPOS Coupon'
-#. Label of a Date field in DocType 'XPOS Offer'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#. Label of a Date field in DocType 'POS Coupon'
+#. Label of a Date field in DocType 'POS Offer'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Valid Upto"
 msgstr "വരെ സാധുവാണ്"
 
-#. Label of a Section Break field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Label of a Section Break field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Validity and Usage"
 msgstr "സാധുതയും ഉപയോഗവും"
 
@@ -4713,9 +4713,9 @@ msgstr ""
 msgid "Walk-in Customer"
 msgstr ""
 
-#. Label of a Link field in DocType 'XPOS Offer'
+#. Label of a Link field in DocType 'POS Offer'
 #: frontend/src/views/PurchaseView.vue:227
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
 msgid "Warehouse"
 msgstr "പണ്ടകശാല"
 
@@ -4729,7 +4729,7 @@ msgstr ""
 
 #. Name of a role
 #: xpos/x_pos/doctype/referral_code/referral_code.json
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "Website Manager"
 msgstr "വെബ്സൈറ്റ് മാനേജർ"
 
@@ -4812,94 +4812,94 @@ msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_allowed_expense_account/xpos_allowed_expense_account.json
-msgid "XPOS Allowed Expense Account"
+msgid "POS Allowed Expense Account"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_allowed_source_account/xpos_allowed_source_account.json
-msgid "XPOS Allowed Source Account"
+msgid "POS Allowed Source Account"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_cash_movement/xpos_cash_movement.json
-msgid "XPOS Cash Movement"
+msgid "POS Cash Movement"
 msgstr ""
 
 #. Name of a DocType
 #. Label of a Link in the X POS Workspace
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/workspace/x_pos/x_pos.json
-msgid "XPOS Closing Shift"
+msgid "POS Closing Shift"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_closing_shift_detail/xpos_closing_shift_detail.json
-msgid "XPOS Closing Shift Detail"
+msgid "POS Closing Shift Detail"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_closing_shift_taxes/xpos_closing_shift_taxes.json
-msgid "XPOS Closing Shift Taxes"
+msgid "POS Closing Shift Taxes"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.py:76
-msgid "XPOS Closing Shift {} against {} between selected period"
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.py:76
+msgid "POS Closing Shift {} against {} between selected period"
 msgstr ""
 
 #. Name of a DocType
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
-msgid "XPOS Coupon"
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
+msgid "POS Coupon"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_coupon_detail/xpos_coupon_detail.json
-msgid "XPOS Coupon Detail"
+msgid "POS Coupon Detail"
 msgstr ""
 
-#. Label of a Data field in DocType 'XPOS Closing Shift'
-#. Label of a Data field in DocType 'XPOS Opening Shift'
-#: xpos/x_pos/doctype/xpos_closing_shift/xpos_closing_shift.json
+#. Label of a Data field in DocType 'POS Closing Shift'
+#. Label of a Data field in DocType 'POS Opening Shift'
+#: xpos/x_pos/doctype/pos_closing_shift/pos_closing_shift.json
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
 msgid "XPOS Local ID"
 msgstr ""
 
 #. Name of a DocType
-#: xpos/x_pos/doctype/xpos_offer/xpos_offer.json
-msgid "XPOS Offer"
+#: xpos/x_pos/doctype/pos_offer/pos_offer.json
+msgid "POS Offer"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_offer_detail/xpos_offer_detail.json
-msgid "XPOS Offer Detail"
+msgid "POS Offer Detail"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_opening_shift/xpos_opening_shift.json
-msgid "XPOS Opening Shift"
+msgid "POS Opening Shift"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_opening_shift_detail/xpos_opening_shift_detail.json
-msgid "XPOS Opening Shift Detail"
+msgid "POS Opening Shift Detail"
 msgstr ""
 
 #: xpos/api/shifts.py:526
-msgid "XPOS Opening Shift {0} not found"
+msgid "POS Opening Shift {0} not found"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_payment_entry_reference/xpos_payment_entry_reference.json
-msgid "XPOS Payment Entry Reference"
+msgid "POS Payment Entry Reference"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_print_format_rule/xpos_print_format_rule.json
-msgid "XPOS Print Format Rule"
+msgid "POS Print Format Rule"
 msgstr ""
 
 #. Name of a DocType
 #: xpos/x_pos/doctype/xpos_sales_person_filter/xpos_sales_person_filter.json
-msgid "XPOS Sales Person Filter"
+msgid "POS Sales Person Filter"
 msgstr ""
 
 #: frontend/src/views/PurchaseInvoiceView.vue:521
@@ -4946,8 +4946,8 @@ msgstr ""
 msgid "days"
 msgstr ""
 
-#. Description of the 'Coupon Name' (Data) field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Description of the 'Coupon Name' (Data) field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "e.g. \"Summer Holiday 2019 Offer 20\""
 msgstr "ഉദാ: &quot;സമ്മർ ഹോളിഡേ 2019 ഓഫർ 20&quot;"
 
@@ -5027,8 +5027,8 @@ msgstr ""
 msgid "unaccounted"
 msgstr ""
 
-#. Description of the 'Coupon Code' (Data) field in DocType 'XPOS Coupon'
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.json
+#. Description of the 'Coupon Code' (Data) field in DocType 'POS Coupon'
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.json
 msgid "unique e.g. SAVE20  To be used to get discount"
 msgstr "അദ്വിതീയ ഉദാ. SAVE20 കിഴിവ് ലഭിക്കുന്നതിന്"
 
@@ -5036,7 +5036,7 @@ msgstr "അദ്വിതീയ ഉദാ. SAVE20 കിഴിവ് ലഭി�
 msgid "will be returned to"
 msgstr ""
 
-#: xpos/x_pos/doctype/xpos_coupon/xpos_coupon.py:177
+#: xpos/x_pos/doctype/pos_coupon/pos_coupon.py:177
 msgid "{0} Coupon used are {1}. Allowed quantity is exhausted"
 msgstr "{0 used ഉപയോഗിച്ച കൂപ്പൺ {1 are ആണ്. അനുവദനീയമായ അളവ് തീർന്നു"
 
@@ -5076,4 +5076,3 @@ msgstr ""
 #: xpos/x_pos/workspace/x_pos/x_pos.json
 msgid "{} Active"
 msgstr ""
-

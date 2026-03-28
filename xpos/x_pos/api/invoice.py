@@ -12,7 +12,7 @@ from xpos.x_pos.api.utilities import get_company_domain
 from xpos.x_pos.doctype.delivery_charges.delivery_charges import (
 	get_applicable_delivery_charges,
 )
-from xpos.x_pos.doctype.xpos_coupon.xpos_coupon import update_coupon_code_count
+from xpos.x_pos.doctype.pos_coupon.pos_coupon import update_coupon_code_count
 
 
 def validate(doc, method):
@@ -75,7 +75,7 @@ def cancel_pos_credit_journal_entries(doc):
 def add_loyalty_point(invoice_doc):
 	for offer in getattr(invoice_doc, "offers", []):
 		if offer.offer == "Loyalty Point":
-			original_offer = frappe.get_doc("XPOS Offer", offer.offer_name)
+			original_offer = frappe.get_doc("POS Offer", offer.offer_name)
 			if original_offer.loyalty_points > 0:
 				loyalty_program = frappe.get_value("Customer", invoice_doc.customer, "loyalty_program")
 				if not loyalty_program:
@@ -308,7 +308,7 @@ def validate_shift(doc):
 	if getattr(doc, "is_consolidated", None):
 		return
 	if getattr(doc, "pos_opening_shift", None) and doc.pos_profile and doc.is_pos:
-		shift = frappe.get_cached_doc("XPOS Opening Shift", doc.pos_opening_shift)
+		shift = frappe.get_cached_doc("POS Opening Shift", doc.pos_opening_shift)
 		if shift.status != "Open":
 			frappe.throw(_("POS Shift {0} is not open").format(shift.name))
 

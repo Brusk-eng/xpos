@@ -29,11 +29,37 @@ from xpos.x_pos.api.invoice_processing.utils import (
 	_validate_return_window,
 	get_latest_rate,
 )
-from xpos.x_pos.api.payment_processing.utils import (
-	get_bank_cash_account as get_bank_account,
-)
 from xpos.x_pos.api.payments import redeeming_customer_credit
 from xpos.x_pos.api.utilities import ensure_child_doctype, set_batch_nos_for_bundels
+
+_coupon_row_fields = ("coupon", "coupon_code", "type", "pos_offer", "applied", "customer")
+_offer_row_fields = ("offer_name", "offer", "apply_on", "offer_applied", "coupon_based")
+
+
+def _set_child_table_from_detail(
+	doc,
+	child_field: str,
+	detail_rows: list[dict],
+	allowed_keys: tuple[str, ...],
+) -> None:
+	"""Replace a child table on *doc* with rows built from *detail_rows*.
+
+	Safely ignores unknown keys so the frontend dict doesn't need to match
+	exactly.
+	"""
+	if not detail_rows:
+		return
+
+	if not hasattr(doc, child_field):
+		return
+
+	doc.set(child_field, [])
+	for row_data in detail_rows:
+		if not isinstance(row_data, dict):
+			continue
+		cleaned = {k: row_data[k] for k in allowed_keys if k in row_data}
+		if cleaned:
+			doc.append(child_field, cleaned)
 
 
 def _resolve_write_off_limit(pos_profile_doc: dict) -> float | None:
@@ -158,6 +184,16 @@ def update_invoice(data: str) -> dict:
 	data = json.loads(data)
 	_sanitize_delivery_dates(data)
 	_strip_client_freebies_from_payload(data)
+
+	# Extract coupon/offer detail rows before doc creation – the frontend
+	# sends ``coupons`` and ``offers`` as JSON-encoded name lists (strings)
+	# which Frappe cannot process as child-table data.  The actual row data
+	# arrives in ``coupons_detail`` / ``offers_detail`` instead.
+	coupons_detail = data.pop("coupons_detail", None) or []
+	data.pop("coupons", None)
+	offers_detail = data.pop("offers_detail", None) or []
+	data.pop("offers", None)
+
 	pos_profile = data.get("pos_profile")
 	doctype = "Sales Invoice"
 	if pos_profile and frappe.db.get_value(
@@ -174,6 +210,10 @@ def update_invoice(data: str) -> dict:
 		invoice_doc.update(data)
 	else:
 		invoice_doc = frappe.get_doc(data)
+
+	# Populate coupons child table from frontend detail rows
+	_set_child_table_from_detail(invoice_doc, "coupons", coupons_detail, _coupon_row_fields)
+	_set_child_table_from_detail(invoice_doc, "offers", offers_detail, _offer_row_fields)
 
 	if (data.get("is_return") or invoice_doc.is_return) and invoice_doc.get("return_against"):
 		from xpos.x_pos.api.invoice_processing.returns import validate_return_items
@@ -369,6 +409,13 @@ def submit_invoice(invoice: str, data: str | dict, submit_in_background: bool = 
 	_sanitize_delivery_dates(invoice)
 	submit_in_background = cint(submit_in_background)
 	_strip_client_freebies_from_payload(invoice)
+
+	# Extract coupon/offer detail rows – same as update_invoice.
+	coupons_detail = invoice.pop("coupons_detail", None) or []
+	invoice.pop("coupons", None)
+	offers_detail = invoice.pop("offers_detail", None) or []
+	invoice.pop("offers", None)
+
 	pos_profile = invoice.get("pos_profile")
 	doctype = "Sales Invoice"
 	if pos_profile and frappe.db.get_value(
@@ -378,6 +425,11 @@ def submit_invoice(invoice: str, data: str | dict, submit_in_background: bool = 
 
 	invoice_name = invoice.get("name")
 	if not invoice_name or not frappe.db.exists(doctype, invoice_name):
+		# Re-inject detail rows so update_invoice can process them.
+		if coupons_detail:
+			invoice["coupons_detail"] = coupons_detail
+		if offers_detail:
+			invoice["offers_detail"] = offers_detail
 		created = update_invoice(json.dumps(invoice))
 		invoice_name = created.get("name")
 		invoice_doc = frappe.get_doc(doctype, invoice_name)
@@ -392,6 +444,10 @@ def submit_invoice(invoice: str, data: str | dict, submit_in_background: bool = 
 			frappe.throw(_("Invoice {0} has been cancelled and cannot be submitted.").format(invoice_name))
 
 		invoice_doc.update(invoice)
+
+		# Populate coupons/offers child tables
+		_set_child_table_from_detail(invoice_doc, "coupons", coupons_detail, _coupon_row_fields)
+		_set_child_table_from_detail(invoice_doc, "offers", offers_detail, _offer_row_fields)
 
 	_deduplicate_free_items(invoice_doc)
 

@@ -16,11 +16,11 @@ class TestCashMovementValidation(unittest.TestCase):
 
 		self.assertEqual(result, existing_doc)
 		mock_frappe.db.get_value.assert_called_once_with(
-			"XPOS Cash Movement",
+			"POS Cash Movement",
 			{"client_request_id": "dup-1"},
 			"name",
 		)
-		mock_frappe.get_doc.assert_called_once_with("XPOS Cash Movement", existing_doc.name)
+		mock_frappe.get_doc.assert_called_once_with("POS Cash Movement", existing_doc.name)
 
 	@patch("xpos.x_pos.api.cash_movement.validation.frappe")
 	def test_validate_account_company_rejects_missing_account(self, mock_frappe):

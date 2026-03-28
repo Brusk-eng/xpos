@@ -42,7 +42,7 @@ def create_customer_referral_code(doc: Any):
 
 def create_gift_coupon(doc: Any):
 	if doc.referral_code:
-		coupon = frappe.new_doc("XPOS Coupon")
+		coupon = frappe.new_doc("POS Coupon")
 		coupon.customer = doc.name
 		coupon.referral_code = doc.referral_code
 		coupon.create_coupon_from_referral()

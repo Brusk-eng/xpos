@@ -67,7 +67,7 @@
    "fieldname": "customer_offer",
    "fieldtype": "Link",
    "label": "Final Customer Offer",
-   "options": "XPOS Offer",
+   "options": "POS Offer",
    "reqd": 1
   },
   {

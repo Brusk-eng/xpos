@@ -81,7 +81,7 @@
    "is_query_report": 0,
    "label": "POS Opening Shift",
    "link_count": 0,
-   "link_to": "XPOS Opening Shift",
+   "link_to": "POS Opening Shift",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
@@ -89,9 +89,9 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "XPOS Closing Shift",
+   "label": "POS Closing Shift",
    "link_count": 0,
-   "link_to": "XPOS Closing Shift",
+   "link_to": "POS Closing Shift",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"

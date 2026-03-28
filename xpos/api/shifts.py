@@ -79,7 +79,7 @@ def open_shift(pos_profile: str, company: str, balance_details: str | list[dict]
 
 	new_shift = frappe.get_doc(
 		{
-			"doctype": "XPOS Opening Shift",
+			"doctype": "POS Opening Shift",
 			"period_start_date": now_datetime(),
 			"posting_date": nowdate(),
 			"user": frappe.session.user,
@@ -109,7 +109,7 @@ def check_open_shift(user: str | None = None):
 	user = user or frappe.session.user
 
 	open_shifts = frappe.db.get_all(
-		"XPOS Opening Shift",
+		"POS Opening Shift",
 		filters={
 			"user": user,
 			"pos_closing_shift": ["is", "not set"],
@@ -128,7 +128,7 @@ def check_open_shift(user: str | None = None):
 	shift_name = _row_value(shift, "name")
 	pos_profile = _row_value(shift, "pos_profile")
 	data = {
-		"pos_opening_shift": frappe.get_doc("XPOS Opening Shift", shift_name).as_dict(),
+		"pos_opening_shift": frappe.get_doc("POS Opening Shift", shift_name).as_dict(),
 	}
 	_enrich_shift_data(data, pos_profile)
 
@@ -137,7 +137,7 @@ def check_open_shift(user: str | None = None):
 
 @frappe.whitelist()
 def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
-	"""Create a XPOS Closing Shift and close the opening shift.
+	"""Create a POS Closing Shift and close the opening shift.
 
 	- Aggregates invoices by POS opening shift reference
 	- Tax summary per shift
@@ -145,7 +145,7 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	"""
 	closing_details = json.loads(closing_details) if isinstance(closing_details, str) else closing_details
 
-	opening = frappe.get_doc("XPOS Opening Shift", opening_shift)
+	opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	doctype = _resolve_invoice_doctype(opening.pos_profile)
 
 	filters = {
@@ -203,7 +203,7 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 
 	closing_shift = frappe.get_doc(
 		{
-			"doctype": "XPOS Closing Shift",
+			"doctype": "POS Closing Shift",
 			"period_start_date": opening.period_start_date,
 			"period_end_date": now_datetime(),
 			"posting_date": nowdate(),
@@ -274,7 +274,7 @@ def get_shift_summary(opening_shift: str):
 
 	Enhanced version with tax breakdown and return info.
 	"""
-	opening = frappe.get_doc("XPOS Opening Shift", opening_shift)
+	opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	doctype = _resolve_invoice_doctype(opening.pos_profile)
 
 	filters = {
@@ -445,7 +445,7 @@ def _get_shift_tax_summary(invoices: list, doctype: str = "Sales Invoice") -> li
 
 @frappe.whitelist()
 def create_opening_shift(data: str | dict, local_id: str | None = None) -> dict:
-	"""Create XPOS Opening Shift from desktop app sync.
+	"""Create POS Opening Shift from desktop app sync.
 
 	Used by the sync engine to push locally-created shifts to the server.
 
@@ -459,13 +459,13 @@ def create_opening_shift(data: str | dict, local_id: str | None = None) -> dict:
 	data = json.loads(data) if isinstance(data, str) else data
 
 	if local_id:
-		existing = frappe.db.get_value("XPOS Opening Shift", {"xpos_local_id": local_id}, "name")
+		existing = frappe.db.get_value("POS Opening Shift", {"xpos_local_id": local_id}, "name")
 		if existing:
 			return {"name": existing, "duplicate": True}
 
 	new_shift = frappe.get_doc(
 		{
-			"doctype": "XPOS Opening Shift",
+			"doctype": "POS Opening Shift",
 			"period_start_date": data.get("period_start_date") or now_datetime(),
 			"posting_date": data.get("posting_date") or nowdate(),
 			"user": data.get("user") or frappe.session.user,
@@ -494,7 +494,7 @@ def create_opening_shift(data: str | dict, local_id: str | None = None) -> dict:
 
 @frappe.whitelist()
 def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
-	"""Create XPOS Closing Shift from desktop app sync.
+	"""Create POS Closing Shift from desktop app sync.
 
 	Used by the sync engine to push locally-created closing shifts to the server.
 
@@ -508,7 +508,7 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 	data = json.loads(data) if isinstance(data, str) else data
 
 	if local_id:
-		existing = frappe.db.get_value("XPOS Closing Shift", {"xpos_local_id": local_id}, "name")
+		existing = frappe.db.get_value("POS Closing Shift", {"xpos_local_id": local_id}, "name")
 		if existing:
 			return {"name": existing, "duplicate": True}
 
@@ -517,13 +517,13 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 		frappe.throw(_("Opening Shift is required"))
 
 	try:
-		opening = frappe.get_doc("XPOS Opening Shift", opening_shift)
+		opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	except frappe.DoesNotExistError:
-		frappe.throw(_("XPOS Opening Shift {0} not found").format(opening_shift))
+		frappe.throw(_("POS Opening Shift {0} not found").format(opening_shift))
 
 	closing_shift = frappe.get_doc(
 		{
-			"doctype": "XPOS Closing Shift",
+			"doctype": "POS Closing Shift",
 			"period_start_date": opening.period_start_date,
 			"period_end_date": data.get("period_end_date") or now_datetime(),
 			"posting_date": data.get("posting_date") or nowdate(),

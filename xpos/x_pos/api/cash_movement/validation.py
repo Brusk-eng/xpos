@@ -19,7 +19,7 @@ def get_opening_shift(opening_shift_name):
 	if not opening_shift_name:
 		frappe.throw(_("POS Opening Shift is required."))
 
-	opening_shift = frappe.get_doc("XPOS Opening Shift", opening_shift_name)
+	opening_shift = frappe.get_doc("POS Opening Shift", opening_shift_name)
 	if opening_shift.docstatus != 1 or opening_shift.status != "Open":
 		frappe.throw(_("POS Opening Shift must be submitted and open."))
 	if opening_shift.user != frappe.session.user:
@@ -179,10 +179,10 @@ def ensure_no_duplicate_client_request(client_request_id):
 	if not client_request_id:
 		return None
 	existing_name = frappe.db.get_value(
-		"XPOS Cash Movement",
+		"POS Cash Movement",
 		{"client_request_id": client_request_id},
 		"name",
 	)
 	if existing_name:
-		return frappe.get_doc("XPOS Cash Movement", existing_name)
+		return frappe.get_doc("POS Cash Movement", existing_name)
 	return None

@@ -45,6 +45,32 @@
 					</span>
 				</div>
 			</template>
+
+			<div
+				v-if="cartStore.offerItemDiscountTotal > 0"
+				class="flex items-center justify-between text-sm"
+			>
+				<span class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+					<Ticket class="w-3 h-3" /> {{ __("Offer Discount") }}
+				</span>
+				<span class="font-medium text-emerald-600 dark:text-emerald-400">
+					-{{ posStore.currencySymbol }}{{ formatPrice(cartStore.offerItemDiscountTotal) }}
+				</span>
+			</div>
+
+			<div
+				v-if="cartStore.offerGrandTotalDiscountPct > 0"
+				class="flex items-center justify-between text-sm"
+			>
+				<span class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+					<Ticket class="w-3 h-3" /> {{ __("Offer") }}
+					<span class="text-xs">({{ cartStore.offerGrandTotalDiscountPct }}%)</span>
+				</span>
+				<span class="font-medium text-emerald-600 dark:text-emerald-400">
+					-{{ posStore.currencySymbol }}{{ formatPrice(grandTotalOfferDiscount) }}
+				</span>
+			</div>
+
 			<div
 				v-if="cartStore.discountPercentage > 0 || cartStore.discountAmount > 0"
 				class="flex items-center justify-between text-sm"
@@ -359,8 +385,22 @@ const isApplyingCoupon = ref(false);
 
 const hasDiscount = computed(() => cartStore.discountPercentage > 0 || cartStore.discountAmount > 0);
 
+const grandTotalOfferDiscount = computed(() => {
+	if (cartStore.offerGrandTotalDiscountPct <= 0) return 0;
+	const baseTotal =
+		cartStore.subtotal +
+		cartStore.calculatedTaxes.filter((t) => !t.included_in_print_rate).reduce((s, t) => s + t.amount, 0) -
+		cartStore.offerItemDiscountTotal;
+	return (baseTotal * cartStore.offerGrandTotalDiscountPct) / 100;
+});
+
 const hasAnyDiscount = computed(
-	() => hasDiscount.value || itemDiscountTotal.value > 0 || cartStore.hasOffers,
+	() =>
+		hasDiscount.value ||
+		itemDiscountTotal.value > 0 ||
+		cartStore.hasOffers ||
+		cartStore.offerItemDiscountTotal > 0 ||
+		cartStore.offerGrandTotalDiscountPct > 0,
 );
 
 function clearAllDiscounts() {
@@ -429,13 +469,33 @@ async function applyCouponCode() {
 	couponError.value = "";
 
 	try {
-		const result = await offerStore.fetchCoupon(couponInput.value, cartStore.customer?.name || "");
-		if (result) {
-			cartStore.applyCoupon(result);
+		if (offerStore.offers.length === 0) {
+			await offerStore.fetchOffers(
+				posStore.profileName,
+				cartStore.items.map((i) => i.item_code),
+				cartStore.customer?.name || "",
+			);
+		}
+
+		const result = await offerStore.fetchCoupon(
+			couponInput.value,
+			cartStore.customer?.name || "",
+			posStore.companyName,
+		);
+		if (result.coupon) {
+			const posOfferName = (result.coupon as Record<string, unknown>).pos_offer as string | undefined;
+			const storeOffer = posOfferName
+				? offerStore.offers.find((o) => o.name === posOfferName)
+				: undefined;
+			const linkedOffer = storeOffer || result.offer;
+			if (linkedOffer) {
+				(result.coupon as Record<string, unknown>)._offer = linkedOffer;
+			}
+			cartStore.applyCoupon(result.coupon);
 			showCoupon.value = false;
 			couponInput.value = "";
 		} else {
-			couponError.value = __("Invalid or expired coupon code");
+			couponError.value = result.msg || __("Invalid or expired coupon code");
 		}
 	} catch (error) {
 		couponError.value = __("Failed to validate coupon");

@@ -374,7 +374,9 @@ function handleAddItem(item: POSItem) {
 			.then((offers) => {
 				if (offers && offers.length > 0) {
 					for (const offer of offers) {
-						cartStore.applyOffer(offer);
+						if ((offer as Record<string, unknown>).auto) {
+							cartStore.applyOffer(offer);
+						}
 					}
 				}
 			})
