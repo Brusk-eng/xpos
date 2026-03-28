@@ -4,7 +4,6 @@
 import json
 
 import frappe
-from frappe import _
 from frappe.utils import cint, flt, getdate, nowdate
 
 
@@ -139,8 +138,11 @@ def get_items_count(pos_profile: str, search_term: str = "", item_group: str = "
 		)"""
 		values["search"] = f"%{search_term}%"
 
+	sql = "SELECT COUNT(DISTINCT i.name) FROM `tabItem` i {bin_join} WHERE {conditions}".format(
+		bin_join=bin_join, conditions=conditions
+	)
 	count = frappe.db.sql(
-		f"SELECT COUNT(DISTINCT i.name) FROM `tabItem` i {bin_join} WHERE {conditions}",
+		sql,
 		values,
 	)
 	return count[0][0] if count else 0
