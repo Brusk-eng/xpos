@@ -36,7 +36,7 @@ def get_offers(pos_profile: str):
 		SELECT *
 		FROM `tabPOS Offer`
 		WHERE
-			disable = 0
+			disabled = 0
 			AND company = %(company)s
 			AND (pos_profile IS NULL OR pos_profile = '' OR pos_profile = %(pos_profile)s)
 			AND (warehouse IS NULL OR warehouse = '' OR warehouse = %(warehouse)s)
@@ -202,7 +202,7 @@ def _get_promotional_scheme_offers(pos_profile_doc: Any) -> list[dict]:
 			"Promotional Scheme",
 			filters={
 				"company": company,
-				"disable": 0,
+				"disabled": 0,
 				"selling": 1,
 			},
 			fields=["name", "valid_from", "valid_upto"],

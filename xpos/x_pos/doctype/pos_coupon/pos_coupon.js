@@ -8,7 +8,7 @@ frappe.ui.form.on("POS Coupon", {
 				filters: {
 					company: frm.doc.company,
 					coupon_based: 1,
-					disable: 0,
+					disabled: 0,
 				},
 			};
 		});

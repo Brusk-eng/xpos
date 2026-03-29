@@ -43,7 +43,9 @@ export const usePosStore = defineStore("pos", () => {
 	const currency = computed(() => posProfile.value?.currency);
 
 	const currencySymbol = computed(() => {
-		const _currency = xpos.boot?.currencies?.find((c: any) => c.name === posProfile.value?.currency);
+		const _currency = (xpos as any).boot?.currencies?.find(
+			(c: any) => c.name === posProfile.value?.currency,
+		);
 		if (_currency) {
 			return _currency.symbol || _currency.name;
 		}
@@ -83,6 +85,8 @@ export const usePosStore = defineStore("pos", () => {
 	const defaultView = computed(() => posProfile.value?.default_view || "Card");
 
 	const defaultPosExpenseAccount = computed(() => posProfile.value?.default_pos_expense_account);
+
+	const requireCashMovementRemarks = computed(() => posProfile.value?.require_cash_movement_remarks);
 
 	const backOfficeCashAccount = computed(() => posProfile.value?.back_office_cash_account);
 
@@ -529,6 +533,7 @@ export const usePosStore = defineStore("pos", () => {
 		defaultPosExpenseAccount,
 		backOfficeCashAccount,
 		useOfflineMode,
+		requireCashMovementRemarks,
 		checkExistingShift,
 		fetchOpeningData,
 		openShift,

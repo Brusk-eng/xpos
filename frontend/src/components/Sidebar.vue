@@ -73,28 +73,30 @@
 							<span>{{ item.label }}</span>
 						</router-link>
 
-						<p
-							class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-						>
-							{{ __("Finance") }}
-						</p>
-						<router-link
-							v-for="item in financeNavItems"
-							:key="item.route"
-							:to="item.route"
-							@click="isOpen = false"
-							:class="
-								cn(
-									'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors no-underline',
-									isActive(item.route)
-										? 'bg-primary/10 text-primary'
-										: 'text-muted-foreground hover:bg-muted hover:text-foreground',
-								)
-							"
-						>
-							<component :is="item.icon" class="w-4 h-4 shrink-0" />
-							<span>{{ item.label }}</span>
-						</router-link>
+						<template v-if="financeNavItems.some((it) => it.show)">
+							<p
+								class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+							>
+								{{ __("Finance") }}
+							</p>
+							<router-link
+								v-for="item in financeNavItems.filter((it) => it.show)"
+								:key="item.route"
+								:to="item.route"
+								@click="isOpen = false"
+								:class="
+									cn(
+										'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors no-underline',
+										isActive(item.route)
+											? 'bg-primary/10 text-primary'
+											: 'text-muted-foreground hover:bg-muted hover:text-foreground',
+									)
+								"
+							>
+								<component :is="item.icon" class="w-4 h-4 shrink-0" />
+								<span>{{ item.label }}</span>
+							</router-link>
+						</template>
 
 						<p
 							class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
@@ -138,6 +140,7 @@ import { useRoute } from "vue-router";
 import { usePosStore } from "@/stores/posStore";
 import { cn } from "@/lib/utils";
 import { __ } from "@/lib/translate";
+import { hasPermission } from "@/services/userRights";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	LayoutGrid,
@@ -187,10 +190,20 @@ const toolsNavItems = [
 	{ route: "/settings", label: __("Settings"), icon: Settings, show: isElectron() },
 ];
 
-const financeNavItems = [
-	{ route: "/expenses", label: __("Expenses"), icon: Wallet },
-	{ route: "/bank-drops", label: __("Bank Drops"), icon: Landmark },
-];
+const financeNavItems = computed(() => [
+	{
+		route: "/expenses",
+		label: __("Expenses"),
+		icon: Wallet,
+		show: hasPermission("expense") && posStore.allowPosExpense,
+	},
+	{
+		route: "/bank-drops",
+		label: __("Bank Drops"),
+		icon: Landmark,
+		show: hasPermission("bank_drop") && posStore.allowCashDeposit,
+	},
+]);
 
 function isActive(path: string): boolean {
 	return route.path === path;

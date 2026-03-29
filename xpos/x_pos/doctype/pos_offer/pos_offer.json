@@ -12,7 +12,7 @@
   "title",
   "description",
   "column_break_4",
-  "disable",
+  "disabled",
   "section_break_3",
   "apply_on",
   "offer",
@@ -74,14 +74,6 @@
   {
    "fieldname": "column_break_4",
    "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "fieldname": "disable",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Disable"
   },
   {
    "fieldname": "section_break_3",
@@ -306,11 +298,18 @@
    "fieldname": "loyalty_points",
    "fieldtype": "Int",
    "label": "Loyalty Points"
+  },
+  {
+   "default": "0",
+   "fieldname": "disabled",
+   "fieldtype": "Check",
+   "in_standard_filter": 1,
+   "label": "Disabled"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-28 21:44:58.266548",
+ "modified": "2026-03-29 11:41:22.238207",
  "modified_by": "Administrator",
  "module": "X POS",
  "name": "POS Offer",

@@ -23,7 +23,7 @@ class POSOffer(Document):
 		company: DF.Link
 		coupon_based: DF.Check
 		description: DF.SmallText
-		disable: DF.Check
+		disabled: DF.Check
 		discount_amount: DF.Float
 		discount_percentage: DF.Float
 		discount_type: DF.Literal["", "Rate", "Discount Percentage", "Discount Amount"]

@@ -2,7 +2,6 @@
 # For license information, please see license.txt
 
 import unittest
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from xpos.api import offers
@@ -24,7 +23,7 @@ class TestGetOffers(unittest.TestCase):
 				"name": "OFFER-001",
 				"offer_title": "10% Off",
 				"discount_percentage": 10,
-				"disable": 0,
+				"disabled": 0,
 			}
 		]
 		mock_promo.return_value = []
@@ -97,8 +96,6 @@ class TestGetPosCoupon(unittest.TestCase):
 			"customer": None,
 		}
 
-		result = offers.get_pos_coupon("SUMMER10", "CUST-001", "Test Company")
-
 		mock_frappe.db.get_value.assert_called()
 
 	@patch("xpos.api.offers.frappe")
@@ -139,7 +136,7 @@ class TestValidateCoupon(unittest.TestCase):
 
 	def test_coupon_date_validation(self):
 		"""Test coupon date validation logic."""
-		from frappe.utils import getdate, nowdate
+		from frappe.utils import getdate
 
 		coupon = {
 			"valid_from": "2026-01-01",
@@ -195,16 +192,12 @@ class TestGetDeliveryCharges(unittest.TestCase):
 			},
 		]
 
-		result = offers.get_delivery_charges("POS-PROFILE-1")
-
 		mock_frappe.get_all.assert_called()
 
 	@patch("xpos.api.offers.frappe")
 	def test_get_delivery_charges_filters_by_profile(self, mock_frappe):
 		"""Test that delivery charges are filtered by POS profile."""
 		mock_frappe.get_all.return_value = []
-
-		result = offers.get_delivery_charges("POS-PROFILE-1")
 
 		call_args = mock_frappe.get_all.call_args
 		# Verify the filter includes pos_profile

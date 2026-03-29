@@ -3,23 +3,29 @@
 		<div class="shrink-0 p-4 pb-3">
 			<div class="flex items-center justify-between mb-4">
 				<h1 class="text-xl font-bold text-foreground">{{ __("Bank Drops") }}</h1>
-				<Button size="sm" @click="showForm = true" :disabled="!canAddBankDrop">
+				<Button size="sm" @click="openForm" :disabled="!canAddBankDrop">
 					<Plus class="w-4 h-4 me-1" />
 					{{ __("New Bank Drop") }}
 				</Button>
 			</div>
 
 			<div class="flex items-center gap-3">
-				<input
-					type="date"
+				<DateTimePicker
 					v-model="fromDate"
-					class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+					mode="date"
+					placeholder="From Date"
+					:show-today="true"
+					:clearable="true"
+					class="w-52"
 				/>
 				<span class="text-muted-foreground text-sm">to</span>
-				<input
-					type="date"
+				<DateTimePicker
 					v-model="toDate"
-					class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm"
+					mode="date"
+					placeholder="To Date"
+					:show-today="true"
+					:clearable="true"
+					class="w-52"
 				/>
 				<Button variant="outline" size="sm" @click="loadDrops">
 					<RefreshCw class="w-4 h-4" />
@@ -43,29 +49,47 @@
 			<div v-else class="space-y-2">
 				<Card v-for="drop in drops" :key="drop.id" class="p-4">
 					<div class="flex items-center gap-4">
+						<div
+							class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-emerald-500/10 text-emerald-500"
+						>
+							<ArrowUpCircle class="w-4 h-4" />
+						</div>
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2 mb-1">
-								<span class="font-semibold text-foreground">{{ __("Bank Drop") }}</span>
+								<span
+									class="font-semibold text-foreground"
+									:title="drop.remarks || drop.target_account || drop.to_account"
+								>
+									{{ drop.remarks || drop.target_account || drop.to_account }}
+								</span>
 								<Badge
-									:variant="drop.sync_status === 'synced' ? 'default' : 'secondary'"
+									:variant="drop.docstatus === 1 ? 'default' : 'secondary'"
 									class="text-[10px]"
 								>
-									{{ drop.sync_status }}
+									{{ DOCSTATUS_MAP[drop.docstatus ?? 0] }}
 								</Badge>
 							</div>
 							<div class="flex items-center gap-3 text-xs text-muted-foreground">
 								<span>{{ drop.posting_date }}</span>
-								<span v-if="drop.mode_of_payment">{{ drop.mode_of_payment }}</span>
-								<span v-if="drop.description" class="truncate max-w-[200px]">{{
-									drop.description
-								}}</span>
+								<span
+									v-if="
+										!posStore.requireCashMovementRemarks &&
+										!!drop.remarks &&
+										(drop.target_account || drop.to_account)
+									"
+									class="truncate max-w-[400px]"
+								>
+									{{ drop.remarks }}
+								</span>
 							</div>
 						</div>
 						<div class="text-end">
-							<span class="font-bold text-foreground">{{ formatCurrency(drop.amount) }}</span>
+							<span class="font-bold text-emerald-500">
+								{{ posStore.currencySymbol }}{{ formatPrice(drop.amount) }}
+							</span>
 						</div>
 						<Button
-							v-if="drop.sync_status === 'pending'"
+							v-if="drop.docstatus === 0 || drop.can_delete"
 							variant="ghost"
 							size="icon"
 							class="text-destructive h-8 w-8"
@@ -78,112 +102,253 @@
 			</div>
 		</div>
 
+		<Pagination
+			v-if="totalDrops > 0"
+			:total="totalDrops"
+			:page-size="pageSize"
+			:current-page="currentPage"
+			@update:current-page="handlePageChange"
+			@update:page-size="handlePageSizeChange"
+		/>
+
 		<Dialog :open="showForm" @update:open="showForm = $event">
 			<DialogContent class="sm:max-w-md">
 				<DialogHeader>
-					<DialogTitle>{{ __("New Bank Drop") }}</DialogTitle>
+					<div class="flex items-center gap-2">
+						<div
+							class="w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-500/10 text-emerald-500"
+						>
+							<ArrowUpCircle class="w-4 h-4" />
+						</div>
+						<div>
+							<DialogTitle class="text-base">{{ __("Cash Deposit") }}</DialogTitle>
+							<DialogDescription class="text-xs">
+								{{ __("Record a cash deposit") }}
+							</DialogDescription>
+						</div>
+					</div>
 				</DialogHeader>
 				<div class="space-y-4">
 					<div>
-						<label class="text-sm font-semibold text-foreground mb-1.5 block">{{
-							__("Amount")
-						}}</label>
-						<NumberInput v-model="form.amount" :min="0" :precision="2" class="w-full" />
+						<label class="text-sm font-semibold text-foreground mb-1.5 block">
+							{{ __("Deposit To") }}
+						</label>
+						<Select v-model="form.target_account">
+							<SelectTriggerStyled class="h-8 w-full">
+								<SelectValue :placeholder="__('Select bank account')" />
+							</SelectTriggerStyled>
+							<SelectContentStyled>
+								<SelectItemStyled
+									class="cursor-pointer"
+									v-for="op in depositAccountOptions"
+									:key="op.value"
+									:value="op.value"
+								>
+									{{ op.label }}
+								</SelectItemStyled>
+							</SelectContentStyled>
+						</Select>
 					</div>
 					<div>
-						<label class="text-sm font-semibold text-foreground mb-1.5 block">{{
-							__("Mode of Payment")
-						}}</label>
-						<select
-							v-model="form.mode_of_payment"
-							class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-						>
-							<option value="">{{ __("Select") }}</option>
-							<option v-for="m in paymentModes" :key="m" :value="m">{{ m }}</option>
-						</select>
-					</div>
-					<div>
-						<label class="text-sm font-semibold text-foreground mb-1.5 block">{{
-							__("Description")
-						}}</label>
-						<textarea
-							v-model="form.description"
-							rows="2"
-							class="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-							:placeholder="__('Optional notes')"
+						<label class="text-sm font-semibold text-foreground mb-1.5 block">
+							{{ __("Amount") }}
+						</label>
+						<NumberInput
+							v-model="form.amount"
+							:min="0"
+							:precision="2"
+							class="text-lg font-bold"
+							placeholder="0.00"
 						/>
 					</div>
-					<Button class="w-full" :disabled="!form.amount || isSaving" @click="handleSave">
-						<template v-if="isSaving">
-							<Loader2 class="w-4 h-4 animate-spin me-2" /> {{ __("Saving...") }}
-						</template>
-						<template v-else>{{ __("Save Bank Drop") }}</template>
-					</Button>
+					<div>
+						<label class="text-sm font-semibold text-foreground mb-1.5 block">
+							{{ __("Reason / Notes") }}
+						</label>
+						<textarea
+							v-model="form.reason"
+							rows="3"
+							class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+							:placeholder="__('Enter reason for this transaction...')"
+						/>
+					</div>
 				</div>
+				<DialogFooter class="mt-4">
+					<Button variant="outline" class="flex-1" @click="showForm = false">
+						{{ __("Cancel") }}
+					</Button>
+					<Button
+						class="flex-1 font-bold bg-emerald-500 hover:bg-emerald-600 text-white"
+						:disabled="!canSubmit || isSaving"
+						@click="handleSave"
+					>
+						<template v-if="isSaving">
+							<Loader2 class="w-4 h-4 animate-spin" />
+						</template>
+						<template v-else>{{ __("Record Deposit") }}</template>
+					</Button>
+				</DialogFooter>
 			</DialogContent>
 		</Dialog>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useAuthStore } from "@/stores/authStore";
+import { usePaymentStore } from "@/stores/paymentStore";
 import { hasPermission } from "@/services/userRights";
-import { createBankDrop, getBankDrops, deleteBankDrop, getModesOfPayment } from "@/services/dbBridge";
+import { createBankDrop, getBankDrops, deleteBankDrop } from "@/services/dbBridge";
 import { isElectron } from "@/services/electronBridge";
+import { showSuccess, showError } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { NumberInput } from "@/components/ui/number-input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Plus, RefreshCw, Trash2, Landmark, Loader2 } from "lucide-vue-next";
-
-const __ = (s: string) => s;
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@/components/ui/dialog";
+import Select from "@/components/ui/select/Select.vue";
+import { SelectTriggerStyled, SelectValue } from "@/components/ui/select";
+import SelectContentStyled from "@/components/ui/select/SelectContentStyled.vue";
+import SelectItemStyled from "@/components/ui/select/SelectItemStyled.vue";
+import { Plus, RefreshCw, Trash2, Landmark, Loader2, ArrowUpCircle } from "lucide-vue-next";
+import DateTimePicker from "@/components/ui/datetime-picker/DateTimePicker.vue";
+import Pagination from "@/components/orders/Pagination.vue";
+import __ from "@/lib/translate";
+import { DOCSTATUS_MAP } from "@/types/pos.types";
 
 const posStore = usePosStore();
 const authStore = useAuthStore();
+const paymentStore = usePaymentStore();
 
 interface BankDrop {
-	id: number;
+	id: number | string;
+	target_account?: string;
+	to_account?: string;
 	amount: number;
-	mode_of_payment?: string;
-	description?: string;
+	remarks?: string;
 	posting_date?: string;
-	sync_status?: string;
+	docstatus?: number;
+	can_delete?: boolean;
 }
 
 const isLoading = ref(false);
 const isSaving = ref(false);
 const showForm = ref(false);
 const drops = ref<BankDrop[]>([]);
-const paymentModes = ref<string[]>([]);
+const isElectronMode = isElectron();
 
 const today = new Date().toISOString().slice(0, 10);
 const fromDate = ref(today);
 const toDate = ref(today);
 
-const canAddBankDrop = computed(() => hasPermission("bank_drop"));
+const currentPage = ref(1);
+const pageSize = ref(20);
+const totalDrops = ref(0);
+const allElectronDrops = ref<BankDrop[]>([]);
+
+const canAddBankDrop = computed(() => hasPermission("bank_drop") && posStore.allowCashDeposit);
 
 const form = ref({
+	target_account: "",
 	amount: 0,
-	mode_of_payment: "Cash",
-	description: "",
+	reason: "",
 });
 
-function formatCurrency(amount: unknown): string {
-	const num = Number(amount) || 0;
-	return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const depositAccountOptions = computed(() => {
+	const ctx = paymentStore.cashMovementContext;
+	if (ctx?.deposit_accounts) {
+		return ctx.deposit_accounts.map((ac) => ({
+			label: ac.name,
+			value: ac.name,
+		}));
+	}
+	return [];
+});
+
+const canSubmit = computed(() => {
+	return form.value.amount > 0 && !!form.value.target_account;
+});
+
+function formatPrice(price: number | string) {
+	return parseFloat(String(price) || "0").toFixed(2);
+}
+
+function openForm() {
+	form.value = { target_account: "", amount: 0, reason: "" };
+	if (posStore.backOfficeCashAccount) {
+		const hasDefault = depositAccountOptions.value.some(
+			(ac) => ac.value === posStore.backOfficeCashAccount,
+		);
+		if (hasDefault) {
+			form.value.target_account = posStore.backOfficeCashAccount;
+		}
+	}
+	showForm.value = true;
+}
+
+watch([fromDate, toDate], () => {
+	currentPage.value = 1;
+	loadDrops();
+});
+
+function handlePageChange(page: number) {
+	currentPage.value = page;
+	loadDrops();
+}
+
+function handlePageSizeChange(size: number) {
+	pageSize.value = size;
+	currentPage.value = 1;
+	loadDrops();
 }
 
 async function loadDrops() {
 	isLoading.value = true;
 	try {
-		drops.value = (await getBankDrops({
-			user: authStore.userEmail,
-			fromDate: fromDate.value,
-			toDate: toDate.value,
-		})) as BankDrop[];
+		if (isElectronMode) {
+			allElectronDrops.value = (await getBankDrops({
+				user: authStore.userEmail,
+				fromDate: fromDate.value,
+				toDate: toDate.value,
+			})) as BankDrop[];
+			totalDrops.value = allElectronDrops.value.length;
+			const start = (currentPage.value - 1) * pageSize.value;
+			drops.value = allElectronDrops.value.slice(start, start + pageSize.value);
+		} else {
+			const shift = posStore.posOpeningShift?.name;
+			if (shift) {
+				const limit_start = (currentPage.value - 1) * pageSize.value;
+				const { data, total } = await paymentStore.fetchShiftCashMovements(
+					shift,
+					"Deposit",
+					fromDate.value,
+					toDate.value,
+					limit_start,
+					pageSize.value,
+				);
+				totalDrops.value = total;
+				drops.value = data.map((m) => {
+					const r = m as Record<string, unknown>;
+					return {
+						id: String(r.name || ""),
+						target_account: String(r.target_account || r.account || ""),
+						amount: Number(r.amount || 0),
+						remarks: String(r.remarks || ""),
+						posting_date: String(r.posting_date || ""),
+						docstatus: r.docstatus as number,
+						can_delete: r.docstatus === 0 || r.docstatus === 1,
+					};
+				});
+			}
+		}
 	} catch (err) {
 		console.error("Failed to load bank drops:", err);
 	} finally {
@@ -192,50 +357,68 @@ async function loadDrops() {
 }
 
 async function handleSave() {
-	if (!form.value.amount) return;
+	if (!canSubmit.value) return;
 	isSaving.value = true;
 	try {
-		await createBankDrop({
-			amount: form.value.amount,
-			mode_of_payment: form.value.mode_of_payment,
-			description: form.value.description,
-			posting_date: today,
-			company: posStore.company,
-			user: authStore.userEmail,
-			pos_opening_entry_id: posStore.posOpeningShift?.name
-				? Number(posStore.posOpeningShift.name)
-				: null,
-		});
+		if (isElectronMode) {
+			await createBankDrop({
+				to_account: form.value.target_account,
+				amount: form.value.amount,
+				remarks: form.value.reason,
+				posting_date: today,
+				company: posStore.companyName,
+				user: authStore.userEmail,
+				pos_opening_entry_id: posStore.posOpeningShift?.name
+					? Number(posStore.posOpeningShift.name)
+					: null,
+			});
+		} else {
+			await paymentStore.createCashDeposit({
+				pos_profile: posStore.profileName,
+				company: posStore.companyName,
+				target_account: form.value.target_account,
+				amount: form.value.amount,
+				reason: form.value.reason,
+				pos_opening_shift: posStore.posOpeningShift?.name || "",
+			});
+		}
+		showSuccess(__("Cash deposit recorded"));
 		showForm.value = false;
-		form.value = { amount: 0, mode_of_payment: "Cash", description: "" };
+		form.value = { target_account: "", amount: 0, reason: "" };
 		await loadDrops();
 	} catch (err) {
+		showError(__("Failed to record deposit"));
 		console.error("Failed to save bank drop:", err);
 	} finally {
 		isSaving.value = false;
 	}
 }
 
-async function handleDelete(id: number) {
+async function handleDelete(id: number | string) {
 	try {
-		await deleteBankDrop(id);
+		if (isElectronMode) {
+			await deleteBankDrop(id);
+		} else {
+			const { call } = await import("@/services/api");
+			await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+		}
+		showSuccess(__("Deposit cancelled"));
 		await loadDrops();
 	} catch (err) {
+		showError(__("Failed to cancel deposit"));
 		console.error("Failed to delete bank drop:", err);
 	}
 }
 
-onMounted(async () => {
-	await loadDrops();
-	if (isElectron()) {
-		try {
-			const modes = await getModesOfPayment();
-			paymentModes.value = (modes as Record<string, unknown>[]).map((m) => String(m.name));
-		} catch {
-			paymentModes.value = ["Cash"];
-		}
-	} else {
-		paymentModes.value = ["Cash", "Card", "Bank Transfer"];
+async function loadContext() {
+	const shift = posStore.posOpeningShift?.name;
+	if (shift && posStore.profileName) {
+		await paymentStore.fetchCashMovementContext(posStore.profileName, shift);
 	}
+}
+
+onMounted(async () => {
+	await loadContext();
+	await loadDrops();
 });
 </script>

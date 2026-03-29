@@ -3,7 +3,6 @@ from frappe import _
 from frappe.utils import getdate, nowdate
 
 from .permissions import (
-	ensure_cancel_allowed,
 	ensure_delete_allowed,
 	ensure_feature_enabled,
 	ensure_movement_allowed,
@@ -50,7 +49,6 @@ def _create_cash_movement(payload: dict, movement_type: str):
 
 	amount = validate_amount(data.get("amount"), profile_doc)
 	remarks = (data.get("remarks") or "").strip()
-	against_name = (data.get("against_name") or "").strip()
 	validate_remarks(remarks, profile_doc)
 
 	existing = ensure_no_duplicate_client_request(data.get("client_request_id"))
@@ -76,7 +74,6 @@ def _create_cash_movement(payload: dict, movement_type: str):
 			"user": frappe.session.user,
 			"movement_type": movement_type,
 			"amount": amount,
-			"against_name": against_name,
 			"source_account": source_account,
 			"target_account": target_account,
 			"expense_account": expense_account,
@@ -183,22 +180,6 @@ def get_submitted_expenses(pos_opening_shift: str, limit_start: int = 0, limit_p
 
 
 @frappe.whitelist()
-def cancel_cash_movement(name: str):
-	movement_doc = frappe.get_doc("POS Cash Movement", name)
-	ensure_owner_or_manager(movement_doc)
-	if movement_doc.docstatus != 1:
-		frappe.throw(_("Only submitted cash movements can be cancelled."))
-
-	profile_doc = get_pos_profile(movement_doc.pos_profile)
-	ensure_feature_enabled(profile_doc)
-	ensure_cancel_allowed(profile_doc)
-
-	movement_doc.flags.ignore_permissions = True
-	movement_doc.cancel()
-	return {"name": movement_doc.name, "docstatus": movement_doc.docstatus}
-
-
-@frappe.whitelist()
 def delete_cash_movement(name: str):
 	movement_doc = frappe.get_doc("POS Cash Movement", name)
 	ensure_owner_or_manager(movement_doc)
@@ -224,7 +205,7 @@ def duplicate_cash_movement(name: str, posting_date: str | None = None):
 		"pos_profile": movement_doc.pos_profile,
 		"pos_opening_shift": movement_doc.pos_opening_shift,
 		"amount": movement_doc.amount,
-		"against_name": movement_doc.get("against_name"),
+		"journal_entry": movement_doc.get("journal_entry"),
 		"source_account": movement_doc.source_account,
 		"remarks": movement_doc.remarks,
 	}

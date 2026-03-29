@@ -232,6 +232,8 @@ def get_shift_cash_movements(
 	movement_type: str | None = None,
 	status: str | None = None,
 	search_text: str | None = None,
+	from_date: str | None = None,
+	to_date: str | None = None,
 	limit_start: int = 0,
 	limit_page_length: int = 20,
 ):
@@ -243,55 +245,38 @@ def get_shift_cash_movements(
 	if movement_type:
 		filters["movement_type"] = movement_type
 
-	return frappe.get_list(
+	if from_date and to_date:
+		filters["posting_date"] = ["between", [from_date, to_date]]
+	elif from_date:
+		filters["posting_date"] = [">=", from_date]
+	elif to_date:
+		filters["posting_date"] = ["<=", to_date]
+
+	fields = [
+		"name",
+		"docstatus",
+		"movement_type",
+		"amount",
+		"remarks",
+		"posting_date",
+		"posting_time",
+		"journal_entry",
+		"expense_account",
+		"target_account",
+		"source_account",
+	]
+
+	total = frappe.db.count("POS Cash Movement", filters=filters)
+	data = frappe.get_list(
 		"POS Cash Movement",
 		filters=filters,
-		fields=[
-			"name",
-			"movement_type",
-			"amount",
-			"remarks",
-			"posting_date",
-			"posting_time",
-			"journal_entry",
-			"account",
-		],
+		fields=fields,
 		limit_start=cint(limit_start),
 		limit_page_length=cint(limit_page_length),
 		order_by="creation desc",
 	)
 
-
-@frappe.whitelist()
-def cancel_cash_movement(name: str):
-	"""Cancels a submitted cash movement and its linked journal entry."""
-
-	try:
-		movement = frappe.get_doc("POS Cash Movement", name)
-	except Exception:
-		frappe.throw(_("Cash movement {0} not found").format(name))
-
-	if movement.user != frappe.session.user and "POS Manager" not in frappe.get_roles():
-		frappe.throw(_("You do not have permission to cancel this cash movement"))
-
-	if movement.status == "Cancelled":
-		frappe.throw(_("Cash movement is already cancelled"))
-
-	if movement.journal_entry:
-		try:
-			je = frappe.get_doc("Journal Entry", movement.journal_entry)
-			if je.docstatus == 1:
-				je.cancel()
-		except Exception:
-			frappe.log_error(
-				f"Failed to cancel Journal Entry {movement.journal_entry}",
-				"POS Cash Movement",
-			)
-
-	movement.status = "Cancelled"
-	movement.save(ignore_permissions=True)
-
-	return movement.as_dict()
+	return {"data": data, "total": total}
 
 
 def _create_cash_movement_record(**kwargs):
@@ -303,7 +288,7 @@ def _create_cash_movement_record(**kwargs):
 			"pos_profile": kwargs.get("pos_profile"),
 			"pos_opening_shift": kwargs.get("pos_opening_shift"),
 			"user": frappe.session.user,
-			"against_name": kwargs.get("journal_entry"),
+			"journal_entry": kwargs.get("journal_entry"),
 			"movement_type": kwargs.get("movement_type"),
 			"amount": kwargs.get("amount"),
 			"source_account": kwargs.get("source_account"),

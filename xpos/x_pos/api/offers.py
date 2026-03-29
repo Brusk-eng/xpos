@@ -67,7 +67,7 @@ def get_offers(profile: str):
         SELECT *
         FROM `tabPOS Offer`
         WHERE
-        disable = 0 AND
+        disabled = 0 AND
         company = %(company)s AND
         (pos_profile is NULL OR pos_profile  = '' OR  pos_profile = %(pos_profile)s) AND
         (warehouse is NULL OR warehouse  = '' OR  warehouse = %(warehouse)s) AND

@@ -109,7 +109,6 @@ class TestCashMovementService(unittest.TestCase):
 			pos_profile="POS-PROFILE-1",
 			pos_opening_shift="POS-OPEN-1",
 			amount=250,
-			against_name="Walk-in Customer",
 			source_account="POS Cash - MC",
 			remarks="Re-enter cancelled move",
 			movement_type="Expense",
@@ -129,7 +128,6 @@ class TestCashMovementService(unittest.TestCase):
 				"pos_profile": "POS-PROFILE-1",
 				"pos_opening_shift": "POS-OPEN-1",
 				"amount": 250,
-				"against_name": "Walk-in Customer",
 				"source_account": "POS Cash - MC",
 				"remarks": "Re-enter cancelled move",
 				"expense_account": "Expenses - MC",
@@ -158,7 +156,6 @@ class TestCashMovementQueries(unittest.TestCase):
 
 		_, kwargs = mock_get_all.call_args
 		self.assertNotIn("docstatus", kwargs["filters"])
-		self.assertIn("against_name", kwargs["fields"])
 
 	@patch("xpos.x_pos.api.cash_movement.queries.frappe.get_all")
 	def test_get_shift_movements_applies_text_search_or_filters(self, mock_get_all):

@@ -55,7 +55,7 @@ class POSCoupon(Document):
 			frappe.throw(_("Please select the correct POS Offer with the same company."))
 		if not pos_offer.coupon_based:
 			frappe.throw(_("Please select Coupon Code Based POS Offer."))
-		if pos_offer.disable:
+		if pos_offer.disabled:
 			frappe.throw(_("POS Offer is disabled."))
 		if pos_offer.valid_from and pos_offer.valid_from > getdate(self.valid_from):
 			self.valid_from = pos_offer.valid_from
@@ -119,7 +119,7 @@ def check_coupon_code(coupon_code, customer=None, company=None):
 		res["msg"] = _("Sorry, this coupon code is no longer valid")
 		return res
 
-	if pos_offer.disable:
+	if pos_offer.disabled:
 		res["msg"] = _("Sorry, this coupon code is no longer valid")
 		return res
 	if pos_offer.valid_from:

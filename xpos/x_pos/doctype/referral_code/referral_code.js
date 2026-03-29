@@ -15,7 +15,7 @@ frappe.ui.form.on("Referral Code", {
 				filters: {
 					company: frm.doc.company,
 					coupon_based: 1,
-					disable: 0,
+					disabled: 0,
 				},
 			};
 		});
@@ -24,7 +24,7 @@ frappe.ui.form.on("Referral Code", {
 				filters: {
 					company: frm.doc.company,
 					coupon_based: 1,
-					disable: 0,
+					disabled: 0,
 				},
 			};
 		});

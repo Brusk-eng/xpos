@@ -28,7 +28,6 @@ def get_shift_movements(
 		like_query = f"%{query}%"
 		or_filters = [
 			{"name": ["like", like_query]},
-			{"against_name": ["like", like_query]},
 			{"remarks": ["like", like_query]},
 			{"source_account": ["like", like_query]},
 			{"target_account": ["like", like_query]},
@@ -50,7 +49,6 @@ def get_shift_movements(
 			"user",
 			"movement_type",
 			"amount",
-			"against_name",
 			"source_account",
 			"target_account",
 			"expense_account",

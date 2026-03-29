@@ -431,7 +431,7 @@ export interface POSOffer {
 	title: string;
 	offer_type: string;
 	apply_on: string;
-	disable: boolean;
+	disabled: boolean;
 	items?: POSOfferDetail[];
 	[key: string]: unknown;
 }
@@ -473,6 +473,7 @@ export interface POSCashMovement {
 	status: string;
 	remarks?: string;
 	expense_account?: string;
+	target_account?: string;
 	source_account?: string;
 	[key: string]: unknown;
 }
@@ -480,8 +481,13 @@ export interface POSCashMovement {
 export interface CashMovementContext {
 	expense_accounts: Record<string, any>[];
 	deposit_accounts: Record<string, any>[];
+	source_accounts: Record<string, any>[];
 	cash_account: string;
+	cost_center: string;
 	mode_of_payment: string;
+	enable_cash_movement?: boolean;
+	allow_pos_expense?: boolean;
+	allow_cash_deposit?: boolean;
 }
 
 export interface DeliveryCharge {
@@ -1002,3 +1008,9 @@ export interface ERPSettings {
 	global_defaults: GlobalDefaults;
 	currency_precision: CurrencyPrecision;
 }
+
+export const DOCSTATUS_MAP: Record<number, string> = {
+	0: "Draft",
+	1: "Submitted",
+	2: "Cancelled",
+};

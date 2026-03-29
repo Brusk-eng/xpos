@@ -18,7 +18,6 @@ class POSCashMovement(Document):
 	if TYPE_CHECKING:
 		from frappe.types import DF
 
-		against_name: DF.Data | None
 		amended_from: DF.Link | None
 		amount: DF.Currency
 		client_request_id: DF.Data | None
@@ -33,8 +32,8 @@ class POSCashMovement(Document):
 		source_account: DF.Link
 		target_account: DF.Link
 		user: DF.Link
-
 	# end: auto-generated types
+
 	def validate(self):
 		self._validate_amount()
 		self._validate_company_links()
