@@ -159,15 +159,6 @@
 			/>
 		</div>
 
-		<div v-if="posStore.displayAuthorizationCode && !cartStore.isEmpty" class="shrink-0 px-4 pb-2">
-			<Input
-				v-model="cartStore.authorizationCode"
-				type="text"
-				placeholder="Authorization code..."
-				class="text-xs"
-			/>
-		</div>
-
 		<div v-if="cartStore.hasOffers && !cartStore.isEmpty" class="shrink-0 px-4 pb-2 space-y-1">
 			<div
 				v-for="offer in cartStore.appliedOffers"
@@ -232,7 +223,7 @@ import {
 	Pencil,
 } from "lucide-vue-next";
 import __ from "@/lib/translate";
-import CustomerEditDialog from "@/components/customer/CustomerEditDialog.vue";
+import CustomerEditDialog from "@/components/dialogs/CustomerEditDialog.vue";
 
 const posStore = usePosStore();
 const cartStore = useCartStore();

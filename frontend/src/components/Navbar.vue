@@ -2,7 +2,7 @@
 	<header class="h-14 bg-background border-b border-border flex items-center px-4 gap-3 shrink-0 z-30">
 		<div class="flex items-center gap-2.5">
 			<img :src="isDark ? LogoDark : LogoLight" alt="X POS Logo" class="w-8 h-8" />
-			<span>{{ __("X POS") }}</span>
+			<span class="hidden md:inline">{{ __("X POS") }}</span>
 		</div>
 		<nav class="hidden md:flex items-center gap-1 ms-4">
 			<router-link
@@ -124,20 +124,6 @@
 			</Badge>
 		</div>
 
-		<TooltipWrapper :content="themeTooltip">
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				@click="toggleDarkMode"
-				:class="{
-					'text-amber-400': theme === 'dark',
-					'text-blue-400': theme === 'system',
-				}"
-			>
-				<component :is="themeIcon" class="w-4 h-4" />
-			</Button>
-		</TooltipWrapper>
-
 		<Popover>
 			<PopoverTrigger as-child>
 				<Button variant="ghost" size="icon-sm" class="rounded-full">
@@ -153,6 +139,17 @@
 					<p class="text-sm font-medium">{{ authStore.userFullName || __("User") }}</p>
 					<p class="text-xs text-muted-foreground">{{ authStore.userEmail }}</p>
 				</div>
+				<Button variant="ghost" size="sm" class="w-full justify-start gap-2" @click="toggleDarkMode">
+					<component
+						:is="themeIcon"
+						class="w-4 h-4"
+						:class="{
+							'text-amber-400': theme === 'dark',
+							'text-blue-400': theme === 'system',
+						}"
+					/>
+					{{ themeTooltip.split(" (")[0] }}
+				</Button>
 				<Button
 					variant="ghost"
 					size="sm"
@@ -218,8 +215,8 @@ import { TooltipWrapper } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContentStyled, PopoverTrigger } from "@/components/ui/popover";
-import ReturnDialog from "@/components/cart/ReturnDialog.vue";
-import RepeatInvoiceDialog from "@/components/cart/RepeatInvoiceDialog.vue";
+import ReturnDialog from "@/components/dialogs/ReturnDialog.vue";
+import RepeatInvoiceDialog from "@/components/dialogs/RepeatInvoiceDialog.vue";
 import {
 	Building2,
 	Sun,
@@ -244,8 +241,8 @@ import {
 	Keyboard,
 } from "lucide-vue-next";
 import OfflinePendingPanel from "@/components/offline/OfflinePendingPanel.vue";
-import AboutDialog from "@/components/AboutDialog.vue";
-import KeyboardShortcutsDialog from "@/components/KeyboardShortcutsDialog.vue";
+import AboutDialog from "@/components/dialogs/AboutDialog.vue";
+import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import { useOfflineStore } from "@/stores/offlineStore";
 
 import LogoDark from "@/assets/images/xpos-logo-dark.svg";

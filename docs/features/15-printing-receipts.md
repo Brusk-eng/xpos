@@ -146,7 +146,6 @@ When designing print formats, the following data is available:
 ### Payments
 - Each payment method with amount
 - Change given
-- Authorization code (if set)
 
 ### Custom Fields
 - POS notes

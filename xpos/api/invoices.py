@@ -133,7 +133,6 @@ def create_invoice(data: str | dict):
 		invoice_doc.apply_discount_on = data.get("apply_discount_on") or "Grand Total"
 
 	invoice_doc.pos_notes = data.get("pos_notes", "")
-	invoice_doc.authorization_code = data.get("authorization_code", "") or ""
 	invoice_doc.pos_delivery_date = data.get("pos_delivery_date", None) or None
 	if data.get("sales_person", None):
 		invoice_doc.append(

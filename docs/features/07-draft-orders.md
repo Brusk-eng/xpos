@@ -16,7 +16,6 @@ X POS allows you to hold (park) an order and resume it later, enabling you to se
 - Selected customer
 - Order-level additional discount
 - Applied coupons and offers
-- Authorization code
 - Order notes (additional notes)
 - Delivery dates (if set)
 

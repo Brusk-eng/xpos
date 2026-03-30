@@ -35,6 +35,13 @@
 				>
 					{{ cartStore.itemCount }}
 				</span>
+				<span
+					v-if="cartStore.itemCount > 0"
+					class="text-[10px] font-medium leading-none"
+					:class="activeTab === 'cart' ? 'text-primary' : 'text-muted-foreground'"
+				>
+					{{ posStore.currencySymbol }}{{ mobileCartTotal }}
+				</span>
 			</button>
 		</div>
 
@@ -176,7 +183,7 @@ import { Autocomplete } from "@/components/ui/autocomplete";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { LayoutGrid, List, Search, ShoppingCart, Package, ScanLine } from "lucide-vue-next";
 
-import CameraBarcodeDialog from "@/components/items/CameraBarcodeDialog.vue";
+import CameraBarcodeDialog from "@/components/dialogs/CameraBarcodeDialog.vue";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 

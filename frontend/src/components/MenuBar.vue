@@ -74,8 +74,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { isElectron } from "@/services/electronBridge";
 import __ from "@/lib/translate";
 import { get_full_url } from "@/utils";
-import AboutDialog from "@/components/AboutDialog.vue";
-import KeyboardShortcutsDialog from "@/components/KeyboardShortcutsDialog.vue";
+import AboutDialog from "@/components/dialogs/AboutDialog.vue";
+import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import {
 	ShoppingCart,
 	Printer,

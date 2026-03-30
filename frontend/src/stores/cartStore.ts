@@ -39,7 +39,6 @@ export const useCartStore = defineStore("cart", () => {
 	const returnItemCodes = ref<string[]>([]);
 	const orderNotes = ref("");
 	const deliveryDate = ref("");
-	const authorizationCode = ref("");
 	const writeOffAmount = ref(0);
 	const salesPerson = ref("");
 	const redeemLoyaltyPoints = ref(false);
@@ -664,7 +663,6 @@ export const useCartStore = defineStore("cart", () => {
 		writeOffAmount.value = 0;
 		orderNotes.value = "";
 		deliveryDate.value = "";
-		authorizationCode.value = "";
 		salesPerson.value = "";
 		payments.value = [];
 		currentDraftName.value = "";
@@ -802,9 +800,6 @@ export const useCartStore = defineStore("cart", () => {
 			if (result.pos_delivery_date) {
 				deliveryDate.value = result.pos_delivery_date;
 			}
-			if (result.authorization_code) {
-				authorizationCode.value = result.authorization_code;
-			}
 			currentDraftName.value = draftName;
 
 			return true;
@@ -926,8 +921,6 @@ export const useCartStore = defineStore("cart", () => {
 
 		if (orderNotes.value) data.pos_notes = orderNotes.value;
 		if (deliveryDate.value) data.pos_delivery_date = deliveryDate.value;
-		if (authorizationCode.value) data.authorization_code = authorizationCode.value;
-
 		if (salesPerson.value) data.sales_person = salesPerson.value;
 
 		if (redeemLoyaltyPoints.value) {
@@ -999,7 +992,6 @@ export const useCartStore = defineStore("cart", () => {
 		returnItemCodes,
 		orderNotes,
 		deliveryDate,
-		authorizationCode,
 		writeOffAmount,
 		salesPerson,
 		redeemLoyaltyPoints,

@@ -128,7 +128,7 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
 
 ### Hold Order (Clock Icon)
 - Saves the current cart as a **draft invoice** on the server
-- All cart data is preserved: items, customer, discounts, notes, authorization code
+- All cart data is preserved: items, customer, discounts, notes
 - The cart is cleared after holding
 - See [Draft & Held Orders](07-draft-orders.md) for details
 
@@ -154,11 +154,6 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
 - A freeform **textarea** for special instructions or notes
 - Can be enabled through your POS Profile settings
 - Notes are saved with the invoice for reference
-
-### Authorization Code
-- An input field for entering an authorization or approval code
-- Can be enabled through your POS Profile settings
-- Useful for businesses requiring manager approvals for certain transactions
 
 ### Sales Person Assignment
 - Select a **Sales Person** from a dropdown

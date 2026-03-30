@@ -938,14 +938,12 @@ async function printInvoiceLocal(localId: number) {
 			return;
 		}
 
-		// Get invoice data from local database
 		const invoice = await window.electronAPI.db.getPendingInvoice(localId);
 		if (!invoice) {
 			showError(__("Invoice not found for printing"));
 			return;
 		}
 
-		// Use Electron's print functionality
 		await window.electronAPI.print.printInvoice({
 			localId,
 			data: invoice.data,

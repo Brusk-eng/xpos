@@ -51,48 +51,60 @@
 				<Card
 					v-for="order in orders"
 					:key="order.name"
-					class="p-4 cursor-pointer transition-all duration-200 border-transparent hover:border-primary/40 hover:shadow-md dark:hover:bg-accent/50 dark:hover:shadow-primary/5"
+					class="p-3 sm:p-4 cursor-pointer transition-all duration-200 border-transparent hover:border-primary/40 hover:shadow-md dark:hover:bg-accent/50 dark:hover:shadow-primary/5"
 					@click="viewOrder(order)"
 				>
-					<div class="flex items-center gap-3 sm:gap-4">
+					<div class="flex items-center gap-2 sm:gap-4">
 						<div class="min-w-0 flex-1">
-							<div class="flex items-center gap-2 mb-1">
-								<span class="font-semibold text-foreground">{{ order.name }}</span>
+							<div class="flex items-center gap-2 mb-1 flex-wrap">
+								<span class="font-semibold text-foreground text-sm leading-tight">{{
+									order.name
+								}}</span>
 								<Badge :variant="statusVariant(order.status)" class="text-[10px]"
 									>{{ __(order.status) }}
 								</Badge>
 							</div>
-							<div class="flex items-center gap-3 text-xs text-muted-foreground">
-								<span class="flex items-center gap-1">
-									<User class="h-3 w-3" />
+							<div
+								class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground"
+							>
+								<span
+									class="flex items-center gap-1 min-w-0 truncate max-w-[120px] sm:max-w-none"
+								>
+									<User class="h-3 w-3 shrink-0" />
 									{{ order.customer_name }}
 								</span>
-								<span class="flex items-center gap-1">
-									<CalendarIcon class="h-3 w-3" />
+								<span class="flex items-center gap-1 whitespace-nowrap">
+									<CalendarIcon class="h-3 w-3 shrink-0" />
 									{{ formatDate(order.posting_date) }}
 								</span>
-								<span v-if="order.posting_time" class="flex items-center gap-1">
-									<Clock class="h-3 w-3" />
+								<span
+									v-if="order.posting_time"
+									class="flex items-center gap-1 whitespace-nowrap"
+								>
+									<Clock class="h-3 w-3 shrink-0" />
 									{{ formatTime(String(order.posting_time)) }}
 								</span>
 							</div>
 						</div>
 
 						<div class="text-end shrink-0">
-							<div class="font-bold text-foreground text-lg">
+							<div class="font-bold text-foreground text-base sm:text-lg leading-tight">
 								{{ posStore.currencySymbol }}{{ formatNumber(order.grand_total) }}
 							</div>
-							<div class="flex items-center gap-2 justify-end text-xs">
-								<span class="text-muted-foreground">
+							<div class="flex flex-col items-end gap-0 text-xs">
+								<span class="text-muted-foreground whitespace-nowrap">
 									Paid: {{ posStore.currencySymbol }}{{ formatNumber(order.paid_amount) }}
 								</span>
-								<span v-if="order.total_taxes_and_charges" class="text-muted-foreground">
+								<span
+									v-if="order.total_taxes_and_charges"
+									class="text-muted-foreground hidden sm:inline whitespace-nowrap"
+								>
 									Tax: {{ posStore.currencySymbol
 									}}{{ formatNumber(Number(order.total_taxes_and_charges) || 0) }}
 								</span>
 							</div>
 						</div>
-						<ChevronRight class="w-5 h-5 text-muted-foreground/40 shrink-0" />
+						<ChevronRight class="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground/40 shrink-0" />
 					</div>
 				</Card>
 			</div>

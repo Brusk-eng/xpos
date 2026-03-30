@@ -21,7 +21,6 @@ export interface POSProfile {
 	allow_delete?: boolean;
 	allow_print_last_invoice?: boolean;
 	display_additional_notes?: boolean;
-	display_authorization_code?: boolean;
 	allow_write_off_change?: boolean;
 	input_qty?: boolean;
 	display_item_code?: boolean;
@@ -363,7 +362,6 @@ export interface InvoiceData {
 	write_off_amount?: number;
 	write_off_account?: string;
 	change_amount?: number;
-	authorization_code?: string;
 	currency?: string;
 	conversion_rate?: number;
 	pos_delivery_charges?: string;

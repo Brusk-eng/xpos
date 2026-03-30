@@ -13,7 +13,6 @@ The POS Profile is the central configuration hub for X POS. It controls every as
 | Display Items in Stock | Only display items that have positive stock |
 | Display Additional Notes | Show notes input per line item and order |
 | Display Discount | Discount display format: Percentage or Amount |
-| Display Authorization Code | Show authorization code input field |
 | Enable Quantity Input | Enable manual quantity input mode |
 | Hide Variant Items | Hide individual variant items in the grid |
 | Show Template Items | Show template (parent) items in the grid |

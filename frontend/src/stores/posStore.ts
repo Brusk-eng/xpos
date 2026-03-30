@@ -116,8 +116,6 @@ export const usePosStore = defineStore("pos", () => {
 
 	const displayAdditionalNotes = computed(() => !!posProfile.value?.display_additional_notes);
 
-	const displayAuthorizationCode = computed(() => !!posProfile.value?.display_authorization_code);
-
 	const allowWriteOffChange = computed(() => !!posProfile.value?.allow_write_off_change);
 
 	const displayItemCode = computed(() => !!posProfile.value?.display_item_code);
@@ -503,7 +501,6 @@ export const usePosStore = defineStore("pos", () => {
 		allowDelete,
 		allowPrintLastInvoice,
 		displayAdditionalNotes,
-		displayAuthorizationCode,
 		allowWriteOffChange,
 		displayItemCode,
 		allowZeroRatedItems,

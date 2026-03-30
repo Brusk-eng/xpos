@@ -160,7 +160,7 @@ import { Autocomplete } from "@/components/ui/autocomplete";
 import type { AutocompleteOption } from "@/components/ui/autocomplete";
 import { Loader2 } from "lucide-vue-next";
 import __ from "@/lib/translate";
-import DateTimePicker from "../ui/datetime-picker/DateTimePicker.vue";
+import DateTimePicker from "@/components/ui/datetime-picker/DateTimePicker.vue";
 
 const cartStore = useCartStore();
 const customerStore = useCustomerStore();
@@ -205,7 +205,6 @@ const canSave = computed(
 	() => !!form.value.customer_name.trim() && !!form.value.customer_group && !!form.value.territory,
 );
 
-// Load customer data when the dialog opens
 watch(
 	() => customerStore.showCustomerEditDialog,
 	async (isOpen) => {
@@ -310,14 +309,12 @@ async function saveChanges() {
 			territory: form.value.territory || undefined,
 		};
 
-		// Remove undefined keys
 		Object.keys(payload).forEach((key) => {
 			if (payload[key] === undefined) delete payload[key];
 		});
 
 		const result = await customerStore.updateCustomer(cartStore.customer.name, payload);
 
-		// Update the customer in the cart with latest data
 		cartStore.setCustomer({
 			name: cartStore.customer.name,
 			customer_name: result.customer_name || form.value.customer_name,

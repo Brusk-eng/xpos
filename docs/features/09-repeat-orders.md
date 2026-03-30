@@ -49,7 +49,6 @@ X POS allows you to quickly duplicate a past invoice to serve repeat customers w
 ### What Doesn't Get Cloned
 - Payment information (the original payment methods are not duplicated)
 - Coupons and time-limited offers (they may have expired)
-- Authorization codes
 - Order notes
 
 ### After Cloning

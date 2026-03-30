@@ -126,14 +126,15 @@ const error = ref<string | null>(null);
 const lastDetected = ref<string | null>(null);
 const torchSupported = ref(false);
 const torchOn = ref(false);
-const hasMultipleCameras = ref(false);
+const hasMultipleCameras = ref(/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent));
+
+type FacingMode = "environment" | "user";
+let facingMode: FacingMode = "environment";
 
 let reader: BrowserMultiFormatReader | null = null;
 let scanControls: { stop: () => void } | null = null;
-let availableDevices: MediaDeviceInfo[] = [];
-let currentDeviceIndex = 0;
 let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
-let currentStream: MediaStream | null = null;
+let activeStream: MediaStream | null = null;
 
 async function startScanning() {
 	if (!videoEl.value) return;
@@ -142,42 +143,52 @@ async function startScanning() {
 	scanning.value = false;
 	lastDetected.value = null;
 
+	const constraints: MediaStreamConstraints = {
+		video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } },
+		audio: false,
+	};
+
 	try {
-		availableDevices = await BrowserMultiFormatReader.listVideoInputDevices();
-		hasMultipleCameras.value = availableDevices.length > 1;
-
-		const rearIdx = availableDevices.findIndex(
-			(d) =>
-				d.label.toLowerCase().includes("back") ||
-				d.label.toLowerCase().includes("rear") ||
-				d.label.toLowerCase().includes("environment"),
-		);
-		currentDeviceIndex = rearIdx >= 0 ? rearIdx : 0;
-
 		reader = new BrowserMultiFormatReader();
 		scanning.value = true;
 
-		const deviceId = availableDevices[currentDeviceIndex]?.deviceId;
-		scanControls = await reader.decodeFromVideoDevice(
-			deviceId || undefined,
-			videoEl.value,
-			(result, err, controls) => {
-				if (result) {
-					const code = result.getText();
-					if (code && code !== lastDetected.value) {
-						handleDetected(code);
-					}
-				}
-			},
-		);
+		scanControls = await reader.decodeFromConstraints(constraints, videoEl.value, (result) => {
+			if (result) {
+				const code = result.getText();
+				if (code && code !== lastDetected.value) handleDetected(code);
+			}
+		});
 
-		setTimeout(checkTorchSupport, 500);
+		if (videoEl.value?.srcObject) {
+			activeStream = videoEl.value.srcObject as MediaStream;
+			setTimeout(checkTorchAndCameras, 600);
+		}
 	} catch (e: any) {
 		scanning.value = false;
 		if (e?.name === "NotAllowedError") {
 			error.value = __("Camera permission denied. Please allow camera access.");
-		} else if (e?.name === "NotFoundError") {
-			error.value = __("No camera found on this device.");
+		} else if (e?.name === "NotFoundError" || e?.name === "OverconstrainedError") {
+			try {
+				reader = new BrowserMultiFormatReader();
+				scanning.value = true;
+				scanControls = await reader.decodeFromConstraints(
+					{ video: true, audio: false },
+					videoEl.value,
+					(result) => {
+						if (result) {
+							const code = result.getText();
+							if (code && code !== lastDetected.value) handleDetected(code);
+						}
+					},
+				);
+				if (videoEl.value?.srcObject) {
+					activeStream = videoEl.value.srcObject as MediaStream;
+					setTimeout(checkTorchAndCameras, 600);
+				}
+			} catch (e2: any) {
+				scanning.value = false;
+				error.value = __("No camera found on this device.");
+			}
 		} else {
 			error.value = __("Could not start camera.");
 		}
@@ -187,7 +198,6 @@ async function startScanning() {
 function handleDetected(code: string) {
 	lastDetected.value = code;
 	emit("scanned", code);
-
 	if (cooldownTimer) clearTimeout(cooldownTimer);
 	cooldownTimer = setTimeout(() => {
 		lastDetected.value = null;
@@ -195,25 +205,28 @@ function handleDetected(code: string) {
 	}, 600);
 }
 
-async function checkTorchSupport() {
+async function checkTorchAndCameras() {
+	if (!activeStream) return;
 	try {
-		if (!videoEl.value?.srcObject) return;
-		const stream = videoEl.value.srcObject as MediaStream;
-		const track = stream.getVideoTracks()[0];
+		const track = activeStream.getVideoTracks()[0];
 		const caps = track?.getCapabilities?.() as any;
-		if (caps?.torch) {
-			torchSupported.value = true;
-			currentStream = stream;
-		}
+		if (caps?.torch) torchSupported.value = true;
+	} catch {
+		/* ignore */
+	}
+	try {
+		const devices = await navigator.mediaDevices.enumerateDevices();
+		const videoInputs = devices.filter((d) => d.kind === "videoinput");
+		if (videoInputs.length > 1) hasMultipleCameras.value = true;
 	} catch {
 		/* ignore */
 	}
 }
 
 async function toggleTorch() {
-	if (!currentStream) return;
+	if (!activeStream) return;
 	try {
-		const track = currentStream.getVideoTracks()[0];
+		const track = activeStream.getVideoTracks()[0];
 		torchOn.value = !torchOn.value;
 		await (track as any).applyConstraints({ advanced: [{ torch: torchOn.value }] });
 	} catch {
@@ -222,8 +235,7 @@ async function toggleTorch() {
 }
 
 async function switchCamera() {
-	if (availableDevices.length < 2) return;
-	currentDeviceIndex = (currentDeviceIndex + 1) % availableDevices.length;
+	facingMode = facingMode === "environment" ? "user" : "environment";
 	stopScanning();
 	await startScanning();
 }
@@ -237,14 +249,14 @@ function stopScanning() {
 		}
 		scanControls = null;
 	}
+	if (activeStream) {
+		activeStream.getTracks().forEach((t) => t.stop());
+		activeStream = null;
+	}
 	if (videoEl.value?.srcObject) {
 		const stream = videoEl.value.srcObject as MediaStream;
 		stream.getTracks().forEach((t) => t.stop());
 		videoEl.value.srcObject = null;
-	}
-	if (currentStream) {
-		currentStream.getTracks().forEach((t) => t.stop());
-		currentStream = null;
 	}
 	reader = null;
 	scanning.value = false;
@@ -256,6 +268,7 @@ watch(
 	() => props.open,
 	async (val) => {
 		if (val) {
+			facingMode = "environment";
 			lastDetected.value = null;
 			error.value = null;
 			setTimeout(startScanning, 150);

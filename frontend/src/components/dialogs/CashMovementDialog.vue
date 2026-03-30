@@ -185,10 +185,10 @@ import { Button } from "@/components/ui/button";
 import { NumberInput } from "@/components/ui/number-input";
 import { Loader2, ArrowDownCircle, ArrowUpCircle } from "lucide-vue-next";
 import __ from "@/lib/translate";
-import Select from "../ui/select/Select.vue";
-import { SelectTriggerStyled, SelectValue } from "../ui/select";
-import SelectContentStyled from "../ui/select/SelectContentStyled.vue";
-import SelectItemStyled from "../ui/select/SelectItemStyled.vue";
+import Select from "@/components/ui/select/Select.vue";
+import { SelectTriggerStyled, SelectValue } from "@/components/ui/select";
+import SelectContentStyled from "@/components/ui/select/SelectContentStyled.vue";
+import SelectItemStyled from "@/components/ui/select/SelectItemStyled.vue";
 
 const posStore = usePosStore();
 const paymentStore = usePaymentStore();

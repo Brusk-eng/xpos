@@ -1,5 +1,5 @@
 <template>
-	<div class="flex flex-col h-screen overflow-hidden">
+	<div class="flex flex-col h-screen h-dvh overflow-hidden">
 		<MenuBar v-if="isElectron()" />
 		<Navbar v-else />
 		<div class="flex-1 relative overflow-hidden">

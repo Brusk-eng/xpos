@@ -3,7 +3,6 @@
 		class="fixed inset-0 bg-gradient-to-br from-primary via-primary/90 to-primary/95 z-50 flex flex-col items-center overflow-y-auto p-4"
 	>
 		<div class="w-full max-w-md animate-in fade-in zoom-in-95 duration-300 my-auto">
-			<!-- Logo & Title -->
 			<div class="text-center mb-8">
 				<div
 					class="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-sm flex items-center justify-center mx-auto mb-4 shadow-lg"
@@ -14,16 +13,13 @@
 				<p class="text-primary-foreground/70 text-sm">Open your shift to get started</p>
 			</div>
 
-			<!-- Form Card -->
 			<Card>
 				<CardContent class="p-6 space-y-5">
-					<!-- Loading -->
 					<div v-if="isLoadingData" class="flex items-center justify-center py-8">
 						<Loader2 class="w-8 h-8 text-primary animate-spin" />
 					</div>
 
 					<template v-else>
-						<!-- Header row: POS Profile label + refresh button -->
 						<div class="flex items-center justify-between">
 							<label class="text-sm font-semibold text-foreground">POS Profile</label>
 							<TooltipWrapper
@@ -44,7 +40,6 @@
 							</TooltipWrapper>
 						</div>
 
-						<!-- POS Profile Select -->
 						<div>
 							<select
 								v-model="selectedProfile"
@@ -56,7 +51,6 @@
 									{{ profile.name }} ({{ profile.company }})
 								</option>
 							</select>
-							<!-- No profiles hint -->
 							<p v-if="profiles.length === 0" class="mt-1 text-xs text-muted-foreground">
 								{{
 									syncStatus.isSyncing.value
@@ -66,7 +60,6 @@
 							</p>
 						</div>
 
-						<!-- Company (auto-filled) -->
 						<div v-if="selectedCompany">
 							<label class="text-sm font-semibold text-foreground mb-1.5 block">Company</label>
 							<div
@@ -76,7 +69,6 @@
 							</div>
 						</div>
 
-						<!-- Opening Balance -->
 						<div v-if="paymentMethodsList.length > 0">
 							<label class="text-sm font-semibold text-foreground mb-2 block"
 								>Opening Cash Balance</label
@@ -101,7 +93,6 @@
 							</div>
 						</div>
 
-						<!-- Open Shift Button -->
 						<Button
 							size="xl"
 							class="w-full font-bold bg-gradient-to-r from-primary to-primary/90"
@@ -121,7 +112,6 @@
 				</CardContent>
 			</Card>
 
-			<!-- Back to desk link — hidden in Electron (no Frappe desk available) -->
 			<div v-if="!isElectronMode" class="text-center mt-4">
 				<a
 					href="/app"
@@ -190,7 +180,6 @@ async function loadProfiles() {
 
 onMounted(loadProfiles);
 
-// Auto-reload the dropdown whenever a sync cycle completes
 watch(syncStatus.syncCompleteCount, (count, prev) => {
 	if (count > prev) {
 		loadProfiles();
