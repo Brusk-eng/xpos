@@ -1,13 +1,13 @@
 <template>
 	<div class="flex flex-col h-full overflow-hidden bg-background">
-		<div class="shrink-0 p-4 pb-3">
-			<div class="flex items-center justify-between mb-4">
+		<div class="shrink-0 p-3 sm:p-4 pb-2 sm:pb-3">
+			<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
 				<h1 class="text-xl font-bold text-foreground">{{ __("Order History") }}</h1>
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2 w-full sm:w-auto">
 					<Input
 						v-model="invoiceSearch"
 						:placeholder="__('Search Invoice ID...')"
-						class="w-48 h-8 text-sm"
+						class="flex-1 sm:w-48 h-8 text-sm"
 						@keydown.enter="onInvoiceSearch"
 						@input="onInvoiceSearchDebounced"
 					/>
@@ -19,7 +19,7 @@
 						:clearable="true"
 						:max-visible="6"
 						empty-text="No customers found"
-						class="w-56"
+						class="flex-1 sm:w-56"
 						@search="onCustomerSearch"
 						@update:model-value="onCustomerFilterChange"
 					/>
@@ -34,7 +34,7 @@
 			/>
 		</div>
 
-		<div class="flex-1 overflow-y-auto px-4 xpos-scrollbar">
+		<div class="flex-1 overflow-y-auto px-3 sm:px-4 xpos-scrollbar">
 			<div v-if="isLoading && orders.length === 0" class="grid gap-3">
 				<div v-for="i in 5" :key="i" class="skeleton h-20 w-full rounded-xl"></div>
 			</div>
@@ -54,7 +54,7 @@
 					class="p-4 cursor-pointer transition-all duration-200 border-transparent hover:border-primary/40 hover:shadow-md dark:hover:bg-accent/50 dark:hover:shadow-primary/5"
 					@click="viewOrder(order)"
 				>
-					<div class="flex items-center gap-4">
+					<div class="flex items-center gap-3 sm:gap-4">
 						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2 mb-1">
 								<span class="font-semibold text-foreground">{{ order.name }}</span>
@@ -196,66 +196,68 @@
 							{{ __("Items") }} ({{ selectedOrder.items.length }})
 						</h3>
 						<div class="rounded-lg border border-border overflow-hidden">
-							<table class="w-full text-sm">
-								<thead class="bg-muted/50">
-									<tr>
-										<th
-											class="text-start px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
-										>
-											{{ __("Item") }}
-										</th>
-										<th
-											class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
-										>
-											{{ __("Qty") }}
-										</th>
-										<th
-											class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
-										>
-											{{ __("Rate") }}
-										</th>
-										<th
-											class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
-										>
-											{{ __("Amount") }}
-										</th>
-									</tr>
-								</thead>
-								<tbody class="divide-y divide-border">
-									<tr
-										v-for="item in selectedOrder.items"
-										:key="item.item_code"
-										class="hover:bg-muted/30 transition-colors"
-									>
-										<td class="px-4 py-3">
-											<div class="text-foreground font-medium">
-												{{ item.item_name }}
-											</div>
-											<div
-												v-if="item.discount_percentage || item.discount_amount"
-												class="text-xs text-muted-foreground"
+							<div class="overflow-x-auto">
+								<table class="w-full text-sm min-w-[360px]">
+									<thead class="bg-muted/50">
+										<tr>
+											<th
+												class="text-start px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
 											>
-												{{ __("Discount") }}:
-												{{
-													item.discount_percentage
-														? item.discount_percentage + "%"
-														: posStore.currencySymbol +
-															formatNumber(item.discount_amount || 0)
-												}}
-											</div>
-										</td>
-										<td class="px-4 py-3 text-end text-muted-foreground">
-											{{ item.qty }} {{ item.uom }}
-										</td>
-										<td class="px-4 py-3 text-end text-muted-foreground">
-											{{ formatNumber(item.rate) }}
-										</td>
-										<td class="px-4 py-3 text-end font-medium text-foreground">
-											{{ formatNumber(item.amount ?? 0) }}
-										</td>
-									</tr>
-								</tbody>
-							</table>
+												{{ __("Item") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
+											>
+												{{ __("Qty") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
+											>
+												{{ __("Rate") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase tracking-wide"
+											>
+												{{ __("Amount") }}
+											</th>
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-border">
+										<tr
+											v-for="item in selectedOrder.items"
+											:key="item.item_code"
+											class="hover:bg-muted/30 transition-colors"
+										>
+											<td class="px-4 py-3">
+												<div class="text-foreground font-medium">
+													{{ item.item_name }}
+												</div>
+												<div
+													v-if="item.discount_percentage || item.discount_amount"
+													class="text-xs text-muted-foreground"
+												>
+													{{ __("Discount") }}:
+													{{
+														item.discount_percentage
+															? item.discount_percentage + "%"
+															: posStore.currencySymbol +
+																formatNumber(item.discount_amount || 0)
+													}}
+												</div>
+											</td>
+											<td class="px-4 py-3 text-end text-muted-foreground">
+												{{ item.qty }} {{ item.uom }}
+											</td>
+											<td class="px-4 py-3 text-end text-muted-foreground">
+												{{ formatNumber(item.rate) }}
+											</td>
+											<td class="px-4 py-3 text-end font-medium text-foreground">
+												{{ formatNumber(item.amount ?? 0) }}
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
 						</div>
 					</div>
 
@@ -659,7 +661,10 @@ async function returnFromOrder(order: Invoice) {
 				batch_no?: string;
 				remaining_returnable_qty?: number;
 			}>;
-		}>("xpos.api.invoices.get_invoice_for_return", { invoice_name: order.name });
+		}>("xpos.api.invoices.get_invoice_for_return", {
+			doctype: posStore.invoiceType,
+			invoice_name: order.name,
+		});
 
 		cartStore.clearCart();
 		const allowedItemCodes = (details?.items || []).map((i) => i.item_code);

@@ -26,7 +26,7 @@
 			</Button>
 		</div>
 
-		<div class="shrink-0 px-4 pt-4 pb-3">
+		<div class="shrink-0 px-4 pt-4 pb-3 border-b">
 			<div class="flex items-center justify-between mb-3 space-x-2">
 				<h2 class="text-base font-bold text-foreground flex items-center gap-2">
 					<ShoppingCart class="w-5 h-5 text-primary dark:text-primary" />
@@ -47,67 +47,75 @@
 				</Button>
 			</div>
 
-			<button
-				@click="handleCustomerClick"
-				class="w-full flex items-center gap-3 p-2.5 rounded-lg border transition-all duration-200 group"
-				:class="
-					cartStore.isReturnMode
-						? 'border-border bg-muted/50 cursor-not-allowed dark:border-muted-foreground/30'
-						: 'border-dashed border-border hover:border-primary hover:bg-primary/5 dark:border-muted-foreground/30 dark:hover:border-primary'
-				"
-				:disabled="cartStore.isReturnMode"
-			>
-				<Avatar size="sm" class="group-hover:ring-2 group-hover:ring-primary/20 transition-all">
-					<img
-						v-if="cartStore.customer && cartStore.customer.image"
-						:src="cartStore.customer.image as string"
-						:alt="cartStore.customer.customer_name"
-						class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-						loading="lazy"
-					/>
-					<AvatarFallback>
-						<User class="w-3.5 h-3.5" />
-					</AvatarFallback>
-				</Avatar>
-				<div class="text-start flex-1 min-w-0">
-					<p class="text-sm font-medium text-foreground truncate">
-						{{ cartStore.customerName }}
-					</p>
-					<template v-if="cartStore.customer">
-						<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-							<template v-if="cartStore.customer.mobile_no">
-								<Phone class="w-3 h-3 shrink-0" />
-								<span class="truncate">{{ cartStore.customer.mobile_no }}</span>
-							</template>
-							<template v-if="cartStore.customer.email_id">
-								<Mail
-									class="w-3 h-3 shrink-0"
-									:class="{ 'ms-1': cartStore.customer.mobile_no }"
-								/>
-								<span class="truncate">{{ cartStore.customer.email_id }}</span>
-							</template>
-						</div>
-						<p
-							v-if="!cartStore.customer.mobile_no && !cartStore.customer.email_id"
-							class="text-[11px] text-muted-foreground"
-						>
-							{{
-								cartStore.isReturnMode
-									? __("Customer locked for return")
-									: __("Click to change customer")
-							}}
+			<div class="w-full flex items-center gap-2">
+				<button
+					@click="handleCustomerClick"
+					class="flex-[0.9] flex items-center gap-3 p-2.5 rounded-lg border transition-all duration-200 group"
+					:class="
+						cartStore.isReturnMode
+							? 'border-border bg-muted/50 cursor-not-allowed dark:border-muted-foreground/30'
+							: 'border-dashed border-border hover:border-primary hover:bg-primary/5 dark:border-muted-foreground/30 dark:hover:border-primary'
+					"
+					:disabled="cartStore.isReturnMode"
+				>
+					<Avatar size="sm" class="group-hover:ring-2 group-hover:ring-primary/20 transition-all">
+						<img
+							v-if="cartStore.customer && cartStore.customer.image"
+							:src="cartStore.customer.image as string"
+							:alt="cartStore.customer.customer_name"
+							class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+							loading="lazy"
+						/>
+						<AvatarFallback>
+							<User class="w-3.5 h-3.5" />
+						</AvatarFallback>
+					</Avatar>
+					<div class="text-start flex-1 min-w-0">
+						<p class="text-sm font-medium text-foreground truncate">
+							{{ cartStore.customerName }}
 						</p>
-					</template>
-					<p v-else class="text-[11px] text-muted-foreground">
-						{{ __("Click to select customer") }}
-					</p>
-				</div>
-				<Lock v-if="cartStore.isReturnMode" class="w-4 h-4 text-muted-foreground/50" />
-				<ChevronDown v-else class="w-4 h-4 text-muted-foreground/50" />
-			</button>
+						<template v-if="cartStore.customer">
+							<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+								<template v-if="cartStore.customer.mobile_no">
+									<Phone class="w-3 h-3 shrink-0" />
+									<span class="truncate">{{ cartStore.customer.mobile_no }}</span>
+								</template>
+								<template v-if="cartStore.customer.email_id">
+									<Mail
+										class="w-3 h-3 shrink-0"
+										:class="{ 'ms-1': cartStore.customer.mobile_no }"
+									/>
+									<span class="truncate">{{ cartStore.customer.email_id }}</span>
+								</template>
+							</div>
+							<p
+								v-if="!cartStore.customer.mobile_no && !cartStore.customer.email_id"
+								class="text-[11px] text-muted-foreground"
+							>
+								{{
+									cartStore.isReturnMode
+										? __("Customer locked for return")
+										: __("Click to change customer")
+								}}
+							</p>
+						</template>
+						<p v-else class="text-[11px] text-muted-foreground">
+							{{ __("Click to select customer") }}
+						</p>
+					</div>
+					<Lock v-if="cartStore.isReturnMode" class="w-4 h-4 text-muted-foreground/50" />
+					<ChevronDown v-else class="w-4 h-4 text-muted-foreground/50" />
+				</button>
+				<button
+					v-if="cartStore.customer && !cartStore.isReturnMode"
+					class="flex-[0.1] flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 group border-dashed border-border hover:border-primary hover:bg-primary/5 dark:border-muted-foreground/30 dark:hover:border-primary"
+					@click.stop="handleEditCustomer"
+					title="Edit Customer"
+				>
+					<Pencil class="w-full" />
+				</button>
+			</div>
 		</div>
-
-		<Separator class="mx-4" />
 
 		<div ref="cartScrollContainer" class="flex-1 overflow-y-auto px-4 xpos-scrollbar">
 			<div
@@ -194,6 +202,7 @@
 		</div>
 
 		<CartSummary />
+		<CustomerEditDialog />
 	</div>
 </template>
 
@@ -210,8 +219,20 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { ShoppingCart, User, ChevronDown, RotateCcw, X, Lock, Gift, Phone, Mail } from "lucide-vue-next";
+import {
+	ShoppingCart,
+	User,
+	ChevronDown,
+	RotateCcw,
+	X,
+	Lock,
+	Gift,
+	Phone,
+	Mail,
+	Pencil,
+} from "lucide-vue-next";
 import __ from "@/lib/translate";
+import CustomerEditDialog from "@/components/customer/CustomerEditDialog.vue";
 
 const posStore = usePosStore();
 const cartStore = useCartStore();
@@ -246,11 +267,15 @@ watch(
 
 function handleCustomerClick() {
 	if (cartStore.isReturnMode) {
-		showError("Customer cannot be changed in return mode");
+		showError(__("Customer cannot be changed in return mode"));
 		return;
 	}
 	customerStore.showCustomerDialog = true;
 	customerStore.searchCustomers();
+}
+
+function handleEditCustomer() {
+	customerStore.showCustomerEditDialog = true;
 }
 
 function handleUpdateQty(index: number, qty: number) {

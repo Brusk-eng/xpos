@@ -42,6 +42,7 @@ def get_pos_items(
 		]
 
 	hide_unavailable = pos.get("hide_unavailable_items") and warehouse
+	use_pos_deduction = bool(pos.get("create_pos_invoice_instead_of_sales_invoice"))
 
 	if hide_unavailable:
 		wh_list = [warehouse]
@@ -53,6 +54,27 @@ def get_pos_items(
 			filters={"warehouse": ["in", wh_list], "actual_qty": [">", 0]},
 			pluck="item_code",
 		)
+
+		if use_pos_deduction and in_stock_items:
+			pending_map = _get_pending_pos_qty_map(wh_list, item_codes=in_stock_items)
+			if pending_map:
+				from frappe.query_builder import DocType as DT
+				from frappe.query_builder.functions import Sum as SumFn
+
+				BinDT = DT("Bin")
+				bin_rows = (
+					frappe.qb.from_(BinDT)
+					.select(BinDT.item_code, SumFn(BinDT.actual_qty).as_("actual_qty"))
+					.where(BinDT.item_code.isin(in_stock_items))
+					.where(BinDT.warehouse.isin(wh_list))
+					.groupby(BinDT.item_code)
+					.run(as_dict=True)
+				)
+				bin_map = {r.item_code: flt(r.actual_qty) for r in bin_rows}
+				in_stock_items = [
+					ic for ic in in_stock_items if (bin_map.get(ic, 0) - pending_map.get(ic, 0)) > 0
+				]
+
 		non_stock_items = frappe.get_all(
 			"Item",
 			filters={"is_stock_item": 0, "disabled": 0, "is_sales_item": 1},
@@ -102,7 +124,9 @@ def get_pos_items(
 			or 0
 		)
 
-		item.actual_qty = get_stock_qty(item.item_code, warehouse) if warehouse else 0
+		item.actual_qty = (
+			get_stock_qty(item.item_code, warehouse, pos_profile=pos_profile) if warehouse else 0
+		)
 
 	return items
 
@@ -219,7 +243,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 			"has_batch_no": item.has_batch_no,
 			"has_serial_no": item.has_serial_no,
 			"image": item.image,
-			"actual_qty": get_stock_qty(item.name, warehouse) if warehouse else 0,
+			"actual_qty": get_stock_qty(item.name, warehouse, pos_profile=pos_profile) if warehouse else 0,
 		}
 
 	if frappe.db.exists("Item", barcode):
@@ -235,7 +259,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 			"has_batch_no": item.has_batch_no,
 			"has_serial_no": item.has_serial_no,
 			"image": item.image,
-			"actual_qty": get_stock_qty(item.name, warehouse) if warehouse else 0,
+			"actual_qty": get_stock_qty(item.name, warehouse, pos_profile=pos_profile) if warehouse else 0,
 		}
 
 	if pos_profile:
@@ -424,7 +448,7 @@ def get_item_attributes(item_code: str):
 
 
 @frappe.whitelist()
-def get_stock_availability(items: str | list, warehouse: str | None = None):
+def get_stock_availability(items: str | list, warehouse: str | None = None, pos_profile: str | None = None):
 	"""Bulk-fetch stock for multiple items.
 
 	Accepts two calling conventions:
@@ -438,6 +462,20 @@ def get_stock_availability(items: str | list, warehouse: str | None = None):
 		items = json.loads(items)
 	if not items:
 		return []
+
+	use_pos_deduction = bool(pos_profile and _is_pos_invoice_mode(pos_profile))
+	pending_map: dict[str, float] = {}
+	if use_pos_deduction and warehouse:
+		wh_list = [warehouse]
+		if frappe.db.get_value("Warehouse", warehouse, "is_group"):
+			wh_list = frappe.db.get_descendants("Warehouse", warehouse) or []
+		all_item_codes = []
+		for d in items:
+			if isinstance(d, str):
+				all_item_codes.append(d)
+			elif d.get("item_code"):
+				all_item_codes.append(d.get("item_code"))
+		pending_map = _get_pending_pos_qty_map(wh_list, item_codes=all_item_codes)
 
 	results = []
 	for d in items:
@@ -459,6 +497,9 @@ def get_stock_availability(items: str | list, warehouse: str | None = None):
 			qty = flt(get_batch_qty(batch_no, item_warehouse))
 		else:
 			qty = flt(get_stock_qty(item_code, item_warehouse))
+
+		if use_pos_deduction and not batch_no:
+			qty -= pending_map.get(item_code, 0.0)
 
 		results.append({"item_code": item_code, "actual_qty": qty})
 
@@ -502,7 +543,7 @@ def get_price_for_uom(item_code: str, price_list: str, uom: str):
 	return flt(rate) if rate else None
 
 
-def get_stock_qty(item_code: str, warehouse: str):
+def get_stock_qty(item_code: str, warehouse: str, pos_profile: str | None = None):
 	"""Get actual qty from Bin, supporting warehouse groups."""
 	if not warehouse:
 		return 0
@@ -522,7 +563,57 @@ def get_stock_qty(item_code: str, warehouse: str):
 		.where(Bin.warehouse.isin(warehouses))
 		.run(as_dict=True)
 	)
-	return flt(rows[0].actual_qty) if rows else 0
+	bin_qty = flt(rows[0].actual_qty) if rows else 0
+
+	if pos_profile and _is_pos_invoice_mode(pos_profile):
+		pending_map = _get_pending_pos_qty_map(warehouses, item_codes=[item_code])
+		bin_qty -= pending_map.get(item_code, 0.0)
+
+	return bin_qty
+
+
+def _is_pos_invoice_mode(pos_profile: str) -> bool:
+	"""Return True when the POS Profile creates POS Invoices instead of Sales Invoices."""
+	return bool(
+		frappe.db.get_value("POS Profile", pos_profile, "create_pos_invoice_instead_of_sales_invoice")
+	)
+
+
+def _get_pending_pos_qty_map(
+	warehouses: list[str],
+	item_codes: list[str] | None = None,
+) -> dict[str, float]:
+	"""Return qty sold in submitted but unconsolidated POS Invoices.
+
+	Returns a dict mapping item_code -> total pending qty across the
+	given warehouses.  Only submitted (docstatus=1) POS Invoices that
+	have not yet been consolidated are considered.
+	"""
+	from frappe.query_builder import DocType
+	from frappe.query_builder.functions import Sum
+
+	POSInv = DocType("POS Invoice")
+	POSItem = DocType("POS Invoice Item")
+
+	query = (
+		frappe.qb.from_(POSItem)
+		.join(POSInv)
+		.on(POSItem.parent == POSInv.name)
+		.select(
+			POSItem.item_code,
+			Sum(POSItem.stock_qty).as_("total_qty"),
+		)
+		.where(POSInv.docstatus == 1)
+		.where((POSInv.consolidated_invoice == "") | (POSInv.consolidated_invoice.isnull()))
+		.where(POSItem.warehouse.isin(warehouses))
+		.groupby(POSItem.item_code)
+	)
+
+	if item_codes:
+		query = query.where(POSItem.item_code.isin(item_codes))
+
+	rows = query.run(as_dict=True)
+	return {r.item_code: flt(r.total_qty) for r in rows}
 
 
 def _get_batch_data(item_code: str, warehouse: str, today: str | None = None):

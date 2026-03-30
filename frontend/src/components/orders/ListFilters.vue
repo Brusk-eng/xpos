@@ -88,7 +88,7 @@
 					</Badge>
 				</Button>
 			</PopoverTrigger>
-			<PopoverContentStyled class="w-[500px] p-0 overflow-visible" align="end">
+			<PopoverContentStyled class="w-[min(500px,calc(100vw-1rem))] p-0 overflow-visible" align="start">
 				<div class="p-3 border-b border-border">
 					<div class="flex items-center justify-between">
 						<span class="text-sm font-semibold text-foreground">{{ __("Query Filters") }}</span>

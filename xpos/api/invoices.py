@@ -284,6 +284,11 @@ def create_invoice(data: str | dict):
 			)
 			total_payment += pay_amount
 
+	if is_return and doctype == "POS Invoice":
+		invoice_doc.validate_change_amount = lambda: None
+	else:
+		invoice_doc.paid_amount = total_payment
+
 	change_amount = flt(data.get("change_amount", 0))
 	if change_amount > 0:
 		invoice_doc.change_amount = change_amount

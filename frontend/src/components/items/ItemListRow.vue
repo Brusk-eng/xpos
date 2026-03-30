@@ -63,7 +63,7 @@
 		</div>
 
 		<button
-			class="shrink-0 w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-secondary/80"
+			class="shrink-0 w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-secondary/80"
 			@click.stop="$emit('showDetail', item)"
 		>
 			<Info class="w-4 h-4" />
@@ -71,7 +71,7 @@
 
 		<div
 			v-if="!isOutOfStock || allowNegativeStock"
-			class="shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+			class="shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity"
 		>
 			<Plus class="w-4 h-4" />
 		</div>

@@ -593,7 +593,9 @@ function clearValue() {
 			</PopoverTrigger>
 
 			<PopoverContentStyled
-				:class="cn('p-0 w-auto', mode === 'time' ? 'w-[200px]' : 'w-[300px]')"
+				:class="
+					cn('p-0 w-auto max-w-[calc(100vw-1rem)]', mode === 'time' ? 'w-[200px]' : 'w-[300px]')
+				"
 				align="start"
 			>
 				<div class="px-3 pt-3 pb-2">

@@ -1,96 +1,160 @@
 <template>
-	<div class="flex h-full overflow-hidden">
+	<div class="flex flex-col h-full overflow-hidden">
 		<div
-			class="flex-1 flex flex-col min-w-0 border-e border-border bg-background max-w-[calc(100%-560px)] xl:max-w-[calc(100%-520px)]"
+			class="md:hidden shrink-0 flex items-center bg-muted/60 border-b border-border mx-3 mt-2 mb-0 rounded-xl overflow-hidden"
 		>
-			<div class="shrink-0 p-4 pb-2 space-y-3">
-				<div class="flex items-center gap-2">
-					<div class="flex-1">
-						<SearchBar
-							ref="searchBarRef"
-							@search="onSearch"
-							@enter="onSearchEnter"
-							@navigate="onNavigate"
+			<button
+				@click="activeTab = 'items'"
+				class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-xl"
+				:class="
+					activeTab === 'items'
+						? 'bg-background text-foreground shadow-sm'
+						: 'text-muted-foreground'
+				"
+			>
+				<Package class="w-4 h-4" />
+				{{ __("Items") }}
+			</button>
+			<button
+				@click="activeTab = 'cart'"
+				class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-xl"
+				:class="
+					activeTab === 'cart' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+				"
+			>
+				<ShoppingCart class="w-4 h-4" />
+				{{ __("Cart") }}
+				<span
+					v-if="cartStore.itemCount > 0"
+					class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-[10px] font-bold rounded-full"
+					:class="
+						activeTab === 'cart'
+							? 'bg-primary text-primary-foreground'
+							: 'bg-primary/80 text-primary-foreground'
+					"
+				>
+					{{ cartStore.itemCount }}
+				</span>
+			</button>
+		</div>
+
+		<div class="flex flex-1 overflow-hidden">
+			<div
+				:class="[
+					'flex flex-col min-w-0 border-e border-border bg-background',
+					'md:flex md:flex-1 md:max-w-[calc(100%-560px)] xl:max-w-[calc(100%-520px)]',
+					activeTab === 'items' ? 'flex flex-1' : 'hidden',
+				]"
+			>
+				<div class="shrink-0 p-3 sm:p-4 pb-1.5 sm:pb-2 space-y-2">
+					<div class="flex items-center gap-2">
+						<div class="flex-1 min-w-0">
+							<SearchBar
+								ref="searchBarRef"
+								@search="onSearch"
+								@enter="onSearchEnter"
+								@navigate="onNavigate"
+							/>
+						</div>
+						<div class="hidden sm:block w-52 shrink-0">
+							<BarcodeScanner ref="barcodeScannerRef" @scanned="onBarcodeScan" />
+						</div>
+						<button
+							class="sm:hidden shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary active:bg-primary/20 transition-colors"
+							@click="showCameraScanner = true"
+						>
+							<ScanLine class="w-5 h-5" />
+						</button>
+						<div class="hidden sm:flex items-center gap-1 border rounded-lg p-1">
+							<Button
+								:variant="viewMode === 'grid' ? 'default' : 'ghost'"
+								size="icon"
+								class="h-8 w-8"
+								@click="viewMode = 'grid'"
+							>
+								<LayoutGrid class="h-4 w-4" />
+							</Button>
+							<Button
+								:variant="viewMode === 'list' ? 'default' : 'ghost'"
+								size="icon"
+								class="h-8 w-8"
+								@click="viewMode = 'list'"
+							>
+								<List class="h-4 w-4" />
+							</Button>
+						</div>
+					</div>
+					<div class="flex items-center gap-2 overflow-x-auto pb-1 xpos-scrollbar">
+						<Autocomplete
+							:model-value="itemStore.selectedGroup"
+							:options="groupAutocompleteOptions"
+							:placeholder="__('Search item groups...')"
+							:show-search-icon="true"
+							:max-visible="12"
+							empty-text="__('No groups found')"
+							class="w-40 sm:w-52 shrink-0 mt-2"
+							@update:model-value="selectGroup($event)"
 						/>
-					</div>
-					<div class="w-52 shrink-0">
-						<BarcodeScanner ref="barcodeScannerRef" @scanned="onBarcodeScan" />
-					</div>
-					<div class="flex items-center gap-1 border rounded-lg p-1">
 						<Button
-							:variant="viewMode === 'grid' ? 'default' : 'ghost'"
-							size="icon"
-							class="h-8 w-8"
-							@click="viewMode = 'grid'"
+							:variant="itemStore.selectedGroup === 'All Item Groups' ? 'default' : 'outline'"
+							size="sm"
+							class="rounded-full shrink-0"
+							@click="selectGroup('All Item Groups')"
 						>
-							<LayoutGrid class="h-4 w-4" />
+							{{ __("All Groups") }}
 						</Button>
 						<Button
-							:variant="viewMode === 'list' ? 'default' : 'ghost'"
-							size="icon"
-							class="h-8 w-8"
-							@click="viewMode = 'list'"
+							v-for="group in topGroups"
+							:key="group.name"
+							:variant="itemStore.selectedGroup === group.name ? 'default' : 'outline'"
+							size="sm"
+							class="rounded-full shrink-0"
+							@click="selectGroup(group.name)"
 						>
-							<List class="h-4 w-4" />
+							{{ __(group.name) }}
 						</Button>
 					</div>
 				</div>
-				<div class="flex items-center gap-2 overflow-x-auto pb-1 xpos-scrollbar">
-					<Autocomplete
-						:model-value="itemStore.selectedGroup"
-						:options="groupAutocompleteOptions"
-						:placeholder="__('Search item groups...')"
-						:show-search-icon="true"
-						:max-visible="12"
-						empty-text="__('No groups found')"
-						class="w-52 shrink-0 mt-2"
-						@update:model-value="selectGroup($event)"
+
+				<div class="flex-1 overflow-y-auto p-2 sm:p-4 pt-1 sm:pt-2 xpos-scrollbar">
+					<ItemGrid
+						:items="itemStore.items"
+						:is-loading="itemStore.isLoading"
+						:currency-symbol="posStore.currencySymbol"
+						:view-mode="viewMode"
+						:highlighted-index="highlightedIndex"
+						@select-item="handleAddItem"
+						@show-detail="handleShowDetail"
+						@load-more="handleLoadMore"
 					/>
-					<Button
-						:variant="itemStore.selectedGroup === 'All Item Groups' ? 'default' : 'outline'"
-						size="sm"
-						class="rounded-full shrink-0"
-						@click="selectGroup('All Item Groups')"
-					>
-						{{ __("All Groups") }}
-					</Button>
-					<Button
-						v-for="group in topGroups"
-						:key="group.name"
-						:variant="itemStore.selectedGroup === group.name ? 'default' : 'outline'"
-						size="sm"
-						class="rounded-full shrink-0"
-						@click="selectGroup(group.name)"
-					>
-						{{ __(group.name) }}
-					</Button>
 				</div>
 			</div>
-
-			<div class="flex-1 overflow-y-auto p-4 pt-2 xpos-scrollbar">
-				<ItemGrid
-					:items="itemStore.items"
-					:is-loading="itemStore.isLoading"
-					:currency-symbol="posStore.currencySymbol"
-					:view-mode="viewMode"
-					:highlighted-index="highlightedIndex"
-					@select-item="handleAddItem"
-					@show-detail="handleShowDetail"
-					@load-more="handleLoadMore"
-				/>
+			<div class="hidden md:flex w-[560px] xl:w-[520px] flex-col bg-background dark:bg-card shrink-0">
+				<Cart />
 			</div>
-		</div>
 
-		<div class="w-[560px] xl:w-[520px] flex flex-col bg-background dark:bg-card shrink-0">
-			<Cart />
-		</div>
+			<div
+				:class="[
+					'md:hidden flex flex-col flex-1 bg-background dark:bg-card overflow-hidden',
+					activeTab === 'cart' ? 'flex' : 'hidden',
+				]"
+			>
+				<Cart />
+			</div>
 
-		<CommandSearch
-			ref="commandSearchRef"
-			:pos-profile="posStore.profileName"
-			:currency-symbol="posStore.currencySymbol"
-			@select-item="handleAddItem"
-		/>
+			<CameraBarcodeDialog
+				:open="showCameraScanner"
+				@close="showCameraScanner = false"
+				@scanned="onCameraScan"
+			/>
+
+			<CommandSearch
+				ref="commandSearchRef"
+				:pos-profile="posStore.profileName"
+				:currency-symbol="posStore.currencySymbol"
+				@select-item="handleAddItem"
+			/>
+		</div>
 	</div>
 </template>
 
@@ -110,8 +174,9 @@ import Cart from "@/components/cart/Cart.vue";
 import { Button } from "@/components/ui/button";
 import { Autocomplete } from "@/components/ui/autocomplete";
 import { TooltipWrapper } from "@/components/ui/tooltip";
-import { LayoutGrid, List, Search } from "lucide-vue-next";
+import { LayoutGrid, List, Search, ShoppingCart, Package, ScanLine } from "lucide-vue-next";
 
+import CameraBarcodeDialog from "@/components/items/CameraBarcodeDialog.vue";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 
@@ -121,6 +186,9 @@ const cartStore = useCartStore();
 const offerStore = useOfferStore();
 
 const viewMode = ref<"grid" | "list">("grid");
+const activeTab = ref<"items" | "cart">("items");
+const showCameraScanner = ref(false);
+const mobileCartTotal = computed(() => Math.abs(cartStore.grandTotal).toFixed(2));
 
 watch(
 	() => posStore.defaultView,
@@ -233,6 +301,11 @@ async function onSearchEnter(val: string) {
 	if (!val) return;
 
 	onSearch(val);
+}
+
+async function onCameraScan(barcode: string) {
+	showCameraScanner.value = false;
+	await onBarcodeScan(barcode);
 }
 
 async function onBarcodeScan(barcode: string) {

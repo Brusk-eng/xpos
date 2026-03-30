@@ -100,6 +100,7 @@ export const useItemStore = defineStore("items", () => {
 			const stockResult = await call<StockAvailability[]>("xpos.api.items.get_stock_availability", {
 				items: JSON.stringify(itemCodes),
 				warehouse,
+				pos_profile: posProfile,
 			});
 
 			const stockEntries: { item_code: string; actual_qty: number }[] = [];
@@ -426,9 +427,11 @@ export const useItemStore = defineStore("items", () => {
 		warehouse: string,
 	): Promise<StockAvailability[]> {
 		try {
+			const posStoreRef = usePosStore();
 			const result = await call<StockAvailability[]>("xpos.api.items.get_stock_availability", {
 				items: JSON.stringify(itemCodes),
 				warehouse,
+				pos_profile: posStoreRef.profileName || undefined,
 			});
 			return result || [];
 		} catch (error) {

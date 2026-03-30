@@ -143,6 +143,10 @@ def consolidate_closing_shift_invoices(closing_shift_doc):
 				pos_invoices.append(invoice_details)
 
 		if pos_invoices:
+			for invoice in pos_invoices:
+				if invoice.return_against and not frappe.db.exists("POS Invoice", invoice.return_against):
+					invoice.return_against = None
+
 			invoices_by_currency = {}
 			for invoice in pos_invoices:
 				invoices_by_currency.setdefault(invoice.currency, []).append(invoice)

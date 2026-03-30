@@ -135,7 +135,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, inject, type Ref, computed } from "vue";
+import { ref, inject, type Ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute } from "vue-router";
 import { usePosStore } from "@/stores/posStore";
 import { cn } from "@/lib/utils";
@@ -167,6 +167,18 @@ const posStore = usePosStore();
 const isDark = inject<Ref<boolean>>("isDark")!;
 
 const isOpen = ref(false);
+
+function handleToggleSidebar() {
+	isOpen.value = !isOpen.value;
+}
+
+onMounted(() => {
+	window.addEventListener("xpos:toggle-sidebar", handleToggleSidebar);
+});
+
+onUnmounted(() => {
+	window.removeEventListener("xpos:toggle-sidebar", handleToggleSidebar);
+});
 
 const isRtl = computed(() => document.documentElement.dir === "rtl");
 const toggleIcon = computed(() => {

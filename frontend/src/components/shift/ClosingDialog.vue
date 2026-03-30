@@ -107,64 +107,76 @@
 							{{ __("Payment Reconciliation") }}
 						</h3>
 						<div class="border border-border rounded-lg overflow-hidden">
-							<table class="w-full text-sm">
-								<thead class="bg-muted">
-									<tr>
-										<th class="text-start px-4 py-2.5 text-muted-foreground font-medium">
-											{{ __("Method") }}
-										</th>
-										<th class="text-end px-4 py-2.5 text-muted-foreground font-medium">
-											{{ __("Opening") }}
-										</th>
-										<th class="text-end px-4 py-2.5 text-muted-foreground font-medium">
-											{{ __("Expected") }}
-										</th>
-										<th class="text-end px-4 py-2.5 text-muted-foreground font-medium">
-											{{ __("Closing") }}
-										</th>
-										<th class="text-end px-4 py-2.5 text-muted-foreground font-medium">
-											{{ __("Difference") }}
-										</th>
-									</tr>
-								</thead>
-								<tbody>
-									<tr
-										v-for="(detail, index) in closingDetails"
-										:key="detail.mode_of_payment"
-										class="border-t border-border"
-									>
-										<td class="px-4 py-2.5 font-medium text-foreground">
-											{{ detail.mode_of_payment }}
-										</td>
-										<td class="px-4 py-2.5 text-end text-muted-foreground">
-											{{ formatPrice(detail.opening_amount) }}
-										</td>
-										<td class="px-4 py-2.5 text-end text-muted-foreground">
-											{{ formatPrice(detail.expected_amount) }}
-										</td>
-										<td class="px-4 py-2.5 text-end">
-											<NumberInput
-												v-model="closingDetails[index].closing_amount"
-												:min="0"
-												:precision="2"
-												class="w-28 text-end text-sm ms-auto"
-												@change="calculateDifference(index)"
-											/>
-										</td>
-										<td
-											class="px-4 py-2.5 text-end font-bold"
-											:class="
-												detail.difference >= 0
-													? 'text-emerald-600'
-													: 'text-destructive'
-											"
+							<div class="overflow-x-auto">
+								<table class="w-full text-sm min-w-[420px]">
+									<thead class="bg-muted">
+										<tr>
+											<th
+												class="text-start px-4 py-2.5 text-muted-foreground font-medium"
+											>
+												{{ __("Method") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium"
+											>
+												{{ __("Opening") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium"
+											>
+												{{ __("Expected") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium"
+											>
+												{{ __("Closing") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium"
+											>
+												{{ __("Difference") }}
+											</th>
+										</tr>
+									</thead>
+									<tbody>
+										<tr
+											v-for="(detail, index) in closingDetails"
+											:key="detail.mode_of_payment"
+											class="border-t border-border"
 										>
-											{{ detail.difference >= 0 ? "+" : ""
-											}}{{ formatPrice(detail.difference) }}
-										</td>
-									</tr>
-								</tbody>
-							</table>
+											<td class="px-4 py-2.5 font-medium text-foreground">
+												{{ detail.mode_of_payment }}
+											</td>
+											<td class="px-4 py-2.5 text-end text-muted-foreground">
+												{{ formatPrice(detail.opening_amount) }}
+											</td>
+											<td class="px-4 py-2.5 text-end text-muted-foreground">
+												{{ formatPrice(detail.expected_amount) }}
+											</td>
+											<td class="px-4 py-2.5 text-end">
+												<NumberInput
+													v-model="closingDetails[index].closing_amount"
+													:min="0"
+													:precision="2"
+													class="w-28 text-end text-sm ms-auto"
+													@change="calculateDifference(index)"
+												/>
+											</td>
+											<td
+												class="px-4 py-2.5 text-end font-bold"
+												:class="
+													detail.difference >= 0
+														? 'text-emerald-600'
+														: 'text-destructive'
+												"
+											>
+												{{ detail.difference >= 0 ? "+" : ""
+												}}{{ formatPrice(detail.difference) }}
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
 						</div>
 					</div>
 				</template>

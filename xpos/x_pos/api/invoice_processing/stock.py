@@ -55,7 +55,7 @@ def _get_available_stock(item):
 	return get_stock_availability(item_code, warehouse)
 
 
-def _collect_stock_errors(items):
+def _collect_stock_errors(items, pos_profile=None):
 	"""Return list of items exceeding available stock."""
 	errors = []
 	items_to_check = []
@@ -76,12 +76,32 @@ def _collect_stock_errors(items):
 
 	stock_map = get_bulk_stock_availability(items_to_check)
 
+	pending_map: dict[tuple[str, str], float] = {}
+	if pos_profile:
+		from xpos.api.items import _get_pending_pos_qty_map, _is_pos_invoice_mode
+
+		if _is_pos_invoice_mode(pos_profile):
+			wh_items: dict[str, list[str]] = {}
+			for d in items_to_check:
+				wh = d.get("warehouse")
+				if wh:
+					wh_items.setdefault(wh, []).append(d.get("item_code"))
+			for wh, codes in wh_items.items():
+				wh_list = [wh]
+				if frappe.db.get_value("Warehouse", wh, "is_group"):
+					wh_list = frappe.db.get_descendants("Warehouse", wh) or []
+				pmap = _get_pending_pos_qty_map(wh_list, item_codes=codes)
+				for ic, qty in pmap.items():
+					pending_map[(ic, wh)] = pending_map.get((ic, wh), 0.0) + qty
+
 	for d in items_to_check:
 		item_code = d.get("item_code")
 		warehouse = d.get("warehouse")
 		batch_no = cstr(d.get("batch_no"))
 
 		available = stock_map.get((item_code, warehouse, batch_no), 0.0)
+		if not batch_no:
+			available -= pending_map.get((item_code, warehouse), 0.0)
 		requested = flt(d.get("stock_qty") or (flt(d.get("qty")) * flt(d.get("conversion_factor") or 1)))
 		if requested > available:
 			errors.append(
@@ -116,8 +136,9 @@ def _validate_stock_on_invoice(invoice_doc):
 	items_to_check = [d.as_dict() for d in invoice_doc.items if d.get("is_stock_item")]
 	if hasattr(invoice_doc, "packed_items"):
 		items_to_check.extend([d.as_dict() for d in invoice_doc.packed_items])
-	errors = _collect_stock_errors(items_to_check)
-	if errors and _should_block(invoice_doc.pos_profile):
+	pos_profile = getattr(invoice_doc, "pos_profile", None)
+	errors = _collect_stock_errors(items_to_check, pos_profile=pos_profile)
+	if errors and _should_block(pos_profile):
 		frappe.throw(frappe.as_json({"errors": errors}), frappe.ValidationError)
 
 
@@ -309,8 +330,6 @@ def _strip_client_freebies_from_payload(payload):
 			continue
 
 		auto_marker = row.get("auto_free_source")
-		is_free = cint(row.get("is_free_item"))
-		has_name = bool(row.get("name"))
 
 		if auto_marker:
 			modified = True

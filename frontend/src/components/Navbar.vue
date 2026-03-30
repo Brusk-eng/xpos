@@ -4,7 +4,7 @@
 			<img :src="isDark ? LogoDark : LogoLight" alt="X POS Logo" class="w-8 h-8" />
 			<span>{{ __("X POS") }}</span>
 		</div>
-		<nav class="flex items-center gap-1 ms-4">
+		<nav class="hidden md:flex items-center gap-1 ms-4">
 			<router-link
 				to="/pos"
 				:class="

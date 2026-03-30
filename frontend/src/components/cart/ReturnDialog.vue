@@ -94,55 +94,57 @@
 					</div>
 
 					<div class="border border-border rounded-lg overflow-hidden">
-						<table class="w-full text-sm">
-							<thead class="bg-muted">
-								<tr>
-									<th class="text-start px-3 py-2 text-muted-foreground font-medium">
-										{{ __("Item") }}
-									</th>
-									<th class="text-center px-3 py-2 text-muted-foreground font-medium">
-										{{ __("Sold") }}
-									</th>
-									<th class="text-center px-3 py-2 text-muted-foreground font-medium">
-										{{ __("Return Qty") }}
-									</th>
-									<th class="text-end px-3 py-2 text-muted-foreground font-medium">
-										{{ __("Amount") }}
-									</th>
-								</tr>
-							</thead>
-							<tbody>
-								<tr
-									v-for="(item, idx) in returnItems"
-									:key="idx"
-									class="border-t border-border"
-								>
-									<td class="px-3 py-2">
-										<p class="font-medium text-foreground">
-											{{ item.item_name }}
-										</p>
-										<p class="text-[11px] text-muted-foreground font-mono">
-											{{ item.item_code }}
-										</p>
-									</td>
-									<td class="px-3 py-2 text-center text-muted-foreground">
-										{{ item.max_qty }}
-									</td>
-									<td class="px-3 py-2 text-center">
-										<NumberInput
-											v-model="item.return_qty"
-											:min="0"
-											:max="item.max_qty"
-											:precision="0"
-											class="w-20 text-center text-sm mx-auto"
-										/>
-									</td>
-									<td class="px-3 py-2 text-end font-medium text-foreground">
-										{{ formatPrice(item.rate * (item.return_qty || 0)) }}
-									</td>
-								</tr>
-							</tbody>
-						</table>
+						<div class="overflow-x-auto">
+							<table class="w-full text-sm min-w-[340px]">
+								<thead class="bg-muted">
+									<tr>
+										<th class="text-start px-3 py-2 text-muted-foreground font-medium">
+											{{ __("Item") }}
+										</th>
+										<th class="text-center px-3 py-2 text-muted-foreground font-medium">
+											{{ __("Sold") }}
+										</th>
+										<th class="text-center px-3 py-2 text-muted-foreground font-medium">
+											{{ __("Return Qty") }}
+										</th>
+										<th class="text-end px-3 py-2 text-muted-foreground font-medium">
+											{{ __("Amount") }}
+										</th>
+									</tr>
+								</thead>
+								<tbody>
+									<tr
+										v-for="(item, idx) in returnItems"
+										:key="idx"
+										class="border-t border-border"
+									>
+										<td class="px-3 py-2">
+											<p class="font-medium text-foreground">
+												{{ item.item_name }}
+											</p>
+											<p class="text-[11px] text-muted-foreground font-mono">
+												{{ item.item_code }}
+											</p>
+										</td>
+										<td class="px-3 py-2 text-center text-muted-foreground">
+											{{ item.max_qty }}
+										</td>
+										<td class="px-3 py-2 text-center">
+											<NumberInput
+												v-model="item.return_qty"
+												:min="0"
+												:max="item.max_qty"
+												:precision="0"
+												class="w-20 text-center text-sm mx-auto"
+											/>
+										</td>
+										<td class="px-3 py-2 text-end font-medium text-foreground">
+											{{ formatPrice(item.rate * (item.return_qty || 0)) }}
+										</td>
+									</tr>
+								</tbody>
+							</table>
+						</div>
 					</div>
 				</div>
 			</div>

@@ -168,7 +168,7 @@
 			<Button
 				variant="ghost"
 				size="icon-sm"
-				class="opacity-0 group-hover:opacity-100 w-4 h-4 hover:text-destructive transition-all"
+				class="md:opacity-0 md:group-hover:opacity-100 w-5 h-5 md:w-4 md:h-4 text-muted-foreground hover:text-destructive transition-all"
 				@click="$emit('remove', index)"
 			>
 				<Trash2 class="w-3.5 h-3.5" />

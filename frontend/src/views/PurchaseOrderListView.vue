@@ -406,66 +406,68 @@ onMounted(() => {
 							{{ __("Items") }} ({{ selectedOrder.items.length }})
 						</h3>
 						<div class="rounded-lg border border-border overflow-hidden">
-							<table class="w-full text-sm">
-								<thead class="bg-muted/50">
-									<tr>
-										<th
-											class="text-start px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
+							<div class="overflow-x-auto">
+								<table class="w-full text-sm min-w-[360px]">
+									<thead class="bg-muted/50">
+										<tr>
+											<th
+												class="text-start px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
+											>
+												{{ __("Item") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
+											>
+												{{ __("Qty") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
+											>
+												{{ __("Rate") }}
+											</th>
+											<th
+												class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
+											>
+												{{ __("Amount") }}
+											</th>
+										</tr>
+									</thead>
+									<tbody class="divide-y divide-border">
+										<tr
+											v-for="item in selectedOrder.items"
+											:key="item.item_code"
+											class="hover:bg-muted/30 transition-colors"
 										>
-											{{ __("Item") }}
-										</th>
-										<th
-											class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
-										>
-											{{ __("Qty") }}
-										</th>
-										<th
-											class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
-										>
-											{{ __("Rate") }}
-										</th>
-										<th
-											class="text-end px-4 py-2.5 text-muted-foreground font-medium text-xs uppercase"
-										>
-											{{ __("Amount") }}
-										</th>
-									</tr>
-								</thead>
-								<tbody class="divide-y divide-border">
-									<tr
-										v-for="item in selectedOrder.items"
-										:key="item.item_code"
-										class="hover:bg-muted/30 transition-colors"
-									>
-										<td class="px-4 py-3">
-											<div class="text-foreground font-medium">
-												{{ item.item_name }}
-											</div>
-											<div class="text-xs text-muted-foreground">
-												{{ item.item_code }}
-											</div>
-										</td>
-										<td class="px-4 py-3 text-end text-muted-foreground">
-											{{ item.qty }} {{ item.uom }}
-										</td>
-										<td class="px-4 py-3 text-end text-muted-foreground">
-											{{ formatCurrency(item.rate) }}
-										</td>
-										<td class="px-4 py-3 text-end font-medium text-foreground">
-											{{ formatCurrency((item.qty || 0) * (item.rate || 0)) }}
-										</td>
-									</tr>
-								</tbody>
-							</table>
+											<td class="px-4 py-3">
+												<div class="text-foreground font-medium">
+													{{ item.item_name }}
+												</div>
+												<div class="text-xs text-muted-foreground">
+													{{ item.item_code }}
+												</div>
+											</td>
+											<td class="px-4 py-3 text-end text-muted-foreground">
+												{{ item.qty }} {{ item.uom }}
+											</td>
+											<td class="px-4 py-3 text-end text-muted-foreground">
+												{{ formatCurrency(item.rate) }}
+											</td>
+											<td class="px-4 py-3 text-end font-medium text-foreground">
+												{{ formatCurrency((item.qty || 0) * (item.rate || 0)) }}
+											</td>
+										</tr>
+									</tbody>
+								</table>
+							</div>
 						</div>
-					</div>
 
-					<div class="space-y-2">
-						<div class="flex justify-between text-sm">
-							<span class="text-muted-foreground">{{ __("Grand Total") }}</span>
-							<span class="font-bold text-foreground text-lg">{{
-								formatCurrency(selectedOrder.grand_total)
-							}}</span>
+						<div class="space-y-2">
+							<div class="flex justify-between text-sm">
+								<span class="text-muted-foreground">{{ __("Grand Total") }}</span>
+								<span class="font-bold text-foreground text-lg">{{
+									formatCurrency(selectedOrder.grand_total)
+								}}</span>
+							</div>
 						</div>
 					</div>
 				</div>

@@ -85,7 +85,7 @@ class POSClosingShift(Document):
 		opening_entry = frappe.get_doc("POS Opening Shift", self.pos_opening_shift)
 		opening_entry.pos_closing_shift = self.name
 		opening_entry.set_status()
-		self.delete_draft_invoices()
+		delete_draft_invoices(self.pos_opening_shift, self.pos_profile)
 		opening_entry.save()
 		_set_closing_entry_invoices(self)
 		consolidate_closing_shift_invoices(self)
