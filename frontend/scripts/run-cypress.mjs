@@ -24,7 +24,10 @@ delete env.ELECTRON_RUN_AS_NODE;
 const DEFAULT_SLOW_MO = "700";
 
 function demoArgs(args) {
-	env.CYPRESS_SLOW_MO = env.CYPRESS_SLOW_MO || DEFAULT_SLOW_MO;
+	const configuredSlowMo = env.CYPRESS_SLOW_MO || DEFAULT_SLOW_MO;
+	const parsedSlowMo = Number.parseInt(String(configuredSlowMo), 10);
+	const safeSlowMo = Number.isFinite(parsedSlowMo) && parsedSlowMo > 0 ? parsedSlowMo : Number.parseInt(DEFAULT_SLOW_MO, 10);
+	env.CYPRESS_SLOW_MO = String(safeSlowMo);
 
 	const extra = [];
 	if (mode === "run") {
@@ -35,7 +38,7 @@ function demoArgs(args) {
 		}
 	}
 
-	console.log(`[e2e] demo mode: ${env.CYPRESS_SLOW_MO}ms per action, headed Chrome`);
+	console.log(`[e2e] demo mode: ${safeSlowMo}ms per action, headed Chrome`);
 	return [...args, ...extra];
 }
 
