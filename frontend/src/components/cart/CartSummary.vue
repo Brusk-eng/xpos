@@ -148,7 +148,7 @@
 					v-if="hasPermission('apply_additional_discount')"
 					variant="outline"
 					size="lg"
-					class="flex-1"
+					class="flex-1 min-w-0 px-2"
 					:class="{
 						'border-emerald-300 text-emerald-600 bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:bg-emerald-900/20':
 							hasDiscount,
@@ -165,7 +165,7 @@
 					v-if="posStore.fetchCoupon"
 					variant="outline"
 					size="lg"
-					class="flex-1"
+					class="flex-1 min-w-0 px-2"
 					:class="{
 						'border-violet-300 text-violet-600 bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:bg-violet-900/20':
 							!!cartStore.appliedCoupon,
@@ -181,7 +181,7 @@
 				<Button
 					variant="outline"
 					size="lg"
-					class="flex-1 dark:border-border dark:text-foreground"
+					class="flex-1 min-w-0 px-2 dark:border-border dark:text-foreground"
 					:disabled="cartStore.isEmpty"
 					data-testid="hold-order"
 					@click="holdOrder"
@@ -193,7 +193,7 @@
 				<Button
 					variant="outline"
 					size="lg"
-					class="flex-1 dark:border-border dark:text-foreground"
+					class="flex-1 min-w-0 px-2 dark:border-border dark:text-foreground"
 					@click="cartStore.openDraftDialog()"
 				>
 					<FileText class="w-4 h-4" />
@@ -203,7 +203,7 @@
 				<Button
 					variant="outline"
 					size="lg"
-					class="flex-1 text-destructive hover:text-destructive dark:border-border"
+					class="flex-1 min-w-0 px-2 text-destructive hover:text-destructive dark:border-border"
 					:disabled="cartStore.isEmpty"
 					data-testid="clear-cart"
 					@click="handleClearCart"
@@ -215,7 +215,7 @@
 				<Button
 					variant="outline"
 					size="lg"
-					class="flex-1"
+					class="flex-1 min-w-0 px-2"
 					:disabled="cartStore.isEmpty"
 					:class="{
 						'border-blue-300 text-blue-600 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-900/20':
@@ -230,7 +230,7 @@
 				<Button
 					variant="outline"
 					size="lg"
-					class="flex-1"
+					class="flex-1 min-w-0 px-2"
 					:disabled="!hasAnyDiscount"
 					:class="{
 						'border-blue-300 text-blue-600 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-900/20':
