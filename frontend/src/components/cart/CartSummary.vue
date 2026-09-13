@@ -147,7 +147,8 @@
 				<Button
 					v-if="hasPermission('apply_additional_discount')"
 					variant="outline"
-					size="sm"
+					size="lg"
+					class="flex-1"
 					:class="{
 						'border-emerald-300 text-emerald-600 bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:bg-emerald-900/20':
 							hasDiscount,
@@ -163,7 +164,8 @@
 				<Button
 					v-if="posStore.fetchCoupon"
 					variant="outline"
-					size="sm"
+					size="lg"
+					class="flex-1"
 					:class="{
 						'border-violet-300 text-violet-600 bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:bg-violet-900/20':
 							!!cartStore.appliedCoupon,
@@ -178,8 +180,8 @@
 			<TooltipWrapper :content="__('Save as draft')">
 				<Button
 					variant="outline"
-					size="sm"
-					class="dark:border-border dark:text-foreground"
+					size="lg"
+					class="flex-1 dark:border-border dark:text-foreground"
 					:disabled="cartStore.isEmpty"
 					data-testid="hold-order"
 					@click="holdOrder"
@@ -190,8 +192,8 @@
 			<TooltipWrapper :content="__('Restore draft')">
 				<Button
 					variant="outline"
-					size="sm"
-					class="dark:border-border dark:text-foreground"
+					size="lg"
+					class="flex-1 dark:border-border dark:text-foreground"
 					@click="cartStore.openDraftDialog()"
 				>
 					<FileText class="w-4 h-4" />
@@ -200,8 +202,8 @@
 			<TooltipWrapper :content="__('Clear cart')">
 				<Button
 					variant="outline"
-					size="sm"
-					class="text-destructive hover:text-destructive dark:border-border"
+					size="lg"
+					class="flex-1 text-destructive hover:text-destructive dark:border-border"
 					:disabled="cartStore.isEmpty"
 					data-testid="clear-cart"
 					@click="handleClearCart"
@@ -212,7 +214,8 @@
 			<TooltipWrapper v-if="!cartStore.isReturnMode" :content="__('Delivery charge')">
 				<Button
 					variant="outline"
-					size="sm"
+					size="lg"
+					class="flex-1"
 					:disabled="cartStore.isEmpty"
 					:class="{
 						'border-blue-300 text-blue-600 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-900/20':
@@ -226,7 +229,8 @@
 			<TooltipWrapper :content="__('Clear all discounts')">
 				<Button
 					variant="outline"
-					size="sm"
+					size="lg"
+					class="flex-1"
 					:disabled="!hasAnyDiscount"
 					:class="{
 						'border-blue-300 text-blue-600 bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:bg-blue-900/20':
