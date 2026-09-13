@@ -203,7 +203,8 @@
 					size="sm"
 					class="text-destructive hover:text-destructive dark:border-border"
 					:disabled="cartStore.isEmpty"
-					@click="cartStore.clearCart()"
+					data-testid="clear-cart"
+					@click="handleClearCart"
 				>
 					<Trash2 class="w-4 h-4" />
 				</Button>
@@ -426,6 +427,11 @@ function clearAllDiscounts() {
 	discountInput.value = 0;
 	showDiscount.value = false;
 	showCoupon.value = false;
+}
+
+function handleClearCart() {
+	if (cartStore.isEmpty) return;
+	window.dispatchEvent(new CustomEvent("xpos:clear-cart"));
 }
 
 const itemDiscountTotal = computed(() => {
