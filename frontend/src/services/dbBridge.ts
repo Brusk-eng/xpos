@@ -208,6 +208,7 @@ export async function addPendingInvoice(record: {
 	data: unknown;
 	customer_name?: string;
 	grand_total?: number;
+	receipt?: import("@/types/pos.types").ReceiptSnapshot;
 }) {
 	// The cart hands over live Vue arrays (payments, change legs); IndexedDB and IPC can only
 	// store plain data and throw DataCloneError otherwise.
@@ -223,6 +224,7 @@ export async function addPendingInvoice(record: {
 		status: "pending",
 		customer_name: record.customer_name,
 		grand_total: record.grand_total,
+		receipt: record.receipt,
 		created_at: new Date().toISOString(),
 	});
 	return { id: id as number, local_id: localId };
