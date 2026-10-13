@@ -278,8 +278,14 @@ def open_shift(pos_profile: str, company: str, balance_details: str | list[dict]
 		}
 	)
 
-	if balance_details:
-		new_shift.set("balance_details", balance_details)
+	for detail in balance_details or []:
+		new_shift.append(
+			"balance_details",
+			{
+				"mode_of_payment": detail.get("mode_of_payment"),
+				"amount": flt(detail.get("opening_amount")),
+			},
+		)
 
 	new_shift.insert(ignore_permissions=True)
 
