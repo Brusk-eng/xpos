@@ -6,7 +6,7 @@ from collections import defaultdict
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, now_datetime, nowdate
+from frappe.utils import cint, flt, get_datetime, getdate, now_datetime, nowdate, to_timedelta
 
 from xpos.api.exchange import change_leg_table_exists, payment_tender_fields_exist
 from xpos.api.utilities import can_close_shift, get_invoice_type, is_pos_cashier
@@ -313,6 +313,93 @@ def check_open_shift(user: str | None = None):
 	return data
 
 
+def get_shift_invoices(opening, doctype: str, fields: list[str]) -> list:
+	"""Return the submitted POS invoices of ``opening`` that no closing has consumed yet.
+
+	Invoices belong to a shift through their ``pos_opening_shift`` link. Only a shift with no
+	linked invoice falls back to legacy invoices that were never linked to any shift.
+	"""
+	filters = {
+		"pos_opening_shift": opening.name,
+		"docstatus": 1,
+		"is_pos": 1,
+	}
+	if doctype == "POS Invoice":
+		filters["consolidated_invoice"] = ["in", ["", None]]
+
+	invoices = frappe.get_all(doctype, filters=filters, fields=fields)
+	return invoices or get_unlinked_shift_invoices(opening, doctype, fields)
+
+
+def get_unlinked_shift_invoices(opening, doctype: str, fields: list[str]) -> list:
+	"""Legacy fallback: the cashier's invoices without a shift link, posted while the shift was open.
+
+	An invoice linked to another shift is never picked up, and neither is one a closing shift
+	already consumed. ``pos_closing_entry`` only exists on Sales Invoice, so it is filtered on
+	only where the column is there; the closing shift's own transaction rows cover POS Invoice.
+	"""
+	filters = {
+		"pos_opening_shift": ["is", "not set"],
+		"pos_profile": opening.pos_profile,
+		"company": opening.company,
+		"owner": opening.user,
+		"posting_date": [">=", getdate(opening.period_start_date)],
+		"docstatus": 1,
+		"is_pos": 1,
+	}
+	if frappe.db.has_column(doctype, "pos_closing_entry"):
+		filters["pos_closing_entry"] = ["is", "not set"]
+	if doctype == "POS Invoice":
+		filters["consolidated_invoice"] = ["in", ["", None]]
+
+	query_fields = list(dict.fromkeys([*fields, "posting_date", "posting_time"]))
+	candidates = frappe.get_all(doctype, filters=filters, fields=query_fields)
+	if not candidates:
+		return []
+
+	link_field = "pos_invoice" if doctype == "POS Invoice" else "sales_invoice"
+	closed = set(
+		frappe.get_all(
+			"Sales Invoice Reference",
+			filters={
+				"parenttype": "POS Closing Shift",
+				"docstatus": 1,
+				link_field: ["in", [row_value(row, "name") for row in candidates]],
+			},
+			pluck=link_field,
+		)
+	)
+
+	period_start = get_datetime(opening.period_start_date)
+	period_end = get_shift_period_end(opening)
+
+	invoices = []
+	for row in candidates:
+		if row_value(row, "name") in closed:
+			continue
+		posted_at = get_datetime(row_value(row, "posting_date")) + to_timedelta(
+			row_value(row, "posting_time") or "00:00:00"
+		)
+		if not period_start <= posted_at <= period_end:
+			continue
+		for extra in ("posting_date", "posting_time"):
+			if extra not in fields:
+				row.pop(extra, None)
+		invoices.append(row)
+
+	return invoices
+
+
+def get_shift_period_end(opening):
+	"""When ``opening`` stopped taking sales: its closing time, or now while it is still open."""
+	closing_shift = opening.get("pos_closing_shift")
+	if closing_shift:
+		period_end = frappe.db.get_value("POS Closing Shift", closing_shift, "period_end_date")
+		if period_end:
+			return get_datetime(period_end)
+	return now_datetime()
+
+
 @frappe.whitelist()
 def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	"""Create a POS Closing Shift and close the opening shift.
@@ -329,29 +416,7 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	doctype = get_invoice_type()
 
-	filters = {
-		"pos_opening_shift": opening.name,
-		"docstatus": 1,
-		"is_pos": 1,
-	}
-	if doctype == "POS Invoice":
-		filters["consolidated_invoice"] = ["in", ["", None]]
-
-	invoices = frappe.get_all(doctype, filters=filters, fields=CLOSING_INVOICE_FIELDS)
-
-	if not invoices:
-		fallback_filters = {
-			"pos_profile": opening.pos_profile,
-			"posting_date": [">=", opening.posting_date],
-			"docstatus": 1,
-			"is_pos": 1,
-			"owner": opening.user,
-			"pos_closing_entry": ["is", "not set"],
-		}
-		if doctype == "POS Invoice":
-			fallback_filters["consolidated_invoice"] = ["in", ["", None]]
-
-		invoices = frappe.get_all(doctype, filters=fallback_filters, fields=CLOSING_INVOICE_FIELDS)
+	invoices = get_shift_invoices(opening, doctype, CLOSING_INVOICE_FIELDS)
 
 	grand_total = sum(flt(row_value(inv, "grand_total", 0)) for inv in invoices)
 	net_total = sum(flt(row_value(inv, "net_total", 0)) for inv in invoices)
@@ -444,29 +509,7 @@ def get_shift_summary(opening_shift: str):
 	opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	doctype = get_invoice_type()
 
-	filters = {
-		"pos_opening_shift": opening.name,
-		"docstatus": 1,
-		"is_pos": 1,
-	}
-	if doctype == "POS Invoice":
-		filters["consolidated_invoice"] = ["in", ["", None]]
-
-	invoices = frappe.get_all(doctype, filters=filters, fields=SUMMARY_INVOICE_FIELDS)
-
-	if not invoices:
-		fallback_filters = {
-			"pos_profile": opening.pos_profile,
-			"posting_date": [">=", opening.posting_date],
-			"docstatus": 1,
-			"is_pos": 1,
-			"owner": opening.user,
-			"pos_closing_entry": ["is", "not set"],
-		}
-		if doctype == "POS Invoice":
-			fallback_filters["consolidated_invoice"] = ["in", ["", None]]
-
-		invoices = frappe.get_all(doctype, filters=fallback_filters, fields=SUMMARY_INVOICE_FIELDS)
+	invoices = get_shift_invoices(opening, doctype, SUMMARY_INVOICE_FIELDS)
 
 	grand_total = sum(flt(row_value(inv, "grand_total", 0)) for inv in invoices)
 	net_total = sum(flt(row_value(inv, "net_total", 0)) for inv in invoices)
