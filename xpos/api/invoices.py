@@ -95,6 +95,22 @@ def _apply_invoice_loyalty_fields(invoice_doc, data: dict):
 	invoice_doc.loyalty_amount = 0
 
 
+def resolve_update_stock(pos, return_against: str | None = None) -> int:
+	if return_against:
+		doctype = "Sales Invoice" if frappe.db.exists("Sales Invoice", return_against) else "POS Invoice"
+		return cint(frappe.db.get_value(doctype, return_against, "update_stock"))
+	return cint(pos.get("update_stock", 1))
+
+
+def apply_invoice_delivery_dates(invoice_doc, data: dict, items: list):
+	dates = []
+	for row, item_data in zip(invoice_doc.items, items):
+		row.delivery_date = item_data.get("delivery_date") or None
+		if row.delivery_date:
+			dates.append(getdate(row.delivery_date))
+	invoice_doc.pos_delivery_date = data.get("pos_delivery_date") or (min(dates) if dates else None)
+
+
 def resolve_return_sales_person(return_against: str | None) -> str | None:
 	"""Sales person credited on the invoice being returned, if any."""
 	if not return_against:
@@ -378,7 +394,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		invoice_doc.posting_time = now_datetime().strftime("%H:%M:%S")
 
 	invoice_doc.set_warehouse = pos.warehouse
-	invoice_doc.update_stock = cint(pos.get("update_stock")) or 1
+	invoice_doc.update_stock = resolve_update_stock(pos, return_against if is_return else None)
 	invoice_doc.currency = (
 		data.get("currency")
 		or pos.currency
@@ -412,7 +428,6 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		invoice_doc.apply_discount_on = data.get("apply_discount_on") or "Grand Total"
 
 	invoice_doc.pos_notes = data.get("pos_notes", "")
-	invoice_doc.pos_delivery_date = data.get("pos_delivery_date", None) or None
 
 	sales_person = data.get("sales_person") or None
 	if sales_person:
@@ -521,11 +536,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 				item.additional_notes = item_data["additional_notes"]
 			except Exception:
 				pass
-		if item_data.get("delivery_date"):
-			try:
-				item.delivery_date = item_data["delivery_date"]
-			except Exception:
-				pass
+
+	apply_invoice_delivery_dates(invoice_doc, data, items)
 
 	existing_account_heads = set()
 	if pos.taxes_and_charges:
@@ -840,7 +852,7 @@ def save_draft_invoice(data: str | dict):
 		invoice_doc.posting_date = nowdate()
 		invoice_doc.posting_time = now_datetime().strftime("%H:%M:%S")
 	invoice_doc.set_warehouse = pos.warehouse
-	invoice_doc.update_stock = cint(pos.get("update_stock")) or 1
+	invoice_doc.update_stock = resolve_update_stock(pos)
 	invoice_doc.currency = (
 		data.get("currency")
 		or pos.currency
@@ -895,6 +907,8 @@ def save_draft_invoice(data: str | dict):
 			item.serial_no = item_data["serial_no"]
 		if item_data.get("batch_no"):
 			item.batch_no = item_data["batch_no"]
+
+	apply_invoice_delivery_dates(invoice_doc, data, items)
 
 	if pos.taxes_and_charges:
 		invoice_doc.taxes_and_charges = pos.taxes_and_charges

@@ -107,6 +107,8 @@ def create_sales_order(doc):
 		getattr(doc, "pos_opening_shift", None)
 		and doc.pos_profile
 		and doc.is_pos
+		and doc.doctype == "Sales Invoice"
+		and not doc.is_return
 		and getattr(doc, "pos_delivery_date", None)
 		and not doc.update_stock
 		and frappe.get_value("POS Profile", doc.pos_profile, "allow_sales_order")
@@ -125,12 +127,9 @@ def create_sales_order(doc):
 				indicator="green",
 				alert=True,
 			)
-			so_items_map = {item.item_code: item for item in sales_order_doc.items}
-			for inv_item in doc.items:
-				so_item = so_items_map.get(inv_item.item_code)
-				if so_item:
-					inv_item.sales_order = sales_order_doc.name
-					inv_item.so_detail = so_item.name
+			for inv_item, so_item in zip(doc.items, sales_order_doc.items, strict=True):
+				inv_item.sales_order = sales_order_doc.name
+				inv_item.so_detail = so_item.name
 
 
 def make_sales_order(source_name, target_doc=None, ignore_permissions=True):
