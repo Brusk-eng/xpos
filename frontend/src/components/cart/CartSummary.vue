@@ -594,6 +594,7 @@ async function applyCouponCode() {
 			cartStore.customer?.name || "",
 			posStore.companyName,
 		);
+		if (cartStore.appliedCoupon) cartStore.removeCoupon();
 		if (result.coupon) {
 			const posOfferName = (result.coupon as Record<string, unknown>).pos_offer as string | undefined;
 			const storeOffer = posOfferName
