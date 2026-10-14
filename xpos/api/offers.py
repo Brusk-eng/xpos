@@ -4,10 +4,10 @@
 from typing import Any
 
 import frappe
-from frappe import _
 from frappe.utils import cstr, flt, getdate, nowdate
 
 from xpos.utils import row_value
+from xpos.x_pos.doctype.pos_coupon.pos_coupon import check_coupon_code
 
 
 @frappe.whitelist()
@@ -63,59 +63,42 @@ def get_offers(pos_profile: str):
 
 @frappe.whitelist()
 def get_pos_coupon(coupon: str, customer: str, company: str):
-	"""Validate and return a POS coupon with its linked POS Offer."""
-	coupon_doc = frappe.db.get_value(
-		"POS Coupon",
-		{"coupon_code": coupon, "company": company},
-		[
-			"name",
-			"coupon_code",
-			"coupon_type",
-			"valid_from",
-			"valid_upto",
-			"customer",
-			"pos_offer",
-			"maximum_use",
-			"used",
-		],
-		as_dict=True,
+	"""Validate and return a POS coupon with its linked POS Offer.
+
+	A coupon that cannot be used comes back as ``{"coupon": None, "msg": reason}``.
+	"""
+	result = check_coupon_code(coupon, customer, company)
+	coupon_doc = result.get("coupon")
+	if not coupon_doc:
+		return {"coupon": None, "offer": None, "msg": result.get("msg")}
+
+	coupon_data = frappe._dict(
+		{
+			field: coupon_doc.get(field)
+			for field in (
+				"name",
+				"coupon_code",
+				"coupon_type",
+				"valid_from",
+				"valid_upto",
+				"customer",
+				"pos_offer",
+				"maximum_use",
+				"used",
+			)
+		}
 	)
 
-	if not coupon_doc:
-		frappe.throw(_("Invalid or already used coupon code"))
+	offer_data = frappe.get_doc("POS Offer", coupon_doc.pos_offer).as_dict()
+	offer_data["row_id"] = cstr(offer_data.get("row_id") or offer_data.get("name"))
+	offer_data["auto"] = flt(offer_data.get("auto") or 0)
+	offer_data["min_qty"] = flt(offer_data.get("min_qty") or 0)
+	offer_data["max_qty"] = flt(offer_data.get("max_qty") or 0)
+	offer_data["min_amt"] = flt(offer_data.get("min_amt") or 0)
+	offer_data["max_amt"] = flt(offer_data.get("max_amt") or 0)
+	_normalize_discount_fields(offer_data)
 
-	if coupon_doc.get("maximum_use") and coupon_doc.get("used", 0) >= coupon_doc.get("maximum_use"):
-		frappe.throw(_("Coupon has already been used the maximum number of times"))
-
-	today = getdate(nowdate())
-	valid_from = row_value(coupon_doc, "valid_from")
-	valid_upto = row_value(coupon_doc, "valid_upto")
-	coupon_customer = row_value(coupon_doc, "customer")
-
-	if valid_from and getdate(valid_from) > today:
-		frappe.throw(_("Coupon is not yet valid"))
-	if valid_upto and getdate(valid_upto) < today:
-		frappe.throw(_("Coupon has expired"))
-	if coupon_customer and coupon_customer != customer:
-		frappe.throw(_("Coupon is not valid for this customer"))
-
-	offer_data = None
-	pos_offer_name = row_value(coupon_doc, "pos_offer")
-	if pos_offer_name:
-		try:
-			offer_doc = frappe.get_doc("POS Offer", pos_offer_name)
-			offer_data = offer_doc.as_dict()
-			offer_data["row_id"] = cstr(offer_data.get("row_id") or offer_data.get("name"))
-			offer_data["auto"] = flt(offer_data.get("auto") or 0)
-			offer_data["min_qty"] = flt(offer_data.get("min_qty") or 0)
-			offer_data["max_qty"] = flt(offer_data.get("max_qty") or 0)
-			offer_data["min_amt"] = flt(offer_data.get("min_amt") or 0)
-			offer_data["max_amt"] = flt(offer_data.get("max_amt") or 0)
-			_normalize_discount_fields(offer_data)
-		except frappe.DoesNotExistError:
-			offer_data = None
-
-	return {"coupon": coupon_doc, "offer": offer_data, "msg": "Apply"}
+	return {"coupon": coupon_data, "offer": offer_data, "msg": "Apply"}
 
 
 @frappe.whitelist()

@@ -164,6 +164,8 @@ export const usePosStore = defineStore("pos", () => {
 
 	const fetchCoupon = computed(() => !!posProfile.value?.auto_fetch_coupons_gifts);
 
+	const allowCouponEntry = computed(() => !!posProfile.value?.allow_coupon_entry);
+
 	const showTemplateItems = computed(() => !!posProfile.value?.show_template_items);
 
 	const hideVariantsItems = computed(() => !!posProfile.value?.hide_variants_items);
@@ -573,6 +575,7 @@ export const usePosStore = defineStore("pos", () => {
 		allowPosExpense,
 		allowCashDeposit,
 		fetchCoupon,
+		allowCouponEntry,
 		showTemplateItems,
 		hideVariantsItems,
 		autoSetBatch,

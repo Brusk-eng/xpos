@@ -66,13 +66,15 @@ Offers can be triggered based on:
 | Coupon Type | Promotional or Gift Card |
 | POS Offer | The POS Offer this coupon activates |
 | Valid From / Valid Until | Validity dates |
-| Maximum Use | Maximum number of total redemptions |
-| Used Count | Counter of times already redeemed |
-| One Use Per Customer | Limit to one use per customer |
+| Maximum Use | Maximum number of total redemptions; `0` means unlimited |
+| Used Count | Counter of submitted sales that redeemed the coupon |
+| One Use Per Customer | Limit to one submitted sale per customer for this coupon |
 | Customer | For gift cards — assigned to a specific customer |
 | Campaign | Marketing campaign association |
 
 ### Applying a Coupon
+The **Coupon** button is shown when **Allow coupon entry** is enabled on the POS Profile. It is independent of **Auto fetch coupons gifts**, which only controls fetching and auto-applying offers as items are added.
+
 1. Click the **Coupon** button in the cart area
 2. Enter the coupon code in the input field
 3. Click **Apply** or press Enter
@@ -81,13 +83,28 @@ Offers can be triggered based on:
    - Are the dates within the validity window?
    - Has the maximum usage been reached?
    - Is the customer eligible? (for customer-specific coupons)
+   - Has this customer already used a One Use Per Customer coupon?
+   - Is the linked POS Offer enabled and in date, and does the coupon belong to this company?
 5. If valid, the coupon's associated POS Offer is applied to the cart
 6. Applied coupons appear as violet tags in the cart
 7. Error messages are shown for invalid or expired coupons
 
+### How Usage Is Counted
+- The check in the cart is a preview. The same rules are enforced again when the invoice is submitted, and a sale that no longer qualifies is rejected.
+- A use is a submitted Sales Invoice or POS Invoice carrying the coupon. Drafts and held orders do not count, and cancelling the invoice gives the use back.
+- Returns and the consolidated Sales Invoice created at shift closing are not uses: the original sale was already counted.
+- One Use Per Customer is counted per coupon and per customer, so using one coupon never blocks a different one.
+- Validity dates are checked against the invoice's posting date when it is submitted.
+- If two terminals redeem the same One Use Per Customer coupon at the same moment, one of them may be asked to try again.
+
+### Promotional Coupons
+- Open to every customer of the coupon's company unless a customer is set on the coupon
+- Limited by Maximum Use (overall) and One Use Per Customer; with neither set they can be reused freely
+
 ### Gift Cards
 - Gift card coupons are tied to a specific customer
 - Gift card balance is tracked via the coupon's `maximum_use` and `used` fields
+- Maximum Use is always 1, so a gift card is spent by its first submitted sale and disappears from the customer's available gift coupons
 
 ---
 

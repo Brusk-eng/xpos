@@ -13,7 +13,7 @@ from xpos.x_pos.api.utilities import get_company_domain
 from xpos.x_pos.doctype.delivery_charges.delivery_charges import (
 	get_applicable_delivery_charges,
 )
-from xpos.x_pos.doctype.pos_coupon.pos_coupon import update_coupon_code_count
+from xpos.x_pos.doctype.pos_coupon.pos_coupon import update_coupon_usage, validate_invoice_coupons
 from xpos.x_pos.integrations.fbr import fiscalize_invoice
 
 
@@ -27,14 +27,15 @@ def validate(doc, method):
 
 
 def before_submit(doc, method):
+	validate_invoice_coupons(doc)
 	fiscalize_invoice(doc)
 	add_loyalty_point(doc)
 	create_sales_order(doc)
-	update_coupon(doc, "used")
+	update_coupon_usage(doc, "used")
 
 
 def before_cancel(doc, method):
-	update_coupon(doc, "cancelled")
+	update_coupon_usage(doc, "cancelled")
 
 
 def on_cancel(doc, method):
@@ -175,13 +176,6 @@ def make_sales_order(source_name, target_doc=None, ignore_permissions=True):
 	)
 
 	return doclist
-
-
-def update_coupon(doc, transaction_type):
-	for coupon in getattr(doc, "coupons", []):
-		if not coupon.applied:
-			continue
-		update_coupon_code_count(coupon.coupon, transaction_type)
 
 
 def set_patient(doc):

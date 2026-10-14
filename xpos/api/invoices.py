@@ -12,6 +12,7 @@ from frappe.utils.background_jobs import enqueue
 from xpos.api.exchange import get_currency_precision
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
+from xpos.x_pos.doctype.pos_coupon.pos_coupon import validate_invoice_coupons
 
 
 def enforce_stock_availability(invoice_doc):
@@ -665,6 +666,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		raise
 
 	enforce_stock_availability(invoice_doc)
+	validate_invoice_coupons(invoice_doc)
 
 	_validate_unpaid_balance_permissions(invoice_doc, pos, data)
 

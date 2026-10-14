@@ -70,6 +70,7 @@ export interface POSProfile {
 	allow_cash_deposit?: boolean;
 	max_discount_percentage_allowed?: number;
 	auto_fetch_coupons_gifts?: boolean;
+	allow_coupon_entry?: boolean;
 	hide_closing_shift?: boolean;
 	use_offline_mode?: boolean;
 	cash_mode_of_payment?: string;

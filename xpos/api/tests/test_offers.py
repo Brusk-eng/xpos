@@ -83,50 +83,47 @@ class TestGetOffers(unittest.TestCase):
 
 
 class TestGetPosCoupon(unittest.TestCase):
-	"""Tests for get_pos_coupon function."""
+	"""get_pos_coupon defers every rule to the shared check_coupon_code.
+
+	The rules themselves are covered against a real database in
+	xpos/x_pos/doctype/pos_coupon/test_pos_coupon.py.
+	"""
 
 	@patch("xpos.api.offers.frappe")
-	def test_get_pos_coupon_validates_existing_coupon(self, mock_frappe):
-		"""Test that get_pos_coupon validates and returns coupon."""
-		mock_frappe.db.get_value.return_value = {
-			"name": "COUPON-001",
-			"coupon_code": "SUMMER10",
-			"coupon_type": "Discount",
-			"valid_from": None,
-			"valid_upto": None,
-			"customer": None,
-			"pos_offer": None,
+	@patch("xpos.api.offers.check_coupon_code")
+	def test_get_pos_coupon_returns_coupon_and_offer(self, mock_check, mock_frappe):
+		"""An accepted coupon comes back with its linked POS Offer."""
+		mock_frappe._dict = dict
+		mock_check.return_value = {
+			"coupon": MagicMock(
+				pos_offer="OFFER-001", get=lambda field: {"coupon_code": "SUMMER10"}.get(field)
+			),
+			"msg": "Apply",
 		}
+		mock_frappe.get_doc.return_value.as_dict.return_value = {"name": "OFFER-001", "min_qty": None}
 
 		result = offers.get_pos_coupon("SUMMER10", "CUST-001", "Test Company")
 
-		mock_frappe.db.get_value.assert_called_once()
+		mock_check.assert_called_once_with("SUMMER10", "CUST-001", "Test Company")
+		mock_frappe.get_doc.assert_called_once_with("POS Offer", "OFFER-001")
 		self.assertEqual(result["coupon"]["coupon_code"], "SUMMER10")
-		self.assertIsNone(result["offer"])
+		self.assertEqual(result["offer"]["row_id"], "OFFER-001")
+		self.assertEqual(result["offer"]["min_qty"], 0)
 		self.assertEqual(result["msg"], "Apply")
 
 	@patch("xpos.api.offers.frappe")
-	def test_get_pos_coupon_throws_for_invalid_coupon(self, mock_frappe):
-		"""Test that get_pos_coupon throws error for invalid coupon."""
-		mock_frappe.db.get_value.return_value = None
-		mock_frappe.throw.side_effect = Exception("Invalid coupon")
+	@patch("xpos.api.offers.check_coupon_code")
+	def test_get_pos_coupon_reports_why_a_coupon_is_rejected(self, mock_check, mock_frappe):
+		"""A rejected coupon carries the validator's reason and loads no offer."""
+		mock_check.return_value = {"coupon": None, "msg": "Sorry, CUST-001 have used this coupon before"}
 
-		with self.assertRaises(Exception):
-			offers.get_pos_coupon("INVALID", "CUST-001", "Test Company")
+		result = offers.get_pos_coupon("ONCE", "CUST-001", "Test Company")
 
-	@patch("xpos.api.offers.frappe")
-	def test_get_pos_coupon_validates_expiry(self, mock_frappe):
-		"""Test that get_pos_coupon validates coupon expiry date."""
-		mock_frappe.db.get_value.return_value = {
-			"name": "COUPON-002",
-			"coupon_code": "EXPIRED10",
-			"valid_from": "2025-01-01",
-			"valid_upto": "2025-01-31",  # Expired
-		}
-		mock_frappe.throw.side_effect = Exception("Coupon has expired")
-
-		with self.assertRaises(Exception):
-			offers.get_pos_coupon("EXPIRED10", "CUST-001", "Test Company")
+		self.assertEqual(
+			result,
+			{"coupon": None, "offer": None, "msg": "Sorry, CUST-001 have used this coupon before"},
+		)
+		mock_frappe.get_doc.assert_not_called()
 
 
 class TestValidateCoupon(unittest.TestCase):

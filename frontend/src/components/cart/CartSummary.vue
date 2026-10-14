@@ -162,7 +162,7 @@
 
 			<TooltipWrapper :content="__('Coupon')">
 				<Button
-					v-if="posStore.fetchCoupon"
+					v-if="posStore.allowCouponEntry"
 					variant="outline"
 					size="lg"
 					class="flex-1 min-w-0 px-2"
