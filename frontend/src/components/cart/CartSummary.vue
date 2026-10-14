@@ -48,7 +48,7 @@
 								: 'text-foreground'
 						"
 					>
-						{{ tax.included_in_print_rate ? "" : "+" }}{{ money(tax.amount) }}
+						{{ formatTaxAmount(tax.amount, tax.included_in_print_rate, money) }}
 					</span>
 				</div>
 			</template>
@@ -386,6 +386,7 @@ import {
 } from "lucide-vue-next";
 import type { DeliveryCharge } from "@/types/pos.types";
 import { useMoney } from "@/composables/useMoney";
+import { formatTaxAmount } from "@/utils/numberFormat";
 
 const posStore = usePosStore();
 const { money, moneyPrecision, percent } = useMoney();

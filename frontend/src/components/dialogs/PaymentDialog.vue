@@ -107,7 +107,7 @@
 									>
 								</span>
 								<span :class="tax.included_in_print_rate ? 'text-blue-500' : ''">
-									{{ tax.included_in_print_rate ? "" : "+" }}{{ money(tax.amount) }}
+									{{ formatTaxAmount(tax.amount, tax.included_in_print_rate, money) }}
 								</span>
 							</div>
 							<div
@@ -769,6 +769,7 @@ import {
 import type { InvoiceChangeLeg, InvoiceData, InvoicePayment, TenderLeg } from "@/types/pos.types";
 import { isOnline, extractErrorMessage, isTabConflictError } from "@/utils";
 import { nowDate } from "@/utils/datetime";
+import { formatTaxAmount } from "@/utils/numberFormat";
 import {
 	isPaymentDialogSaveAndPrintShortcut,
 	isPaymentDialogSaveOnlyShortcut,
