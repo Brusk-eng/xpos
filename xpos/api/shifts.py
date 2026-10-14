@@ -11,6 +11,7 @@ from frappe.utils import cint, flt, get_datetime, getdate, now_datetime, nowdate
 from xpos.api.exchange import change_leg_table_exists, payment_tender_fields_exist
 from xpos.api.utilities import can_close_shift, get_invoice_type, is_pos_cashier
 from xpos.utils import row_value
+from xpos.x_pos.gift_cards import gift_card_config
 
 CLOSING_INVOICE_FIELDS = [
 	"name",
@@ -596,6 +597,7 @@ def _enrich_shift_data(data: dict, pos_profile: str):
 	data["pos_profile"] = profile.as_dict()
 	data["company"] = frappe.get_cached_doc("Company", profile.company).as_dict()
 	data["is_cashier"] = is_pos_cashier(frappe.session.user, pos_profile)
+	data["gift_cards"] = gift_card_config(profile)
 	attach_tender_currencies(data, profile)
 
 	allow_negative_stock = cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock") or 0)

@@ -1,6 +1,10 @@
 # Promotions & Offers
 
-X POS includes a powerful promotions engine supporting automatic discounts, coupon codes, gift cards, pricing rules, and promotional schemes.
+X POS includes a powerful promotions engine supporting automatic discounts, coupon codes, pricing rules, and promotional schemes.
+
+In the desk, all of it lives under **Promotions & Offers** in the X POS dock: offers, coupons and referral codes, gift cards, and their setup.
+
+> Looking for gift cards a customer can buy and someone else can spend over several visits? Those are **[stored-value Gift Cards](29-gift-cards.md)**, not coupons. The "Gift Card" coupon type below is a one-time discount for one customer and holds no balance.
 
 ---
 
@@ -63,13 +67,13 @@ Offers can be triggered based on:
 | Field | Description |
 |---|---|
 | Coupon Code | Unique code the customer provides |
-| Coupon Type | Promotional or Gift Card |
+| Coupon Type | Promotional or Gift Card (a single-use, customer-bound discount; see below) |
 | POS Offer | The POS Offer this coupon activates |
 | Valid From / Valid Until | Validity dates |
 | Maximum Use | Maximum number of total redemptions; `0` means unlimited |
 | Used Count | Counter of submitted sales that redeemed the coupon |
 | One Use Per Customer | Limit to one submitted sale per customer for this coupon |
-| Customer | For gift cards — assigned to a specific customer |
+| Customer | Required for the Gift Card coupon type; it is the only customer who can use it |
 | Campaign | Marketing campaign association |
 
 ### Applying a Coupon
@@ -101,10 +105,11 @@ The **Coupon** button is shown when **Allow coupon entry** is enabled on the POS
 - Open to every customer of the coupon's company unless a customer is set on the coupon
 - Limited by Maximum Use (overall) and One Use Per Customer; with neither set they can be reused freely
 
-### Gift Cards
-- Gift card coupons are tied to a specific customer
-- Gift card balance is tracked via the coupon's `maximum_use` and `used` fields
-- Maximum Use is always 1, so a gift card is spent by its first submitted sale and disappears from the customer's available gift coupons
+### Gift Card Coupons
+- A Gift Card coupon is a **discount**, not money: it applies its POS Offer once, for the one customer it names
+- It has **no balance**. `maximum_use` is always 1 and `used` counts sales, so the first submitted sale uses it up, whatever the amount
+- It cannot be bought by one person and spent by another, and it cannot be spent in parts
+- For a card that holds an amount, can be given to anyone and spent over several visits, use [stored-value Gift Cards](29-gift-cards.md)
 
 ---
 
@@ -170,4 +175,4 @@ When the invoice is created, offer information is tracked:
 - Use coupon-based offers for targeted promotions (email campaigns, loyalty rewards)
 - Auto offers work best for store-wide or always-on promotions (e.g., "Buy 2 Get 1 Free")
 - Monitor coupon usage through the system
-- Gift cards are great for customer retention when issued after returns or as loyalty rewards
+- Gift Card coupons suit one-off goodwill discounts for a named customer; sell [stored-value Gift Cards](29-gift-cards.md) when the customer pays money for a card

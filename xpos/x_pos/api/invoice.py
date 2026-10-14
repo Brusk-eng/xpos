@@ -14,6 +14,11 @@ from xpos.x_pos.doctype.delivery_charges.delivery_charges import (
 	get_applicable_delivery_charges,
 )
 from xpos.x_pos.doctype.pos_coupon.pos_coupon import update_coupon_usage, validate_invoice_coupons
+from xpos.x_pos.gift_cards import (
+	apply_gift_cards_on_submit,
+	reverse_gift_cards_on_cancel,
+	validate_invoice_gift_cards,
+)
 from xpos.x_pos.integrations.fbr import fiscalize_invoice
 
 
@@ -24,10 +29,12 @@ def validate(doc, method):
 	calc_delivery_charges(doc)
 	apply_tax_inclusive(doc)
 	validate_tender_currency_legs(doc)
+	validate_invoice_gift_cards(doc)
 
 
 def before_submit(doc, method):
 	validate_invoice_coupons(doc)
+	apply_gift_cards_on_submit(doc)
 	fiscalize_invoice(doc)
 	add_loyalty_point(doc)
 	create_sales_order(doc)
@@ -36,6 +43,7 @@ def before_submit(doc, method):
 
 def before_cancel(doc, method):
 	update_coupon_usage(doc, "cancelled")
+	reverse_gift_cards_on_cancel(doc)
 
 
 def on_cancel(doc, method):

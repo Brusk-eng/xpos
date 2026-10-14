@@ -177,6 +177,19 @@
 				</Button>
 			</TooltipWrapper>
 
+			<TooltipWrapper v-if="canSellGiftCards" :content="__('Sell gift card')">
+				<Button
+					variant="outline"
+					size="lg"
+					class="flex-1 min-w-0 px-2"
+					data-testid="sell-gift-card"
+					:disabled="!offlineStore.isOnline || (!cartStore.isEmpty && !cartStore.isGiftCardSale)"
+					@click="showGiftCard = !showGiftCard"
+				>
+					<Gift class="w-4 h-4" />
+				</Button>
+			</TooltipWrapper>
+
 			<TooltipWrapper :content="__('Save as draft')">
 				<Button
 					variant="outline"
@@ -315,6 +328,32 @@
 		</transition>
 
 		<transition name="slide-up">
+			<div v-if="showGiftCard" class="bg-muted rounded-lg p-3 space-y-2">
+				<div class="flex items-center gap-2">
+					<NumberInput
+						v-model="giftCardValue"
+						:min="0"
+						:precision="moneyPrecision"
+						class="flex-1"
+						data-testid="gift-card-value"
+						:placeholder="__('Gift card value')"
+						@keydown.enter="addGiftCard"
+					/>
+					<Button size="sm" :disabled="!(giftCardValue > 0)" @click="addGiftCard">
+						{{ __("Add gift card") }}
+					</Button>
+				</div>
+				<p class="text-xs text-muted-foreground">
+					{{
+						__(
+							"A new code is printed when the sale is paid. Gift cards are sold on their own sale.",
+						)
+					}}
+				</p>
+			</div>
+		</transition>
+
+		<transition name="slide-up">
 			<div v-if="showCoupon" class="bg-muted rounded-lg p-3 space-y-2">
 				<div class="flex items-center gap-2">
 					<Input
@@ -398,6 +437,21 @@ const { printInvoice, printInvoiceLocal } = usePrintInvoice();
 
 const showDiscount = ref(false);
 const showCoupon = ref(false);
+const showGiftCard = ref(false);
+const giftCardValue = ref(0);
+const canSellGiftCards = computed(
+	() => !!posStore.giftCards && !cartStore.isReturnMode && hasPermission("sell_gift_card"),
+);
+
+function addGiftCard() {
+	const result = cartStore.addGiftCardLine(giftCardValue.value);
+	if (!result.success) {
+		showError(result.message || __("Could not add the gift card."));
+		return;
+	}
+	giftCardValue.value = 0;
+	showGiftCard.value = false;
+}
 const showDelivery = ref(false);
 const isLoadingDelivery = ref(false);
 const availableDeliveryCharges = ref<DeliveryCharge[]>([]);

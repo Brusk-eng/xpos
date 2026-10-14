@@ -13,6 +13,13 @@ from xpos.api.exchange import get_currency_precision
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
 from xpos.x_pos.doctype.pos_coupon.pos_coupon import validate_invoice_coupons
+from xpos.x_pos.gift_cards import (
+	claim_issued_codes,
+	get_company_setting,
+	payment_summary,
+	refunds_available,
+	require_gift_card_access,
+)
 
 
 def enforce_stock_availability(invoice_doc):
@@ -446,16 +453,30 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 
 	rate_precision = _get_item_rate_precision()
 
+	gift_setting = get_company_setting(pos.company)
+	gift_issue_lines = [
+		i
+		for i in items
+		if cint(i.get("gift_card_issue")) or (gift_setting and i.get("item_code") == gift_setting.issue_item)
+	]
+	if gift_issue_lines:
+		gift_setting = require_gift_card_access("sell_gift_card", pos_profile)
+	if gift_setting and any(p.get("mode_of_payment") == gift_setting.mode_of_payment for p in payments):
+		require_gift_card_access("redeem_gift_card", pos_profile)
+
 	from xpos.api.auth import user_has_pos_permission
 
 	allow_rate_change = user_has_pos_permission("allow_change_price", pos_profile=pos.name)
 
 	for item_data in items:
+		if item_data in gift_issue_lines:
+			item_data["item_code"] = gift_setting.issue_item
+			item_data["is_free_item"] = 0
 		item_rate = flt(item_data.get("rate", 0), rate_precision)
 		item_qty = flt(item_data.get("qty", 1), 3)
 		is_free_item = cint(item_data.get("is_free_item"))
 
-		if not allow_rate_change and not is_free_item:
+		if not allow_rate_change and not is_free_item and item_data not in gift_issue_lines:
 			price_list = pos.get("selling_price_list")
 			if price_list:
 				price_list_rate = frappe.db.get_value(
@@ -530,6 +551,10 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			item.batch_no = item_data.get("batch_no")
 		if item_data.get("item_tax_template"):
 			item.item_tax_template = item_data.get("item_tax_template")
+		if item_data in gift_issue_lines:
+			item.income_account = gift_setting.liability_account
+			if is_return:
+				item.xpos_gift_card = item_data.get("gift_card")
 
 		if item_data.get("additional_notes"):
 			try:
@@ -540,7 +565,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	apply_invoice_delivery_dates(invoice_doc, data, items)
 
 	existing_account_heads = set()
-	if pos.taxes_and_charges:
+	# a gift card is money, not a supply: tax is charged when it is spent
+	if pos.taxes_and_charges and not gift_issue_lines:
 		invoice_doc.taxes_and_charges = pos.taxes_and_charges
 		tax_template = frappe.get_doc("Sales Taxes and Charges Template", pos.taxes_and_charges)
 		for tax in tax_template.taxes:
@@ -1558,6 +1584,7 @@ def get_invoice_for_return(invoice_name: str, pos_profile: str = "", doctype: st
 				"batch_no": getattr(item, "batch_no", None),
 				"already_returned_qty": already_returned,
 				"remaining_returnable_qty": max(remaining_qty, 0),
+				"gift_card": item.get("xpos_gift_card"),
 			}
 		)
 
@@ -1579,7 +1606,11 @@ def get_invoice_for_return(invoice_name: str, pos_profile: str = "", doctype: st
 		"items": items,
 		"is_fully_returned": is_fully_returned,
 		"return_expired": return_expired,
-		"payments": [{"mode_of_payment": p.mode_of_payment, "amount": p.amount} for p in doc.payments],
+		"payments": [
+			{"mode_of_payment": p.mode_of_payment, "amount": p.amount, "gift_card": p.get("xpos_gift_card")}
+			for p in doc.payments
+		],
+		"gift_card_refunds": refunds_available(doctype, doc.name),
 	}
 
 
@@ -1641,7 +1672,12 @@ def get_last_invoice_rates(customer: str, item_codes: str | list, company: str):
 
 def _build_invoice_response(invoice_doc: dict) -> dict:
 	"""Build a standard invoice response dict."""
+	issued = invoice_doc.flags.xpos_issued_gift_cards
+	if issued is None and invoice_doc.docstatus == 1:
+		issued = claim_issued_codes(invoice_doc.doctype, invoice_doc.name)
 	return {
+		"gift_cards": payment_summary(invoice_doc) if invoice_doc.docstatus == 1 else [],
+		"issued_gift_cards": issued or [],
 		"name": invoice_doc.name,
 		"grand_total": invoice_doc.grand_total,
 		"net_total": invoice_doc.net_total,
