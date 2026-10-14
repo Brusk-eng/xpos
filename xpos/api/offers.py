@@ -8,6 +8,7 @@ from frappe.utils import cstr, flt, getdate, nowdate
 
 from xpos.utils import row_value
 from xpos.x_pos.doctype.pos_coupon.pos_coupon import check_coupon_code
+from xpos.x_pos.promotional_scheme_offers import get_promotional_scheme_offers
 
 
 @frappe.whitelist()
@@ -55,7 +56,7 @@ def get_offers(pos_profile: str):
 		offer["max_amt"] = flt(offer.get("max_amt") or 0)
 		_normalize_discount_fields(offer)
 
-	promo_offers = _get_promotional_scheme_offers(pos) or []
+	promo_offers = get_promotional_scheme_offers(pos) or []
 	data.extend(promo_offers)
 
 	return data
@@ -151,74 +152,3 @@ def _normalize_discount_fields(offer: dict):
 	for field in ("discount_percentage", "discount_amount", "rate"):
 		if field in offer:
 			offer[field] = flt(offer[field])
-
-
-def _get_promotional_scheme_offers(pos_profile_doc: Any) -> list[dict]:
-	"""Convert Promotional Scheme records into POS Offer-compatible dicts."""
-	company = pos_profile_doc.company
-	today = nowdate()
-
-	try:
-		schemes = frappe.get_all(
-			"Promotional Scheme",
-			filters={
-				"company": company,
-				"disabled": 0,
-				"selling": 1,
-			},
-			fields=["name", "valid_from", "valid_upto"],
-		)
-	except Exception:
-		return []
-
-	offers = []
-	for scheme in schemes:
-		if scheme.valid_from and getdate(scheme.valid_from) > getdate(today):
-			continue
-		if scheme.valid_upto and getdate(scheme.valid_upto) < getdate(today):
-			continue
-
-		try:
-			doc = frappe.get_doc("Promotional Scheme", scheme.name)
-			for rule in doc.get("product_discount_rules") or []:
-				offer = {
-					"name": f"{scheme.name}-{rule.name}",
-					"row_id": f"{scheme.name}-{rule.name}",
-					"offer_type": "Product Discount",
-					"apply_on": rule.get("apply_on", ""),
-					"item_code": rule.get("item_code", ""),
-					"item_group": rule.get("item_group", ""),
-					"min_qty": flt(rule.get("min_qty", 0)),
-					"max_qty": flt(rule.get("max_qty", 0)),
-					"min_amt": flt(rule.get("min_amount", 0)),
-					"max_amt": flt(rule.get("max_amount", 0)),
-					"free_item": rule.get("free_item", ""),
-					"free_qty": flt(rule.get("free_qty", 0)),
-					"auto": 1,
-					"promotional_scheme": scheme.name,
-				}
-				offers.append(offer)
-
-			for rule in doc.get("price_discount_rules") or []:
-				offer = {
-					"name": f"{scheme.name}-{rule.name}",
-					"row_id": f"{scheme.name}-{rule.name}",
-					"offer_type": "Price Discount",
-					"apply_on": rule.get("apply_on", ""),
-					"item_code": rule.get("item_code", ""),
-					"item_group": rule.get("item_group", ""),
-					"min_qty": flt(rule.get("min_qty", 0)),
-					"max_qty": flt(rule.get("max_qty", 0)),
-					"min_amt": flt(rule.get("min_amount", 0)),
-					"max_amt": flt(rule.get("max_amount", 0)),
-					"discount_percentage": flt(rule.get("discount_percentage", 0)),
-					"discount_amount": flt(rule.get("discount_amount", 0)),
-					"rate": flt(rule.get("rate", 0)),
-					"auto": 1,
-					"promotional_scheme": scheme.name,
-				}
-				offers.append(offer)
-		except Exception:
-			continue
-
-	return offers
