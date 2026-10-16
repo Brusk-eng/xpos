@@ -310,6 +310,17 @@ export const usePurchaseStore = defineStore("purchase", () => {
 
 	const lastAddedIndex = ref(-1);
 
+	function defaultPurchaseUom(item: SearchItem): { uom: string; conversion_factor: number } {
+		const uoms = item.item_uoms || [];
+		for (const candidate of [usePosStore().posProfile?.default_purchase_uom, item.purchase_uom]) {
+			const row = candidate
+				? uoms.find((u) => u.uom === candidate && Number(u.conversion_factor) > 0)
+				: undefined;
+			if (row) return { uom: row.uom, conversion_factor: Number(row.conversion_factor) };
+		}
+		return { uom: item.stock_uom, conversion_factor: 1 };
+	}
+
 	function addToCart(item: SearchItem, qty = 1): void {
 		const existingIndex = cartItems.value.findIndex((i) => i.item_code === item.item_code);
 
@@ -318,14 +329,15 @@ export const usePurchaseStore = defineStore("purchase", () => {
 			lastAddedIndex.value = existingIndex;
 		} else {
 			const posStore = usePosStore();
+			const lineUom = defaultPurchaseUom(item);
 			cartItems.value.push({
 				item_code: item.item_code,
 				item_name: item.item_name,
 				qty,
-				rate: item.standard_rate || 0,
-				uom: item.stock_uom,
+				rate: (item.standard_rate || 0) * lineUom.conversion_factor,
+				uom: lineUom.uom,
 				stock_uom: item.stock_uom,
-				conversion_factor: 1,
+				conversion_factor: lineUom.conversion_factor,
 				warehouse: posStore.warehouse,
 				stock_in_hand: 0,
 				transit_stock: 0,
@@ -1180,6 +1192,7 @@ export const usePurchaseStore = defineStore("purchase", () => {
 		searchByBarcode,
 		fetchItemByCode,
 		addToCart,
+		defaultPurchaseUom,
 		updateCartItemQty,
 		updateCartItemRate,
 		updateCartItemUOM,

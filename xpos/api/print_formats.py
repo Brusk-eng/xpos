@@ -4,8 +4,59 @@
 import frappe
 from frappe import _
 from frappe.utils import cint
+from frappe.utils.nestedset import get_ancestors_of
 
 REPRINT_DOCTYPES = ("Sales Invoice", "POS Invoice")
+FALLBACK_PRINT_FORMAT = "XPOS Thermal Receipt"
+
+
+def usable_print_format(name: str | None) -> bool:
+	"""An enabled Print Format for an invoice doctype."""
+	if not name:
+		return False
+	row = frappe.db.get_value("Print Format", name, ["disabled", "doc_type"], as_dict=True)
+	return bool(row) and not row.disabled and row.doc_type in REPRINT_DOCTYPES
+
+
+def resolve_print_format(pos_profile: str | None, customer: str | None = None) -> str:
+	"""Receipt format for a sale (``print_format_rules``).
+
+	The first rule row (in table order) whose customer group is the customer's
+	group or one of its parents wins; then the profile's Default Print Format;
+	then the XPOS thermal receipt. Disabled, missing or non-invoice formats are
+	skipped. Rules are plain group matches - no expressions are evaluated.
+	"""
+	candidates = []
+	profile = frappe.get_cached_doc("POS Profile", pos_profile) if pos_profile else None
+	if profile:
+		group = frappe.db.get_value("Customer", customer, "customer_group") if customer else None
+		if group:
+			groups = {group, *get_ancestors_of("Customer Group", group)}
+			rules = sorted(profile.get("print_format_rules") or [], key=lambda row: row.idx)
+			candidates += [row.print_format for row in rules if row.customer_group in groups]
+		candidates.append(profile.get("default_print_format"))
+	return next((name for name in candidates if usable_print_format(name)), FALLBACK_PRINT_FORMAT)
+
+
+@frappe.whitelist()
+def get_invoice_print_format(doctype: str, name: str) -> dict:
+	"""The print format a posted invoice prints (and reprints) with."""
+	if doctype not in REPRINT_DOCTYPES:
+		frappe.throw(_("Unsupported doctype for printing: {0}").format(doctype))
+	frappe.has_permission(doctype, "read", doc=name, throw=True)
+	pos_profile, customer = frappe.db.get_value(doctype, name, ["pos_profile", "customer"])
+	return {"print_format": resolve_print_format(pos_profile, customer)}
+
+
+def validate_print_format_rules(doc, method=None) -> None:
+	"""POS Profile validate hook: every rule must point at a usable invoice print format."""
+	for row in doc.get("print_format_rules") or []:
+		if not usable_print_format(row.print_format):
+			frappe.throw(
+				_("Row {0}: Print Format {1} is disabled, missing or not for Sales/POS Invoice.").format(
+					row.idx, row.print_format
+				)
+			)
 
 
 @frappe.whitelist()
@@ -58,7 +109,9 @@ def get_receipt_context(pos_profile: str, print_format: str | None = None) -> di
 			if p
 		)
 
-	fmt = print_format or profile.get("default_print_format") or "XPOS Thermal Receipt"
+	# Offline receipts use the fixed XPOS layout and only this format's CSS; customer-group
+	# rules need the server print view, so they apply online only.
+	fmt = print_format if usable_print_format(print_format) else resolve_print_format(pos_profile)
 	css = frappe.db.get_value("Print Format", fmt, "css") or ""
 
 	return {

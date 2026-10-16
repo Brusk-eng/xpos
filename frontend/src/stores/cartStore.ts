@@ -35,7 +35,7 @@ import {
 } from "@/services/pricingService";
 import type { CartPricingLine, FreeItemLine } from "@/services/pricingEngine";
 import { nowDate, toDateOrNow } from "@/utils/datetime";
-import { debounce } from "@/utils";
+import { debounce, isOnline } from "@/utils";
 
 let cartRowSeq = 0;
 
@@ -118,6 +118,7 @@ export const useCartStore = defineStore("cart", () => {
 
 	const ruleDiscountPercentage = ref(0);
 	const ruleDiscountAmount = ref(0);
+	const customerDiscountPercentage = ref(0);
 	const applyDiscountOn = ref("Grand Total");
 	const isPricingCart = ref(false);
 	const pricingSource = ref<PricingSource>("server");
@@ -381,7 +382,7 @@ export const useCartStore = defineStore("cart", () => {
 		if (!posStore.blockSaleBeyondAvailableQty) {
 			return { allowed: true };
 		}
-		if (Number(item.is_stock_item) === 0) {
+		if (Number(item.is_stock_item) === 0 || Number(item.allow_negative_stock)) {
 			return { allowed: true };
 		}
 
@@ -436,7 +437,9 @@ export const useCartStore = defineStore("cart", () => {
 			return { valid: true, messages: [] };
 		}
 
-		const stockItems = items.value.filter((i: CartItem) => Number(i.is_stock_item) !== 0);
+		const stockItems = items.value.filter(
+			(i: CartItem) => Number(i.is_stock_item) !== 0 && !Number(i.allow_negative_stock),
+		);
 		if (stockItems.length === 0) {
 			return { valid: true, messages: [] };
 		}
@@ -460,6 +463,7 @@ export const useCartStore = defineStore("cart", () => {
 
 		const messages: string[] = [];
 		for (const [itemCode, available] of freshMap) {
+			if (!stockItems.some((i: CartItem) => i.item_code === itemCode)) continue;
 			const required = committedStockQty(itemCode);
 			if (required > available) {
 				const row = stockItems.find((i: CartItem) => i.item_code === itemCode);
@@ -730,6 +734,7 @@ export const useCartStore = defineStore("cart", () => {
 	function updateItemRate(index: number, rate: number): void {
 		items.value[index].rate = normalizeItemRate(rate);
 		items.value[index].pos_rate_overridden = true;
+		items.value[index].pos_price_unavailable = false;
 	}
 
 	function updateItemDiscount(index: number, type: "percentage" | "amount", value: number): void {
@@ -789,6 +794,7 @@ export const useCartStore = defineStore("cart", () => {
 		}
 		ruleDiscountPercentage.value = 0;
 		ruleDiscountAmount.value = 0;
+		customerDiscountPercentage.value = 0;
 	}
 
 	function enterReturnMode(invoiceName: string, allowedItemCodes?: string[]): void {
@@ -1052,7 +1058,7 @@ export const useCartStore = defineStore("cart", () => {
 					customer: customer.value?.name,
 					customer_group: customer.value?.customer_group,
 					territory: customer.value?.territory,
-					price_list: posStore.sellingPriceList,
+					price_list: cartPriceList.value,
 					currency: currency.value || posStore.currency,
 					conversion_rate: conversionRate.value,
 					warehouse: posStore.warehouse,
@@ -1097,6 +1103,202 @@ export const useCartStore = defineStore("cart", () => {
 			].join("~"),
 		() => schedulePricingRules(),
 	);
+
+	const effectivePriceList = ref("");
+	const cartPriceList = computed(() => effectivePriceList.value || posStore.sellingPriceList);
+
+	function customerPriceKey(): string {
+		return posStore.forcePriceFromCustomerPriceList && customer.value?.name
+			? `c:${customer.value.name}`
+			: "";
+	}
+
+	function linePriceKey(item: CartItem): string {
+		return item.pos_price_key ?? `|${item.uom || item.stock_uom}`;
+	}
+
+	function isPriceListLine(item: CartItem): boolean {
+		return (
+			!item.pos_is_free_item &&
+			!item.pos_is_offer &&
+			!item.pos_rate_overridden &&
+			!item.gift_card_issue &&
+			!item.gift_card
+		);
+	}
+
+	let priceListRequestId = 0;
+
+	/**
+	 * Re-price lines whose rate came from a different price list than the one the
+	 * current customer resolves to. The server resolves the list (customer →
+	 * customer group → profile); a missing price leaves the line at 0 and flags
+	 * it "price unavailable" so checkout blocks instead of selling it free.
+	 */
+	async function applyCustomerPriceList(): Promise<void> {
+		if (isReturnMode.value) return;
+		const key = customerPriceKey();
+		const stale = items.value.filter(
+			(i) => isPriceListLine(i) && linePriceKey(i) !== `${key}|${i.uom || i.stock_uom}`,
+		);
+		if (!key) effectivePriceList.value = "";
+		if (!stale.length) return;
+
+		const requestId = ++priceListRequestId;
+		if (!isOnline()) {
+			// Offline the only cached prices are the profile list's.
+			const cached = customer.value as Record<string, unknown> | null;
+			// Electron tills only know the customer's own list, not a customer-group one.
+			const cachedCustomerList = cached?.pos_price_list ?? cached?.default_price_list;
+			for (const line of stale) {
+				const profilePriced =
+					!key || !cachedCustomerList || cachedCustomerList === posStore.sellingPriceList;
+				if (profilePriced && !key) {
+					const cached = await getCachedItemByCode(line.item_code);
+					if (cached && (line.uom || line.stock_uom) === cached.stock_uom)
+						line.rate = normalizeItemRate(cached.rate);
+					else line.pos_price_unavailable = true;
+				} else if (!profilePriced) {
+					line.pos_price_unavailable = true;
+				}
+				line.pos_price_key = `${key}|${line.uom || line.stock_uom}`;
+			}
+			return;
+		}
+
+		const result = await call<{ price_list: string; prices: Record<string, number | null> }>(
+			"xpos.api.profile_rules.get_customer_line_prices",
+			{
+				pos_profile: posStore.profileName,
+				customer: key ? customer.value?.name : undefined,
+				posting_date: postingDate.value,
+				lines: JSON.stringify(
+					stale.map((i) => ({
+						row_id: i.uid,
+						item_code: i.item_code,
+						uom: i.uom || i.stock_uom,
+						qty: i.qty,
+						batch_no: i.batch_no || undefined,
+					})),
+				),
+			},
+		);
+		if (requestId !== priceListRequestId || !result) return;
+
+		effectivePriceList.value = key ? result.price_list : "";
+		for (const line of stale) {
+			if (!items.value.includes(line) || !isPriceListLine(line)) continue;
+			const price = line.uid ? result.prices[line.uid] : undefined;
+			const unavailable = price === null || price === undefined;
+			line.rate = unavailable ? 0 : normalizeItemRate(price);
+			line.pos_price_unavailable = unavailable;
+			line.pos_price_key = `${key}|${line.uom || line.stock_uom}`;
+		}
+	}
+
+	const scheduleCustomerPriceList = debounce(() => {
+		applyCustomerPriceList().catch((error) => {
+			console.error("Customer price list repricing failed:", error);
+		});
+	}, 150);
+
+	watch(
+		() =>
+			[
+				customerPriceKey(),
+				items.value
+					.filter(isPriceListLine)
+					.map((i) => `${i.uid}:${i.uom}:${linePriceKey(i)}`)
+					.join("|"),
+			].join("~"),
+		() => scheduleCustomerPriceList(),
+	);
+
+	function customerDiscountRate(): number {
+		if (isReturnMode.value || !posStore.applyCustomerDiscount) return 0;
+		const rate = Number((customer.value as Record<string, unknown> | null)?.discount || 0);
+		const cap = Number(posStore.maxDiscountAllowed || 0);
+		return cap > 0 ? Math.min(rate, cap) : rate;
+	}
+
+	/**
+	 * Apply the customer's Discount (%) as the invoice discount.
+	 *
+	 * Precedence: a pricing-rule transaction discount or a grand-total offer owns
+	 * the invoice discount; a manual discount replaces the customer one. The
+	 * value is assigned, never added, so restores and recalculations cannot stack it.
+	 */
+	function syncCustomerDiscount(): void {
+		const owned =
+			customerDiscountPercentage.value > 0 &&
+			discountPercentage.value === customerDiscountPercentage.value &&
+			!discountAmount.value;
+		const target = customerDiscountRate();
+		const ruleOwned =
+			ruleDiscountPercentage.value > 0 ||
+			ruleDiscountAmount.value > 0 ||
+			offerGrandTotalDiscountPct.value > 0;
+
+		if (!owned) {
+			customerDiscountPercentage.value = 0;
+			// A restored draft that already carries exactly this discount is still the customer's.
+			if (target && !ruleOwned && !discountAmount.value && discountPercentage.value === target) {
+				customerDiscountPercentage.value = target;
+				return;
+			}
+			if (discountPercentage.value || discountAmount.value) return;
+		}
+
+		if (!target || ruleOwned) {
+			if (owned) discountPercentage.value = 0;
+			customerDiscountPercentage.value = 0;
+			return;
+		}
+		discountPercentage.value = target;
+		customerDiscountPercentage.value = target;
+	}
+
+	watch(
+		() =>
+			[
+				customer.value?.name || "",
+				(customer.value as Record<string, unknown> | null)?.discount ?? "",
+				posStore.applyCustomerDiscount,
+				posStore.maxDiscountAllowed,
+				ruleDiscountPercentage.value,
+				ruleDiscountAmount.value,
+				offerGrandTotalDiscountPct.value,
+				discountPercentage.value,
+				discountAmount.value,
+				isReturnMode.value,
+			].join("~"),
+		() => syncCustomerDiscount(),
+	);
+
+	/** Lines checkout must refuse: unresolved prices, and zero-price lines the profile does not allow. */
+	const pricingIssues = computed<string[]>(() => {
+		if (isReturnMode.value) return [];
+		const issues: string[] = [];
+		for (const item of items.value) {
+			if (item.pos_is_free_item || item.pos_is_offer || item.gift_card_issue || item.gift_card)
+				continue;
+			if (item.pos_price_unavailable && !item.pos_rate_overridden) {
+				issues.push(__("Price unavailable for {0}", [item.item_name || item.item_code]));
+				continue;
+			}
+			const netRate = item.discount_percentage
+				? item.rate * (1 - item.discount_percentage / 100)
+				: item.rate - (item.discount_amount || 0);
+			if (netRate <= 0 && !posStore.allowZeroRatedItems) {
+				issues.push(
+					__("{0} has a zero price, which this POS Profile does not allow", [
+						item.item_name || item.item_code,
+					]),
+				);
+			}
+		}
+		return issues;
+	});
 
 	function clearAllDiscounts(): void {
 		discountPercentage.value = 0;
@@ -1151,11 +1353,13 @@ export const useCartStore = defineStore("cart", () => {
 	function clearCart(): void {
 		invoiceLocalId = "";
 		items.value = [];
+		effectivePriceList.value = "";
 		selectedCartIndex.value = -1;
 		discountPercentage.value = 0;
 		discountAmount.value = 0;
 		ruleDiscountPercentage.value = 0;
 		ruleDiscountAmount.value = 0;
+		customerDiscountPercentage.value = 0;
 		applyDiscountOn.value = "Grand Total";
 		pricingSource.value = "server";
 		clearLoyalty();
@@ -1425,6 +1629,14 @@ export const useCartStore = defineStore("cart", () => {
 		};
 
 		const _hasOfferDisc = offerItemDiscountTotal.value > 0 || offerGrandTotalDiscountPct.value > 0;
+		if (
+			!_hasOfferDisc &&
+			customerDiscountPercentage.value > 0 &&
+			discountPercentage.value === customerDiscountPercentage.value
+		) {
+			// Lets the server check it against the customer's own Discount (%).
+			data.discount_source = "customer";
+		}
 		if (_hasOfferDisc) {
 			let totalDisc = offerItemDiscountTotal.value;
 			let remaining = subtotal.value + taxAmount.value - totalDisc;
@@ -1514,7 +1726,7 @@ export const useCartStore = defineStore("cart", () => {
 			}));
 		}
 
-		if (selectedDeliveryCharge.value) {
+		if (selectedDeliveryCharge.value && posStore.useDeliveryCharges && !isReturnMode.value) {
 			data.pos_delivery_charges = selectedDeliveryCharge.value.name;
 			data.pos_delivery_charges_rate = selectedDeliveryCharge.value.rate;
 		}
@@ -1657,6 +1869,10 @@ export const useCartStore = defineStore("cart", () => {
 		hasOffers,
 		canAddItem,
 		revalidateStock,
+		pricingIssues,
+		cartPriceList,
+		customerDiscountPercentage,
+		applyCustomerPriceList,
 		getStockReservations,
 		canAddItemWithDetails,
 		addItem,

@@ -252,6 +252,18 @@ class TestCreateReclassJournalEntry(unittest.TestCase):
 		self.assertEqual([call.args[0] for call in mock_cancel.call_args_list], ["JV-1", "JV-2"])
 
 
+class TestReferenceModes(unittest.TestCase):
+	def test_only_per_payment_modes_with_require_reference_insist_on_one(self):
+		rows = {
+			"UNIBANK HTG": Doc(**account_row("C", "B", "Per Payment"), pos_reference_required=1),
+			"SOGEBANK HTG": Doc(**account_row("C", "B", "Per Payment"), pos_reference_required=0),
+			"BUH HTG": Doc(**account_row("C", "B"), pos_reference_required=1),
+		}
+		with patch(f"{MODULE}.destination_accounts", return_value=rows):
+			self.assertEqual(reclass.per_payment_modes("Kajo"), {"UNIBANK HTG", "SOGEBANK HTG"})
+			self.assertEqual(reclass.reference_required_modes("Kajo"), {"UNIBANK HTG"})
+
+
 @patch(f"{MODULE}.frappe")
 class TestValidateModeOfPayment(unittest.TestCase):
 	def test_per_payment_is_refused_on_a_cash_mode(self, mock_frappe):

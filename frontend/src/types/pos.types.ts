@@ -77,6 +77,13 @@ export interface POSProfile {
 	use_customer_credit?: boolean;
 	use_cashback?: boolean;
 	apply_customer_discount?: boolean;
+	force_price_from_customer_price_list?: boolean;
+	use_delivery_charges?: boolean;
+	auto_set_delivery_charges?: boolean;
+	hide_expected_amount?: boolean;
+	auto_create_referral_for_new_customers?: boolean;
+	default_purchase_uom?: string;
+	print_format_rules?: { customer_group: string; print_format: string }[];
 	show_template_items?: boolean;
 	hide_variants_items?: boolean;
 	hide_unavailable_items?: boolean;
@@ -102,6 +109,7 @@ export interface POSPaymentMethod {
 	pos_tender_currency?: string;
 	type?: string;
 	is_foreign_tender?: boolean;
+	takes_reference?: boolean;
 	requires_reference?: boolean;
 	exchange_rate?: number;
 	rate_date?: string;
@@ -187,6 +195,7 @@ export interface POSItem {
 	barcode?: string;
 	item_tax_template?: string;
 	is_stock_item?: boolean;
+	allow_negative_stock?: boolean | number;
 	has_variants?: boolean;
 	variant_of?: string;
 	is_template?: boolean;
@@ -211,6 +220,8 @@ export interface CartItem extends POSItem {
 	uid?: string;
 	pos_pricing_rules?: string[];
 	pos_rate_overridden?: boolean;
+	pos_price_key?: string;
+	pos_price_unavailable?: boolean;
 	pos_is_free_item?: boolean;
 	pos_free_item_rule?: string;
 	/** A stored-value gift card being sold, not a stock item. */
@@ -308,10 +319,17 @@ export interface CustomerAddress {
 	is_shipping_address?: boolean;
 }
 
+export interface CustomerCreditSource {
+	source_type: "Payment Entry" | "Sales Invoice";
+	source_name: string;
+	posting_date?: string;
+	available: number;
+}
+
 export interface CustomerCredit {
 	total_credit: number;
-	credit_notes: CreditNote[];
-	unallocated_payments: UnallocatedPayment[];
+	currency?: string | null;
+	sources: CustomerCreditSource[];
 	loyalty_points?: number;
 	loyalty_amount?: number;
 }
@@ -465,6 +483,8 @@ export interface InvoiceData {
 	posting_date?: string;
 	additional_discount_percentage?: number;
 	discount_amount?: number;
+	customer_credit?: { source_type: string; source_name: string; amount: number }[];
+	discount_source?: "customer";
 	apply_discount_on?: string;
 	payments?: InvoicePayment[];
 	pos_notes?: string;
@@ -1026,6 +1046,7 @@ export interface SearchItem {
 	item_name: string;
 	local_item_name?: string;
 	stock_uom: string;
+	purchase_uom?: string;
 	item_uoms?: ItemUOMDetail[];
 	standard_rate?: number;
 	selling_price?: number;

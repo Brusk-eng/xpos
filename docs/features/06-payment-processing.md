@@ -220,8 +220,10 @@ When `use_customer_credit` is enabled:
 2. Credits come from:
    - **Unallocated Payment Entries** — Advance payments from the customer
    - **Credit Notes** — Refunds or return credits
-3. Select credits to apply toward the current payment
+3. Enter how much to use from each source; the rest can be paid by any other method
 4. The applied credit reduces the amount due
+
+Credit needs a live connection (it is not offered offline or on the desktop app) and Sales Invoice mode. The server re-checks every amount when the sale is saved, so two tills cannot spend the same credit. See [POS Profile Settings: Implementation Status](pos-profile-settings-status.md#business-rules).
 
 ---
 

@@ -26,6 +26,11 @@ class TestCreateInvoice(unittest.TestCase):
 		self.stub("build_change_legs", return_value=([], 0.0))
 		self.stub("invoice_currency_of", return_value="USD")
 		self.stub("get_currency_precision", return_value=2)
+		# Profile access is covered by test_profile_settings; here it resolves through the mocked frappe.
+		self.stub(
+			"resolve_pos_profile",
+			side_effect=lambda name: invoices.frappe.get_cached_doc("POS Profile", name),
+		)
 
 	def stub(self, name, **kwargs):
 		"""Patch `name` in the xpos.api.invoices namespace for the current test."""

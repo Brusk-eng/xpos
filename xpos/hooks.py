@@ -179,6 +179,9 @@ doc_events = {
 		"validate": "xpos.x_pos.api.customer.validate",
 		"after_insert": "xpos.x_pos.api.customer.after_insert",
 	},
+	"POS Profile": {
+		"validate": "xpos.api.print_formats.validate_print_format_rules",
+	},
 }
 
 # Scheduled Tasks

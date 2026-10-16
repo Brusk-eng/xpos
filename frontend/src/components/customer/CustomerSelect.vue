@@ -281,7 +281,7 @@ import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useCartStore } from "@/stores/cartStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { usePosStore } from "@/stores/posStore";
-import { showSuccess, showError, call } from "@/services/api";
+import { showSuccess, showError, showInfo, call } from "@/services/api";
 import {
 	cacheCustomerGroups,
 	getCachedCustomerGroups,
@@ -526,7 +526,13 @@ async function createAndSelect() {
 
 		const result = await customerStore.createCustomer(payload);
 		cartStore.setCustomer(result);
-		showSuccess(__("Customer created successfully!"));
+		const created = result as Record<string, unknown>;
+		showSuccess(
+			created.referral_code
+				? __("Customer created with referral code {0}", [String(created.referral_code)])
+				: __("Customer created successfully!"),
+		);
+		if (created.referral_note) showInfo(String(created.referral_note));
 		close();
 	} catch (error: unknown) {
 		showError(__("Failed to create customer: ") + ((error as Error)?.message || error));

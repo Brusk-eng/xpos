@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
 from xpos.api.exchange import get_currency_precision
 from xpos.x_pos.api.cash_movement.posting import cancel_journal_entry
@@ -135,17 +135,32 @@ def destination_accounts(company):
 			"parenttype": "Mode of Payment",
 			"pos_destination_account": ["is", "set"],
 		},
-		fields=["parent", "default_account", "pos_destination_account", "pos_destination_posting"],
+		fields=[
+			"parent",
+			"default_account",
+			"pos_destination_account",
+			"pos_destination_posting",
+			"pos_reference_required",
+		],
 	)
 	return {row.parent: row for row in rows}
 
 
 def per_payment_modes(company):
-	"""Modes whose payments each post their own Journal Entry, so the till must take a reference."""
+	"""Modes whose payments each post their own Journal Entry, so the till offers a reference box."""
 	return {
 		mode
 		for mode, row in destination_accounts(company).items()
 		if row.pos_destination_posting == PER_PAYMENT
+	}
+
+
+def reference_required_modes(company):
+	"""Per Payment modes whose bank shows the customer's reference, so a sale must carry one."""
+	return {
+		mode
+		for mode, row in destination_accounts(company).items()
+		if row.pos_destination_posting == PER_PAYMENT and cint(row.pos_reference_required)
 	}
 
 

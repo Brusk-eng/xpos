@@ -90,6 +90,7 @@ class POSClosingShift(Document):
 		opening_entry.pos_closing_shift = self.name
 		opening_entry.set_status()
 		delete_draft_invoices(self.pos_opening_shift, self.pos_profile)
+		opening_entry.flags.ignore_permissions = True
 		opening_entry.save()
 		_set_closing_entry_invoices(self)
 		consolidate_closing_shift_invoices(self)

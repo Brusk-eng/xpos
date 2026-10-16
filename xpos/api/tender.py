@@ -14,7 +14,7 @@ from xpos.api.exchange import (
 	get_mode_tender_currencies,
 	resolve_tender_rate,
 )
-from xpos.x_pos.doctype.pos_closing_shift.closing_processing.reclass import per_payment_modes
+from xpos.x_pos.doctype.pos_closing_shift.closing_processing.reclass import reference_required_modes
 from xpos.x_pos.gift_cards import GiftCardAuthError, gift_card_mode, live_connection_message, read_auth_token
 
 
@@ -45,7 +45,7 @@ def build_tender_legs(payments: list[dict], invoice_doc, rate_cache: dict | None
 	tender_map = get_mode_tender_currencies(modes)
 	gift_mode = gift_card_mode(invoice_doc.get("company"))
 	needs_reference = (
-		set() if cint(invoice_doc.get("is_return")) else per_payment_modes(invoice_doc.get("company"))
+		set() if cint(invoice_doc.get("is_return")) else reference_required_modes(invoice_doc.get("company"))
 	)
 
 	rows: list[dict] = []

@@ -224,7 +224,10 @@
 					<Trash2 class="w-4 h-4" />
 				</Button>
 			</TooltipWrapper>
-			<TooltipWrapper v-if="!cartStore.isReturnMode" :content="__('Delivery charge')">
+			<TooltipWrapper
+				v-if="!cartStore.isReturnMode && posStore.useDeliveryCharges"
+				:content="__('Delivery charge')"
+			>
 				<Button
 					variant="outline"
 					size="lg"
@@ -398,7 +401,7 @@ import { hasPermission } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useOfferStore } from "@/stores/offerStore";
-import { call, showSuccess, showError } from "@/services/api";
+import { call, showSuccess, showError, showInfo } from "@/services/api";
 import { __ } from "@/lib/translate";
 import { isElectron } from "@/services/electronBridge";
 import { isTabConflictError } from "@/utils";
@@ -563,9 +566,14 @@ function syncSelectedDeliveryCharge(charges: DeliveryCharge[]) {
 
 	if (currentCharge) {
 		cartStore.setDeliveryCharge(null);
+		showInfo(
+			__("Delivery charge {0} is no longer available and was removed.", [
+				currentCharge.label || currentCharge.name,
+			]),
+		);
 	}
 
-	if (posStore.posProfile?.auto_set_delivery_charges && charges.length > 0) {
+	if (posStore.autoSetDeliveryCharges && charges.length > 0) {
 		cartStore.setDeliveryCharge(charges[0]);
 	}
 }
@@ -577,7 +585,17 @@ async function syncAutoDeliveryCharge() {
 		return;
 	}
 
-	if (!posStore.posProfile?.auto_set_delivery_charges) {
+	if (!posStore.useDeliveryCharges) {
+		availableDeliveryCharges.value = [];
+		showDelivery.value = false;
+		if (cartStore.selectedDeliveryCharge) {
+			cartStore.setDeliveryCharge(null);
+			showInfo(__("Delivery charges are disabled for this POS Profile; the charge was removed."));
+		}
+		return;
+	}
+
+	if (!posStore.autoSetDeliveryCharges && !cartStore.selectedDeliveryCharge) {
 		return;
 	}
 
@@ -587,7 +605,8 @@ async function syncAutoDeliveryCharge() {
 
 watch(
 	[
-		() => posStore.posProfile?.auto_set_delivery_charges,
+		() => posStore.useDeliveryCharges,
+		() => posStore.autoSetDeliveryCharges,
 		() => posStore.profileName,
 		() => posStore.companyName,
 		() => cartStore.customer?.name || "",

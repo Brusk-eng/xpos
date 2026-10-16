@@ -161,6 +161,9 @@ mode, and keeps each one as its own payment row. The number goes onto the paymen
 `reference_no` and into the Journal Entry's **Reference No** (`cheque_no`). Bank Reconciliation
 ranks matches on that reference and the amount, and auto-matches when the reference equals the bank
 line's. A refund posts its own reversing entry; when no number was taken, the invoice name is used.
+Banks differ in whether their statement shows the customer's reference. Untick **Require
+Reference** on a bank's row when it does not: the till still offers the box but lets the sale
+through without it, and the payment then matches on amount and date, as it would on paper.
 Per Payment is for non-cash modes only, and a Cash mode refuses it. Change is handed back in cash,
 so it would make a payment's amount differ from the transfer.
 

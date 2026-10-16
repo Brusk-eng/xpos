@@ -76,7 +76,7 @@ def tender_patches(func):
 	"""
 	func = patch("xpos.api.tender.frappe")(func)
 	func = patch("xpos.api.tender._", new=lambda message: message)(func)
-	func = patch("xpos.api.tender.per_payment_modes", new=lambda company: set())(func)
+	func = patch("xpos.api.tender.reference_required_modes", new=lambda company: set())(func)
 	func = patch("xpos.api.tender.gift_card_mode", new=lambda company: None)(func)
 	func = patch("xpos.api.tender.get_mode_tender_currencies", return_value=cash_modes())(func)
 	func = patch("xpos.api.tender.resolve_tender_rate", side_effect=fake_rate)(func)
@@ -118,7 +118,7 @@ class TestBuildTenderLegs(unittest.TestCase):
 		self, mock_frappe, mock_modes, mock_rate, mock_prec
 	):
 		mock_frappe.throw.side_effect = Exception("no reference")
-		with patch("xpos.api.tender.per_payment_modes", return_value={"Card"}):
+		with patch("xpos.api.tender.reference_required_modes", return_value={"Card"}):
 			with self.assertRaises(Exception):
 				build([{"mode_of_payment": "Card", "amount": 100}])
 			mock_frappe.throw.reset_mock()

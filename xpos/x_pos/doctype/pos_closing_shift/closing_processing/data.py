@@ -53,6 +53,7 @@ def get_pos_invoices(pos_opening_shift: str, doctype: str | None = None):
 	Runs four queries regardless of shift size: one for the invoices, one each for
 	the tax rows, the payment rows and the change legs.
 	"""
+	frappe.has_permission("POS Closing Shift", "read", throw=True)
 	if not pos_opening_shift:
 		return []
 
@@ -118,6 +119,7 @@ def get_child_rows(child_doctype, parenttype, parentfield, parents):
 
 @frappe.whitelist()
 def get_payments_entries(pos_opening_shift: str):
+	frappe.has_permission("POS Closing Shift", "read", throw=True)
 	if not pos_opening_shift:
 		return []
 

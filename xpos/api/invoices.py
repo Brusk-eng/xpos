@@ -9,7 +9,19 @@ from frappe import _, cstr
 from frappe.utils import cint, flt, getdate, now_datetime, nowdate
 from frappe.utils.background_jobs import enqueue
 
+from xpos.api.customer_credit import allocate_customer_credit, credit_total, lock_credit_sources
 from xpos.api.exchange import get_currency_precision
+from xpos.api.profile_rules import (
+	check_zero_price_line,
+	get_line_rate,
+	price_unavailable,
+	profile_flag,
+	resolve_selling_price_list,
+	validate_customer_discount,
+	verified_offer_free_line,
+	verified_pricing_rule_free_line,
+)
+from xpos.api.profiles import resolve_pos_profile
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
 from xpos.x_pos.doctype.pos_coupon.pos_coupon import validate_invoice_coupons
@@ -224,20 +236,35 @@ def _guard_stale_draft(doctype: str, invoice_name: str, client_modified) -> None
 		)
 
 
-def _validate_unpaid_balance_permissions(invoice_doc, pos_profile_doc, data: dict):
-	"""Enforce POS Profile permissions before submitting an invoice with a balance due."""
+def _validate_unpaid_balance_permissions(
+	invoice_doc, pos_profile_doc, data: dict, customer_credit: float = 0
+):
+	"""Enforce POS Profile permissions before submitting an invoice with a balance due.
+
+	``customer_credit`` is existing customer credit allocated right after submit,
+	so it settles that much of the balance.
+	"""
 	if cint(getattr(invoice_doc, "is_return", 0)):
 		return
 
 	outstanding_amount = _get_unpaid_balance(invoice_doc)
+	if customer_credit - outstanding_amount > 0.009:
+		frappe.throw(
+			_("Customer credit of {0} is more than the {1} still due.").format(
+				customer_credit, outstanding_amount
+			)
+		)
+	outstanding_amount -= customer_credit
 	if outstanding_amount <= 0.009:
 		return
 
 	allow_credit_sale = cint(pos_profile_doc.get("allow_credit_sale"))
 	allow_partial_payment = cint(pos_profile_doc.get("allow_partial_payment"))
 	requested_credit_sale = cint(data.get("is_credit_sale"))
-	settled_amount = abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0))) + abs(
-		_coerce_amount(getattr(invoice_doc, "write_off_amount", 0))
+	settled_amount = (
+		abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
+		+ abs(_coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
+		+ customer_credit
 	)
 
 	if requested_credit_sale or settled_amount <= 0.009:
@@ -344,7 +371,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	if not items:
 		frappe.throw(_("At least one item is required"))
 
-	pos = frappe.get_cached_doc("POS Profile", pos_profile)
+	pos = resolve_pos_profile(pos_profile)
 
 	doctype = get_invoice_type()
 
@@ -353,6 +380,14 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		debit_to = pos.debit_to
 	if not debit_to:
 		debit_to = frappe.db.get_value("Company", pos.company, "default_receivable_account")
+
+	customer_credit = []
+	if data.get("customer_credit"):
+		if is_return:
+			frappe.throw(_("Customer credit cannot be used on a return."))
+		# Locked until this request commits; re-read so a stale till cannot double-spend.
+		customer_credit = lock_credit_sources(pos, customer, debit_to, data["customer_credit"])
+		submit_in_background = 0
 
 	invoice_name = data.get("name")
 	is_existing_draft = False
@@ -407,7 +442,10 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		or pos.currency
 		or frappe.db.get_value("Company", pos.company, "default_currency")
 	)
-	invoice_doc.selling_price_list = data.get("selling_price_list") or pos.get("selling_price_list")
+	if is_return:
+		invoice_doc.selling_price_list = data.get("selling_price_list") or pos.get("selling_price_list")
+	else:
+		invoice_doc.selling_price_list = resolve_selling_price_list(pos, customer)
 
 	if data.get("conversion_rate"):
 		invoice_doc.conversion_rate = flt(data["conversion_rate"])
@@ -426,6 +464,9 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			frappe.throw(_("Return Against invoice is required for returns"))
 	else:
 		invoice_doc.return_against = None
+
+	if data.get("discount_source") == "customer" and not is_return:
+		validate_customer_discount(pos, customer, additional_discount_percentage, discount_amount)
 
 	if additional_discount_percentage:
 		invoice_doc.additional_discount_percentage = additional_discount_percentage
@@ -467,6 +508,13 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	from xpos.api.auth import user_has_pos_permission
 
 	allow_rate_change = user_has_pos_permission("allow_change_price", pos_profile=pos.name)
+	force_customer_price = profile_flag(pos, "force_price_from_customer_price_list")
+	coupon_offers = {c.get("pos_offer") for c in data.get("coupons_detail") or [] if c.get("pos_offer")}
+	paid_lines = [
+		i
+		for i in items
+		if not cint(i.get("is_free_item")) and not cint(i.get("is_offer")) and i not in gift_issue_lines
+	]
 
 	for item_data in items:
 		if item_data in gift_issue_lines:
@@ -474,23 +522,28 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			item_data["is_free_item"] = 0
 		item_rate = flt(item_data.get("rate", 0), rate_precision)
 		item_qty = flt(item_data.get("qty", 1), 3)
-		is_free_item = cint(item_data.get("is_free_item"))
+		is_free_item = cint(item_data.get("is_free_item")) and verified_pricing_rule_free_line(pos, item_data)
+		verified_free = bool(is_free_item) or bool(
+			not is_return
+			and cint(item_data.get("is_offer"))
+			and verified_offer_free_line(pos, item_data, paid_lines, coupon_offers, invoice_doc.posting_date)
+		)
+		is_sale_line = not is_return and not verified_free and item_data not in gift_issue_lines
 
-		if not allow_rate_change and not is_free_item and item_data not in gift_issue_lines:
-			price_list = pos.get("selling_price_list")
-			if price_list:
-				price_list_rate = frappe.db.get_value(
-					"Item Price",
-					{
-						"item_code": item_data.get("item_code"),
-						"price_list": price_list,
-						"selling": 1,
-						"uom": item_data.get("uom") or item_data.get("stock_uom"),
-					},
-					"price_list_rate",
-				)
-				if price_list_rate is not None and flt(price_list_rate, rate_precision) != item_rate:
-					item_rate = flt(price_list_rate, rate_precision)
+		if is_sale_line and not allow_rate_change:
+			listed_rate = get_line_rate(
+				invoice_doc.selling_price_list,
+				item_data.get("item_code"),
+				item_data.get("uom") or item_data.get("stock_uom"),
+				customer,
+				item_qty,
+				invoice_doc.posting_date,
+				item_data.get("batch_no"),
+			)
+			if listed_rate is not None:
+				item_rate = flt(listed_rate, rate_precision)
+			elif force_customer_price:
+				price_unavailable(item_data.get("item_code"), invoice_doc.selling_price_list)
 
 		item = invoice_doc.append("items", {})
 		item.item_code = item_data.get("item_code")
@@ -524,7 +577,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		disc_amt = flt(item_data.get("discount_amount", 0), 2)
 
 		max_discount = flt(pos.get("max_discount_percentage_allowed", 0))
-		if max_discount > 0 and disc_pct > max_discount and not is_free_item:
+		if max_discount > 0 and disc_pct > max_discount and not verified_free:
 			frappe.throw(
 				_("Item {0}: Discount {1}% exceeds maximum allowed {2}%").format(
 					item_data.get("item_code"), disc_pct, max_discount
@@ -545,6 +598,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			item.rate = flt(item_rate - disc_amt, rate_precision)
 		else:
 			item.rate = item_rate
+		if is_sale_line:
+			check_zero_price_line(pos, item.item_code, flt(item.rate), verified_free)
 		if item_data.get("serial_no"):
 			item.serial_no = item_data.get("serial_no")
 		if item_data.get("batch_no"):
@@ -706,7 +761,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	enforce_stock_availability(invoice_doc)
 	validate_invoice_coupons(invoice_doc)
 
-	_validate_unpaid_balance_permissions(invoice_doc, pos, data)
+	_validate_unpaid_balance_permissions(invoice_doc, pos, data, credit_total(customer_credit))
 
 	from xpos.x_pos.integrations import fbr
 
@@ -717,6 +772,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	else:
 		outcome = fbr.prepare_fiscalization(invoice_doc)
 		if outcome.status == "local_required":
+			if customer_credit:
+				frappe.throw(_("Customer credit cannot be combined with local FBR fiscalization."))
 			return {
 				"status": "fbr_local_required",
 				"name": invoice_doc.name,
@@ -748,6 +805,9 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		}
 
 	invoice_doc.submit()
+	allocate_customer_credit(invoice_doc, customer_credit)
+	if customer_credit:
+		invoice_doc.reload()
 
 	return _build_invoice_response(invoice_doc)
 
@@ -838,7 +898,7 @@ def save_draft_invoice(data: str | dict):
 	if not pos_profile or not customer or not items:
 		frappe.throw(_("POS Profile, Customer, and Items are required"))
 
-	pos = frappe.get_cached_doc("POS Profile", pos_profile)
+	pos = resolve_pos_profile(pos_profile)
 
 	doctype = get_invoice_type()
 
@@ -884,7 +944,7 @@ def save_draft_invoice(data: str | dict):
 		or pos.currency
 		or frappe.db.get_value("Company", pos.company, "default_currency")
 	)
-	invoice_doc.selling_price_list = data.get("selling_price_list") or pos.get("selling_price_list")
+	invoice_doc.selling_price_list = resolve_selling_price_list(pos, customer)
 
 	if data.get("additional_discount_percentage"):
 		invoice_doc.additional_discount_percentage = flt(data["additional_discount_percentage"])

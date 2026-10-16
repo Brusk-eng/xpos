@@ -7,6 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt
 
+from xpos.api.profile_rules import resolve_selling_price_list
 from xpos.api.profiles import resolve_pos_profile
 from xpos.utils import row_value
 
@@ -65,7 +66,8 @@ def get_customers(search_term: str = "", limit: int = 20, pos_profile: str = Non
 			c.image,
 			c.tax_id,
 			c.customer_type,
-			c.gender
+			c.gender,
+			c.discount
 		FROM `tabCustomer` c
 		WHERE {conditions}
 		ORDER BY c.customer_name ASC
@@ -75,7 +77,17 @@ def get_customers(search_term: str = "", limit: int = 20, pos_profile: str = Non
 		as_dict=True,
 	)
 
+	if pos_profile and customers and frappe.db.exists("POS Profile", pos_profile):
+		set_pos_price_lists(customers, pos_profile)
+
 	return customers
+
+
+def set_pos_price_lists(customers: list, pos_profile: str) -> None:
+	"""Attach the price list each customer's sale lines resolve to, so offline carts know it."""
+	pos = frappe.get_cached_doc("POS Profile", pos_profile)
+	for customer in customers:
+		customer["pos_price_list"] = resolve_selling_price_list(pos, customer.name)
 
 
 @frappe.whitelist()
@@ -255,6 +267,7 @@ def create_customer(
 		customer.company = company
 
 	customer.insert(ignore_permissions=True)
+	referral = create_pos_referral_code(customer.name)
 
 	if address_line1 and city:
 		make_address(
@@ -274,7 +287,57 @@ def create_customer(
 		"email_id": customer.email_id,
 		"customer_group": customer.customer_group,
 		"territory": customer.territory,
+		**referral,
 	}
+
+
+def create_pos_referral_code(customer: str) -> dict:
+	"""``auto_create_referral_for_new_customers``: a Referral Code for a customer XPOS just created.
+
+	The profile comes from the caller's open shift, never from the request.
+	Re-running for the same customer and company never creates a second code.
+	"""
+	pos_profile = frappe.db.get_value(
+		"POS Opening Shift",
+		{"user": frappe.session.user, "status": "Open", "docstatus": 1},
+		"pos_profile",
+		order_by="creation desc",
+	)
+	if not pos_profile:
+		return {}
+	profile = frappe.get_cached_doc("POS Profile", pos_profile)
+	if not cint(profile.get("auto_create_referral_for_new_customers")):
+		return {}
+
+	company = frappe.get_cached_doc("Company", profile.company)
+	if not company.get("final_customer_offer"):
+		return {
+			"referral_note": _(
+				"No referral code was created: set a Final Customer Offer on company {0}."
+			).format(company.name)
+		}
+
+	# Serialise concurrent retries for this customer before checking for an existing code.
+	frappe.db.get_value("Customer", customer, "name", for_update=True)
+	existing = frappe.db.get_value(
+		"Referral Code", {"customer": customer, "company": company.name}, "referral_code"
+	)
+	if existing:
+		return {"referral_code": existing}
+
+	from xpos.x_pos.doctype.referral_code.referral_code import create_referral_code
+
+	primary_offer = company.get("primary_customer_offer")
+	if primary_offer and not frappe.db.exists("DocType", "XPOS Offer"):
+		primary_offer = None  # the field links to a DocType this app does not ship
+	doc = create_referral_code(
+		company.name,
+		customer,
+		company.final_customer_offer,
+		primary_offer,
+		company.get("referral_campaign"),
+	)
+	return {"referral_code": doc.referral_code}
 
 
 @frappe.whitelist()
@@ -428,57 +491,11 @@ def make_address(args: str | dict):
 
 
 @frappe.whitelist()
-def get_customer_credit(customer: str, company: str):
-	"""
-	Return all available credit (outstanding returns + unallocated advances) for a customer.
-	"""
-	if not customer or not company:
-		return []
+def get_customer_credit(customer: str, company: str | None = None, pos_profile: str | None = None):
+	"""Spendable customer credit through the caller's POS Profile (see xpos.api.customer_credit)."""
+	from xpos.api.customer_credit import get_customer_credit as profile_credit
 
-	credits = []
-
-	unallocated = frappe.db.sql(
-		"""
-		SELECT
-			pe.name AS credit_origin,
-			(pe.paid_amount - pe.total_allocated_amount) AS total_credit,
-			'Payment Entry' AS type,
-			pe.posting_date
-		FROM `tabPayment Entry` pe
-		WHERE pe.party_type = 'Customer'
-			AND pe.party = %(customer)s
-			AND pe.company = %(company)s
-			AND pe.docstatus = 1
-			AND pe.payment_type = 'Receive'
-			AND (pe.paid_amount - pe.total_allocated_amount) > 0
-		ORDER BY pe.posting_date ASC
-		""",
-		{"customer": customer, "company": company},
-		as_dict=True,
-	)
-	credits.extend(unallocated)
-
-	credit_notes = frappe.db.sql(
-		"""
-		SELECT
-			si.name AS credit_origin,
-			ABS(si.outstanding_amount) AS total_credit,
-			'Sales Invoice' AS type,
-			si.posting_date
-		FROM `tabSales Invoice` si
-		WHERE si.customer = %(customer)s
-			AND si.company = %(company)s
-			AND si.docstatus = 1
-			AND si.is_return = 1
-			AND si.outstanding_amount < 0
-		ORDER BY si.posting_date ASC
-		""",
-		{"customer": customer, "company": company},
-		as_dict=True,
-	)
-	credits.extend(credit_notes)
-
-	return credits
+	return profile_credit(customer, pos_profile=pos_profile)
 
 
 def get_allowed_sales_persons(pos_profile: str | None = None) -> list[str]:

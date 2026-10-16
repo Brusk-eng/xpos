@@ -32,6 +32,13 @@
 				>
 					{{ __("Free") }}
 				</span>
+				<span
+					v-if="item.pos_price_unavailable && !item.pos_rate_overridden"
+					role="status"
+					class="ms-1 px-1 py-px rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
+				>
+					{{ __("Price unavailable") }}
+				</span>
 			</p>
 
 			<div class="flex items-center gap-1 mt-0.5 flex-wrap">
