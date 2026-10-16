@@ -172,6 +172,9 @@ doc_events = {
 		"before_cancel": "xpos.x_pos.api.invoice.before_cancel",
 		"on_cancel": "xpos.x_pos.api.invoice.on_cancel",
 	},
+	"Mode of Payment": {
+		"validate": "xpos.x_pos.doctype.pos_closing_shift.closing_processing.reclass.validate_mode_of_payment",
+	},
 	"Customer": {
 		"validate": "xpos.x_pos.api.customer.validate",
 		"after_insert": "xpos.x_pos.api.customer.after_insert",

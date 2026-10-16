@@ -67,6 +67,7 @@ export const usePosStore = defineStore("pos", () => {
 			pos_tender_currency: p.pos_tender_currency || invoiceCurrency.value,
 			type: p.type || "",
 			is_foreign_tender: !!p.is_foreign_tender,
+			requires_reference: !!p.requires_reference,
 			exchange_rate: p.exchange_rate ?? 1,
 			rate_date: p.rate_date || "",
 		}));

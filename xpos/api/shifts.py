@@ -578,6 +578,7 @@ def attach_tender_currencies(data: dict, profile_doc):
 		row["pos_tender_currency"] = entry["currency"]
 		row["type"] = entry["type"]
 		row["is_foreign_tender"] = entry["is_foreign_tender"]
+		row["requires_reference"] = bool(entry.get("requires_reference"))
 		row["exchange_rate"] = entry["exchange_rate"]
 		row["rate_date"] = entry["rate_date"]
 		row["precision"] = entry["precision"]

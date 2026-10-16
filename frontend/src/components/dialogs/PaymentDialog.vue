@@ -283,6 +283,22 @@
 							@keydown.down.prevent="focusFirstQuickAmount"
 						/>
 
+						<div v-if="selectedTakesReference" class="mt-2" data-testid="payment-reference">
+							<input
+								ref="referenceRef"
+								v-model="referenceNo"
+								autocomplete="off"
+								maxlength="140"
+								class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-mono"
+								:placeholder="
+									selectedNeedsReference
+										? __('Transfer / reference number (required)')
+										: __('Transfer / reference number')
+								"
+								@keydown.enter.stop.prevent="handleAmountInputSubmit"
+							/>
+						</div>
+
 						<div v-if="selectedIsForeign" class="mt-1.5 space-y-1">
 							<p v-if="selectedRateMissing" class="text-xs font-medium text-destructive">
 								{{
@@ -334,7 +350,7 @@
 							size="sm"
 							class="w-full"
 							@click="addSplitPayment"
-							:disabled="!selectedMethod || tenderedAmount <= 0"
+							:disabled="!selectedMethod || tenderedAmount <= 0 || referenceMissing"
 						>
 							<Plus class="w-4 h-4" />
 							Add {{ selectedMethod }} &mdash;
@@ -354,6 +370,11 @@
 										v-if="sp.masked_code"
 										class="font-mono text-xs text-muted-foreground"
 										>{{ sp.masked_code }}</span
+									>
+									<span
+										v-if="sp.reference_no"
+										class="font-mono text-xs text-muted-foreground"
+										>{{ sp.reference_no }}</span
 									>
 								</div>
 								<div class="flex items-center gap-2">
@@ -875,6 +896,9 @@ const printAfterSave = ref(false);
 const isSplitPayment = ref(false);
 const splitPayments = ref<TenderLeg[]>([]);
 
+const referenceRef = ref<HTMLInputElement | null>(null);
+const referenceNo = ref("");
+
 const changeLegs = ref<InvoiceChangeLeg[]>([]);
 const changeTouched = ref(false);
 
@@ -946,10 +970,26 @@ function buildLeg(mode: string, nativeAmount: number, id?: string): TenderLeg {
 	return buildTenderLeg(mode, nativeAmount, tenderContext.value, id);
 }
 
+const selectedTakesReference = computed(
+	() => !!posStore.tenderModeFor(selectedMethod.value)?.requires_reference,
+);
+const selectedNeedsReference = computed(() => selectedTakesReference.value && !cartStore.isReturnMode);
+const referenceMissing = computed(() => selectedNeedsReference.value && !referenceNo.value.trim());
+
+watch(selectedMethod, () => {
+	referenceNo.value = "";
+});
+
+function withReference(leg: TenderLeg): TenderLeg {
+	const reference = referenceNo.value.trim();
+	if (selectedTakesReference.value && reference) leg.reference_no = reference;
+	return leg;
+}
+
 const activeLegs = computed<TenderLeg[]>(() => {
 	if (isSplitPayment.value) return splitPayments.value;
 	if (!selectedMethod.value || tenderedAmount.value <= 0) return [];
-	return [buildLeg(selectedMethod.value, tenderedAmount.value, "single")];
+	return [withReference(buildLeg(selectedMethod.value, tenderedAmount.value, "single"))];
 });
 
 const splitTotal = computed(() => tenderBaseTotal(splitPayments.value, invoiceCurrency.value));
@@ -1084,6 +1124,7 @@ const canSubmit = computed(() => {
 	if (cartStore.isEmpty) return false;
 	if (isGiftCardSale.value && !offlineStore.isOnline) return false;
 	if (selectedRateMissing.value) return false;
+	if (!isSplitPayment.value && referenceMissing.value) return false;
 	const total = roundCurrency(Math.abs(cartStore.grandTotal));
 	if (total <= 0) return true;
 	if (remainingAmount.value > 0) {
@@ -1163,6 +1204,11 @@ onUnmounted(() => {
 
 function handleAmountInputSubmit(event: KeyboardEvent) {
 	if (isSubmitting.value) return;
+
+	if (referenceMissing.value && tenderedAmount.value > 0) {
+		referenceRef.value?.focus();
+		return;
+	}
 
 	if (isPaymentDialogSaveOnlyShortcut(event)) {
 		if (canSubmit.value) {
@@ -1257,8 +1303,13 @@ function refillTenderRemainder() {
 
 function addSplitPayment() {
 	if (!selectedMethod.value || tenderedAmount.value <= 0) return;
-	const leg = buildLeg(selectedMethod.value, tenderedAmount.value);
+	if (referenceMissing.value) {
+		referenceRef.value?.focus();
+		return;
+	}
+	const leg = withReference(buildLeg(selectedMethod.value, tenderedAmount.value));
 	mergeTenderLeg(splitPayments.value, leg, tenderContext.value);
+	referenceNo.value = "";
 	refillTenderRemainder();
 }
 

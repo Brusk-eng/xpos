@@ -8,7 +8,7 @@ For what the feature does and how a cashier uses it, see
 [Payment Processing](06-payment-processing.md#mixed-currency-cash-payment-and-change). For how it
 differs from `allow_multi_currency`, see [Multi-Currency](19-multi-currency.md).
 
-Do this once, in order. Steps 1 to 6 are one-time; step 7 is daily.
+Do this once, in order. Steps 1 to 6 are one-time; step 7 is daily; step 9 is optional.
 
 ---
 
@@ -129,6 +129,58 @@ The closing count sheet asks for the same units back.
 
 ---
 
+## 9. Destination accounts (optional)
+
+By default every mode leaves its takings in the shared company-currency account. To have them land
+in a real bank account, so they can be revalued and matched in Bank Reconciliation, set
+**Destination Account** on the mode's Mode of Payment Account row, and choose how it posts with
+**Destination Posting**:
+
+| Mode | Type | Default Account | Destination Account | Destination Posting |
+|---|---|---|---|---|
+| Cash USD | Cash | Shared LBP cash account | `USD Bank - K` (USD) | Per Shift |
+| Card | Bank | Shared LBP cash account | `Card Settlement - K` | Per Shift |
+| Bank Transfer | Bank | Shared LBP cash account | `Transfers Bank - K` | Per Payment |
+
+When the closing shift is submitted, X POS posts the Journal Entries and lists them on the closing
+shift's **Connections** tab (each one carries the shift in its **POS Closing Shift** field).
+Every entry debits the destination and credits the default account by the same company-currency
+amount. A destination in the tender currency takes the native amount at the frozen rate. A
+destination in the company currency takes the base amount. Any other currency is refused.
+
+**Per Shift** posts one Journal Entry for the shift, with one pair of rows per mode, dated on the
+closing. It moves the mode's net: tendered, **minus** change handed back on that mode, **minus**
+returns refunded on it, at the average of the shift's frozen rates. Opening float and count
+differences are not moved. Use it where the bank shows one deposit, such as cash you bank or a card
+processor's settlement.
+
+**Per Payment** posts one Journal Entry for **each payment**, dated on its invoice and using that
+invoice's exact rate. Use it where the bank shows every payment on its own line, such as customers'
+bank transfers. The till then asks for the **transfer or reference number** with every sale on that
+mode, and keeps each one as its own payment row. The number goes onto the payment row's
+`reference_no` and into the Journal Entry's **Reference No** (`cheque_no`). Bank Reconciliation
+ranks matches on that reference and the amount, and auto-matches when the reference equals the bank
+line's. A refund posts its own reversing entry; when no number was taken, the invoice name is used.
+Per Payment is for non-cash modes only, and a Cash mode refuses it. Change is handed back in cash,
+so it would make a payment's amount differ from the transfer.
+
+Bank Reconciliation matches a Journal Entry as a whole. It adds up all its rows on the bank account,
+so splitting one shift entry into lines would still show as one lump. That is why Per Payment
+posts separate entries.
+
+Cancelling the closing shift cancels all of its entries. Leave Destination Account blank to keep
+today's behaviour.
+
+Things to know:
+
+- Once foreign money sits in a foreign-currency account, **Exchange Rate Revaluation** applies to it,
+  so FX gain and loss start to appear. That is the point, but it is new
+- Do not also bank-drop the same cash through **Cash Deposit**, or it leaves the cash account twice
+- In POS Invoice mode the sales are merged into one Sales Invoice at close. Per Payment entries still
+  post one per payment, because they are built from the POS Invoices
+
+---
+
 ## Verifying the setup
 
 Ring up one sale and check it end to end.
@@ -151,7 +203,7 @@ Ring up one sale and check it end to end.
   counted in, and a shift opened before the change will be counted after it
 - A foreign-currency invoice queued offline and replayed after the rate moved will be rejected on
   purpose. Re-ring it at the current rate rather than editing the rate to match
-- There is no FX gain or loss tracking. The foreign figure is drawer-reconciliation metadata against
-  one shared company-currency cash account
+- There is no FX gain or loss tracking unless you set a Destination Account (step 9). Otherwise the
+  foreign figure is drawer-reconciliation metadata against one shared company-currency cash account
 - Genuine note shortfalls go through the existing write-off path, not through the change legs. The
   allocator's tolerance is exactly one minor unit and is deliberately not configurable

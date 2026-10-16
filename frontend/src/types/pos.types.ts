@@ -102,6 +102,7 @@ export interface POSPaymentMethod {
 	pos_tender_currency?: string;
 	type?: string;
 	is_foreign_tender?: boolean;
+	requires_reference?: boolean;
 	exchange_rate?: number;
 	rate_date?: string;
 	precision?: number;
@@ -404,6 +405,7 @@ export interface InvoicePayment {
 	gift_card_auth?: string;
 	/** On a return: the card that paid the original sale, refunded here. */
 	gift_card?: string;
+	reference_no?: string;
 }
 
 export interface TenderLeg {
@@ -416,6 +418,7 @@ export interface TenderLeg {
 	gift_card?: string;
 	gift_card_auth?: string;
 	masked_code?: string;
+	reference_no?: string;
 }
 
 export interface GiftCardCheck {

@@ -192,6 +192,15 @@ cd apps/xpos
 pre-commit install
 ```
 
+### Translations
+
+```
+bench generate-pot-file --app <app> - extracted each app's own translatable strings into locale/main.pot.
+bench migrate-csv-to-po --app <app> --locale ar - merged the CSV translations into locale/ar.po.
+bench compile-po-to-mo --app <app> --locale ar --force
+bench update-csv-from-po <app> --locale ar
+```
+
 ### Code Quality
 
 This project uses `pre-commit` for code formatting and linting:
