@@ -31,6 +31,11 @@ class TestCreateInvoice(unittest.TestCase):
 			"resolve_pos_profile",
 			side_effect=lambda name: invoices.frappe.get_cached_doc("POS Profile", name),
 		)
+		# Repricing, discount authority and zero payable run on ERPNext's real calculation;
+		# they are covered live in test_profile_settings_hardening.
+		self.stub("repricing_changes", return_value=None)
+		self.stub("validate_sale_discounts")
+		self.stub("check_zero_payable")
 
 	def stub(self, name, **kwargs):
 		"""Patch `name` in the xpos.api.invoices namespace for the current test."""

@@ -122,13 +122,19 @@ class TestCustomerPriceList(unittest.TestCase):
 class TestZeroPriceAndFreeLines(unittest.TestCase):
 	"""A3: zero-price sale lines and server-verified free lines."""
 
-	def test_zero_price_rejected_unless_allowed(self):
+	def test_zero_payable_rejected_unless_allowed(self):
+		"""``net_amount`` already carries the invoice discount, so 100% / fixed invoice discounts count."""
+		row = lambda net: frappe._dict(item_code="ITEM", net_amount=net)  # noqa: E731
+		doc = lambda total: frappe._dict(grand_total=total)  # noqa: E731
 		with patch.object(profile_rules.frappe, "throw", side_effect=raise_thrown):
 			with self.assertRaises(Thrown):
-				profile_rules.check_zero_price_line(profile(allow_zero_rated_items=0), "ITEM", 0, False)
-			profile_rules.check_zero_price_line(profile(allow_zero_rated_items=1), "ITEM", 0, False)
-			profile_rules.check_zero_price_line(profile(allow_zero_rated_items=0), "ITEM", 0, True)
-			profile_rules.check_zero_price_line(profile(allow_zero_rated_items=0), "ITEM", 5, False)
+				profile_rules.check_zero_payable(profile(allow_zero_rated_items=0), doc(10), [row(0)])
+			with self.assertRaises(Thrown):
+				profile_rules.check_zero_payable(profile(allow_zero_rated_items=0), doc(0), [row(5)])
+			profile_rules.check_zero_payable(profile(allow_zero_rated_items=1), doc(0), [row(0)])
+			profile_rules.check_zero_payable(profile(allow_zero_rated_items=0), doc(5), [row(5)])
+			# Only verified free promotion lines (not passed as sale rows) may be free.
+			profile_rules.check_zero_payable(profile(allow_zero_rated_items=0), doc(0), [])
 
 	def offer(self, **values):
 		base = dict(
@@ -251,6 +257,18 @@ class TestCreateInvoicePricing(unittest.TestCase):
 		self.can_change_price = patcher.start()
 		self.addCleanup(patcher.stop)
 
+		# Checks that need ERPNext's real totals run live (test_profile_settings_hardening).
+		for name in ("repricing_changes", "validate_sale_discounts"):
+			patcher = patch(f"xpos.api.invoices.{name}", return_value=None)
+			patcher.start()
+			self.addCleanup(patcher.stop)
+		patcher = patch("xpos.api.invoices.check_zero_payable")
+		self.zero_check = patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def sale_rows(self):
+		return self.zero_check.call_args.args[2]
+
 	def run_invoice(self, pos, items, prices=None, **data):
 		prices = prices or {}
 		with (
@@ -276,7 +294,12 @@ class TestCreateInvoicePricing(unittest.TestCase):
 				[{"item_code": "A", "qty": 1, "rate": 50}],
 			)
 
-	def test_missing_price_keeps_rate_when_not_forced(self):
+	def test_missing_price_cannot_be_invented_without_price_rights(self):
+		with self.assertRaisesRegex(frappe.ValidationError, "Price unavailable"):
+			self.run_invoice(profile(allow_zero_rated_items=1), [{"item_code": "A", "qty": 1, "rate": 50}])
+
+	def test_missing_price_keeps_rate_with_price_rights(self):
+		self.can_change_price.return_value = True
 		self.run_invoice(profile(allow_zero_rated_items=1), [{"item_code": "A", "qty": 1, "rate": 50}])
 		self.assertEqual(self.rows[0].rate, 50)
 
@@ -285,24 +308,25 @@ class TestCreateInvoicePricing(unittest.TestCase):
 		self.run_invoice(profile(), [{"item_code": "A", "qty": 1, "rate": 55}], prices={"A": 80})
 		self.assertEqual(self.rows[0].rate, 55)
 
-	def test_crafted_free_line_rejected_when_zero_price_not_allowed(self):
-		with self.assertRaisesRegex(frappe.ValidationError, "zero price"):
-			self.run_invoice(
-				profile(allow_zero_rated_items=0),
-				[
-					{"item_code": "A", "qty": 1, "rate": 80},
-					{"item_code": "B", "qty": 1, "rate": 0, "is_free_item": 1, "is_offer": 1, "offers": "X"},
-				],
-				prices={"A": 80, "B": 0},
-			)
+	def test_crafted_free_line_is_checked_as_a_sale_line(self):
+		self.run_invoice(
+			profile(allow_zero_rated_items=0),
+			[
+				{"item_code": "A", "qty": 1, "rate": 80},
+				{"item_code": "B", "qty": 1, "rate": 0, "is_free_item": 1, "is_offer": 1, "offers": "X"},
+			],
+			prices={"A": 80, "B": 0},
+		)
+		self.assertEqual(self.sale_rows(), self.rows)
+		self.assertFalse(self.rows[1].is_free_item == 1)
 
-	def test_full_manual_discount_counts_as_zero_price(self):
+	def test_discounted_line_is_checked_as_a_sale_line(self):
 		self.can_change_price.return_value = True
-		with self.assertRaisesRegex(frappe.ValidationError, "zero price"):
-			self.run_invoice(
-				profile(allow_zero_rated_items=0),
-				[{"item_code": "A", "qty": 1, "rate": 80, "discount_percentage": 100}],
-			)
+		self.run_invoice(
+			profile(allow_zero_rated_items=0),
+			[{"item_code": "A", "qty": 1, "rate": 80, "discount_percentage": 100}],
+		)
+		self.assertEqual(self.sale_rows(), self.rows)
 
 	def test_zero_price_allowed_when_enabled(self):
 		self.run_invoice(
@@ -535,31 +559,79 @@ class TestBlindClosing(unittest.TestCase):
 			report.ensure_not_blind({"POS-1"})
 
 
-class TestCustomerDiscount(unittest.TestCase):
-	"""C1: a till-labelled customer discount must be the customer's own, within the profile cap."""
+class TestSaleDiscountAuthority(unittest.TestCase):
+	"""C1/A: discount authority is derived on the server; ``discount_source`` is never consulted."""
 
-	def check(self, pos, percentage, amount=0, stored=10):
+	def check(
+		self,
+		rows,
+		discount=0,
+		grand_total=100,
+		perms=(),
+		cap=100.0,
+		customer_pct=0,
+		rule_pct=0,
+		offers=(0, 0),
+	):
+		doc = frappe._dict(
+			discount_amount=discount,
+			grand_total=grand_total,
+			total=grand_total + discount,
+			apply_discount_on="Grand Total",
+			customer="CUST-1",
+			posting_date="2026-10-17",
+			pricing_rules=[],
+		)
 		with (
-			patch.object(profile_rules.frappe.db, "get_value", return_value=stored),
 			patch.object(profile_rules.frappe, "throw", side_effect=raise_thrown),
+			patch("xpos.api.auth.user_has_pos_permission", side_effect=lambda key, **kw: key in perms),
+			patch.object(profile_rules, "manual_discount_cap", return_value=cap),
+			patch.object(profile_rules, "rule_line_discount_pct", return_value=rule_pct),
+			patch.object(profile_rules, "customer_discount_rate", return_value=customer_pct),
+			patch.object(profile_rules, "offer_discounts", return_value=offers),
+			patch.object(profile_rules, "transaction_rule_discount", return_value=0),
 		):
-			profile_rules.validate_customer_discount(pos, "CUST-1", percentage, amount)
+			profile_rules.validate_sale_discounts(profile(), doc, rows, [], [], set())
 
-	def test_matching_discount_passes(self):
-		self.check(profile(apply_customer_discount=1), 10)
+	def line(self, plr=100, rate=100):
+		return frappe._dict(name="row1", idx=1, item_code="A", price_list_rate=plr, rate=rate)
 
-	def test_capped_by_profile_maximum(self):
-		self.check(profile(apply_customer_discount=1, max_discount_percentage_allowed=5), 5)
-		with self.assertRaises(Thrown):
-			self.check(profile(apply_customer_discount=1, max_discount_percentage_allowed=5), 10)
+	def test_customer_discount_needs_no_manual_permission(self):
+		# 10% customer discount on a 100 sale (grand total 90 after it).
+		self.check([self.line()], discount=10, grand_total=90, customer_pct=10)
 
-	def test_forged_or_disabled_discount_rejected(self):
+	def test_forged_customer_discount_is_manual_and_rejected(self):
 		with self.assertRaises(Thrown):
-			self.check(profile(apply_customer_discount=1), 50)
+			self.check([self.line()], discount=50, grand_total=50, customer_pct=10)
+
+	def test_manual_invoice_discount_needs_permission_and_cap(self):
 		with self.assertRaises(Thrown):
-			self.check(profile(apply_customer_discount=0), 10)
+			self.check([self.line()], discount=10, grand_total=90)
+		self.check([self.line()], discount=10, grand_total=90, perms=("apply_additional_discount",), cap=10)
 		with self.assertRaises(Thrown):
-			self.check(profile(apply_customer_discount=1), 10, amount=20)
+			self.check(
+				[self.line()], discount=20, grand_total=80, perms=("apply_additional_discount",), cap=10
+			)
+
+	def test_manual_line_discount_needs_permission_and_cap(self):
+		with self.assertRaises(Thrown):
+			self.check([self.line(rate=90)])
+		self.check([self.line(rate=90)], perms=("show_edit_discount_field",), cap=10)
+		with self.assertRaises(Thrown):
+			self.check([self.line(rate=80)], perms=("show_edit_discount_field",), cap=10)
+
+	def test_verified_pricing_rule_line_discount_is_not_manual(self):
+		self.check([self.line(rate=50)], rule_pct=50)
+
+	def test_offer_discount_is_not_manual(self):
+		# 20 item-level offer discount plus a 10% grand-total offer on the remaining 80 = 28.
+		self.check([self.line()], discount=28, grand_total=72, offers=(20, 10))
+
+	def test_line_and_invoice_manual_discounts_cannot_stack_past_cap(self):
+		perms = ("apply_additional_discount", "show_edit_discount_field")
+		with self.assertRaises(Thrown):
+			self.check([self.line(rate=90)], discount=9, grand_total=81, perms=perms, cap=10)
+		self.check([self.line(rate=95)], discount=4.75, grand_total=90.25, perms=perms, cap=10)
 
 
 class TestPurchaseUom(unittest.TestCase):
@@ -612,6 +684,8 @@ class TestCustomerCredit(unittest.TestCase):
 			patch.object(
 				customer_credit.frappe.db, "sql", side_effect=lambda q, name, as_dict: rows.get(name, [])
 			),
+			patch.object(customer_credit.frappe.db, "get_value", return_value="CUST-1"),
+			patch.object(customer_credit.frappe.db, "rollback"),
 		):
 			return customer_credit.lock_credit_sources(pos, "CUST-1", "Debtors - TC", requested)
 
@@ -794,14 +868,15 @@ class TestReferralOnCreate(unittest.TestCase):
 		created = MagicMock(referral_code="ABC123")
 
 		def get_value(doctype, filters, field=None, **kwargs):
-			if doctype == "POS Opening Shift":
-				return shift_profile
 			if doctype == "Referral Code":
 				return existing
+			if doctype == "POS Offer":
+				return frappe._dict(disabled=0, company="Test Co")
 			return "CUST-1"
 
 		with (
 			patch.object(customers.frappe.db, "get_value", side_effect=get_value),
+			patch.object(customers.frappe, "get_all", return_value=[shift_profile] if shift_profile else []),
 			patch.object(
 				customers.frappe,
 				"get_cached_doc",

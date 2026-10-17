@@ -14,7 +14,7 @@ Do this once, in order. Steps 1 to 6 are one-time; step 7 is daily; step 9 is op
 
 ## 1. Currency masters
 
-Both currencies must be enabled, and both need a correct `number_format` — it is the only source
+Both currencies must be enabled, and both need a correct `number_format` - it is the only source
 of an amount's decimal places.
 
 | Currency | `number_format` | Renders |
@@ -54,8 +54,8 @@ Create one mode per currency of cash you accept.
 
 Both are mandatory:
 
-- `type = Cash` — change calculation is gated on it, so a non-cash mode can never hand change back
-- The account row — `before_save` throws without one for the company
+- `type = Cash` - change calculation is gated on it, so a non-cash mode can never hand change back
+- The account row - `before_save` throws without one for the company
 
 The account must stay in the **company currency** for both modes. A USD-denominated account cannot
 work: ERPNext writes `payment_mode.amount` into `debit_in_account_currency`, and that field always
@@ -81,7 +81,7 @@ holds the invoice-currency value.
 
 With it off, ERPNext subtracts the full change amount from `base_amount` on **every** payment row
 matching `account_for_change_amount`, which is only correct when exactly one row matches. Zero
-matches leaves a dangling Debtors credit and two matches subtracts twice — and because debits
+matches leaves a dangling Debtors credit and two matches subtracts twice - and because debits
 still equal credits either way, nothing errors. A server-side guard refuses the sale if the
 setting is ever turned back off.
 
@@ -107,7 +107,7 @@ One **Currency Exchange** record per trading day:
 | `for_buying` | ✅ |
 | `for_selling` | ✅ |
 
-**`for_selling` is required** — the resolver filters on it, and a record without it is invisible to
+**`for_selling` is required** - the resolver filters on it, and a record without it is invisible to
 the POS. Tick both to keep the record usable elsewhere in ERPNext.
 
 If today's record is missing, X POS falls back to the newest rate available and writes an
@@ -195,7 +195,7 @@ Ring up one sale and check it end to end.
 3. Submit, then open the **General Ledger** report for the invoice. Debtors must net to exactly
    **5,892,300 Dr** and the cash account to **5,892,300**, with `outstanding_amount = 0`.
 4. Reopen the submitted invoice after changing the daily rate. Its payment rows must still read
-   the old rate — rates are frozen at submit time.
+   the old rate - rates are frozen at submit time.
 5. Close the shift. The count sheet must ask for **$270** and **592,300 LBP** as separate lines.
 
 ---

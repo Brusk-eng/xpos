@@ -874,9 +874,7 @@ async function loadPurchaseTaxTemplate(): Promise<void> {
 		if (result?.taxes && result.taxes.length > 0) {
 			defaultTaxRate.value = result.taxes[0].rate || 0;
 		}
-	} catch {
-		// no default purchase tax template found — ok
-	}
+	} catch {}
 }
 
 onMounted(() => {

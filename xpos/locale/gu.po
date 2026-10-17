@@ -603,7 +603,7 @@ msgid "Arrow keys to navigate"
 msgstr ""
 
 #: frontend/src/components/core/SortBy.vue:8
-msgid "Ascending — click to sort descending"
+msgid "Ascending - click to sort descending"
 msgstr ""
 
 #: xpos/api/invoices.py:345
@@ -1071,7 +1071,7 @@ msgid "Cashier settlement is disabled"
 msgstr ""
 
 #: frontend/src/views/CashierView.vue:8
-msgid "Cashier — Unsettled Invoices"
+msgid "Cashier - Unsettled Invoices"
 msgstr ""
 
 #: frontend/src/components/dialogs/PaymentDialog.vue:544
@@ -1941,7 +1941,7 @@ msgid "Deposit cancelled"
 msgstr ""
 
 #: frontend/src/components/core/SortBy.vue:7
-msgid "Descending — click to sort ascending"
+msgid "Descending - click to sort ascending"
 msgstr ""
 
 #. Label of the description (Small Text) field in DocType 'POS Offer'
@@ -2456,7 +2456,7 @@ msgid "FBR did not return a fiscal invoice number."
 msgstr ""
 
 #: frontend/src/components/dialogs/PaymentDialog.vue:1688
-msgid "FBR fiscalization failed — both the FBR cloud and the local service are unavailable."
+msgid "FBR fiscalization failed - both the FBR cloud and the local service are unavailable."
 msgstr ""
 
 #: xpos/x_pos/integrations/fbr.py:170

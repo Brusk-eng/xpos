@@ -8,6 +8,30 @@
 			{{ __("Prices calculated offline, will be confirmed when the invoice syncs") }}
 		</div>
 
+		<div
+			v-if="cartStore.repriceReview"
+			role="alert"
+			class="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-[11px] text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 space-y-1.5"
+		>
+			<p class="font-semibold">{{ __("Prices changed - nothing was charged or saved") }}</p>
+			<p>
+				{{
+					__(
+						"The server priced this sale at {0}. Check the marked lines, then take payment again.",
+						[money(cartStore.repriceReview.rounded_total || cartStore.repriceReview.grand_total)],
+					)
+				}}
+			</p>
+			<Button
+				size="sm"
+				variant="outline"
+				class="h-7 text-[11px]"
+				@click="cartStore.acknowledgeRepricing()"
+			>
+				{{ __("I have reviewed the new prices") }}
+			</Button>
+		</div>
+
 		<div class="space-y-1.5">
 			<div class="flex items-center justify-between text-sm">
 				<span class="text-muted-foreground">{{ __("Subtotal") }}</span>

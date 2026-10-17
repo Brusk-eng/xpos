@@ -417,12 +417,11 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	- Tax summary per shift
 	- Payment reconciliation with expected vs actual amounts
 	"""
-	if not can_close_shift():
+	opening = frappe.get_doc("POS Opening Shift", opening_shift)
+	if not user_may_use_profile(opening.pos_profile) or not can_close_shift(pos_profile=opening.pos_profile):
 		frappe.throw(_("Only a Supervisor can close a shift."), frappe.PermissionError)
 
 	closing_details = json.loads(closing_details) if isinstance(closing_details, str) else closing_details
-
-	opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	doctype = get_invoice_type()
 
 	invoices = get_shift_invoices(opening, doctype, CLOSING_INVOICE_FIELDS)
@@ -777,6 +776,8 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 		opening = frappe.get_doc("POS Opening Shift", opening_shift)
 	except frappe.DoesNotExistError:
 		frappe.throw(_("POS Opening Shift {0} not found").format(opening_shift))
+	if not user_may_use_profile(opening.pos_profile) or not can_close_shift(pos_profile=opening.pos_profile):
+		frappe.throw(_("Only a Supervisor can close a shift."), frappe.PermissionError)
 
 	closing_shift = frappe.get_doc(
 		{

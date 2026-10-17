@@ -109,6 +109,7 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 			{ key: "print_draft_invoice", label: "Print Draft Invoice" },
 			{ key: "shift_report", label: "Shift Report" },
 			{ key: "view_expected_amount", label: "View Expected Amount" },
+			{ key: "resolve_fiscal_check", label: "Resolve FBR Check" },
 		],
 	},
 	{

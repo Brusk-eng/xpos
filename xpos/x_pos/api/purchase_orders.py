@@ -2244,6 +2244,7 @@ def get_item_purchase_details(item_code: str, pos_profile: str | None = None) ->
 	) or frappe.db.get_value("Price List", {"buying": 1, "enabled": 1}, "name", order_by="creation asc")
 	buying_rate = 0
 	if buying_price_list:
+		from erpnext.setup.utils import get_exchange_rate
 		from erpnext.stock.get_item_details import get_price_list_rate_for
 
 		# Priced in the line's UOM: its own Item Price, else the stock-UOM price times the factor.
@@ -2260,6 +2261,17 @@ def get_item_purchase_details(item_code: str, pos_profile: str | None = None) ->
 				item_code,
 			)
 		)
+		# The purchase invoice is in company currency; a price in another currency is converted,
+		# or not used when no exchange rate exists.
+		company = (
+			frappe.db.get_value("POS Profile", pos_profile, "company") if pos_profile else None
+		) or frappe.defaults.get_user_default("Company")
+		list_currency = frappe.db.get_value("Price List", buying_price_list, "currency")
+		company_currency = (
+			frappe.get_cached_value("Company", company, "default_currency") if company else None
+		)
+		if buying_rate and list_currency and company_currency and list_currency != company_currency:
+			buying_rate *= flt(get_exchange_rate(list_currency, company_currency, nowdate(), "for_buying"))
 	if not buying_rate:
 		stock_rate = flt(item.last_purchase_rate) or flt(item.standard_rate) or flt(item.valuation_rate)
 		buying_rate = stock_rate * purchase_cf

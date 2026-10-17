@@ -66,8 +66,9 @@ vi.mock("@/services/pricingService", () => ({
 }));
 
 import { call } from "@/services/api";
+import { getCachedItemByCode } from "@/services/dbBridge";
 import { useCartStore } from "@/stores/cartStore";
-import type { POSItem } from "@/types/pos.types";
+import type { POSItem, POSOffer } from "@/types/pos.types";
 
 const mockedCall = vi.mocked(call);
 
@@ -137,7 +138,8 @@ describe("force_price_from_customer_price_list", () => {
 
 		expect(cart.items[0].rate).toBe(0);
 		expect(cart.items[0].pos_price_unavailable).toBe(true);
-		expect(cart.pricingIssues[0]).toContain("Price unavailable");
+		expect(cart.items[0].pos_price_state).toBe("no_price");
+		expect(cart.pricingIssues[0]).toContain("no price is configured");
 	});
 
 	it("leaves a manually overridden rate alone", async () => {
@@ -161,7 +163,50 @@ describe("force_price_from_customer_price_list", () => {
 		await cart.applyCustomerPriceList();
 
 		expect(cart.items[0].pos_price_unavailable).toBe(true);
+		expect(cart.items[0].pos_price_state).toBe("needs_connection");
+		expect(cart.pricingIssues[0]).toContain("connect to the server");
+		expect(cart.items).toHaveLength(1);
 		expect(mockedCall).not.toHaveBeenCalled();
+	});
+
+	it("reprices lines that needed a connection as soon as it is back", async () => {
+		vi.useFakeTimers();
+		try {
+			pos.forcePriceFromCustomerPriceList = true;
+			online.value = false;
+			const cart = useCartStore();
+			cart.addItem(posItem());
+			cart.setCustomer({ name: "CUST-VIP", pos_price_list: "VIP List" } as never);
+			await cart.applyCustomerPriceList();
+			expect(cart.items[0].pos_price_state).toBe("needs_connection");
+
+			online.value = true;
+			mockedCall.mockImplementation(priceReply("VIP List", 80) as never);
+			window.dispatchEvent(new Event("online"));
+			await vi.advanceTimersByTimeAsync(200);
+
+			// (Stores left by earlier tests listen too; this cart's line is what matters.)
+			expect(mockedCall).toHaveBeenCalled();
+			expect(cart.items[0].rate).toBe(80);
+			expect(cart.items[0].pos_price_unavailable).toBe(false);
+			expect(cart.pricingIssues).toHaveLength(0);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it("offline, a customer-group list from the server is used to decide what is known", async () => {
+		pos.forcePriceFromCustomerPriceList = true;
+		online.value = false;
+		const cart = useCartStore();
+		cart.addItem(posItem());
+		// The group fallback resolved to the profile list: cached profile prices are valid.
+		vi.mocked(getCachedItemByCode).mockResolvedValue({ stock_uom: "Nos", rate: 100 } as never);
+		cart.setCustomer({ name: "CUST-GROUP", pos_price_list: "Standard Selling" } as never);
+		await cart.applyCustomerPriceList();
+		expect(cart.items[0].pos_price_state).toBeUndefined();
+		expect(cart.items[0].rate).toBe(100);
+		vi.mocked(getCachedItemByCode).mockResolvedValue(null as never);
 	});
 
 	it("does nothing when the profile does not force customer prices", async () => {
@@ -183,6 +228,97 @@ describe("allow_zero_rated_items", () => {
 		cart.updateItemDiscount(1, "percentage", 100);
 		expect(cart.pricingIssues).toHaveLength(2);
 
+		pos.allowZeroRatedItems = true;
+		expect(cart.pricingIssues).toHaveLength(0);
+	});
+});
+
+describe("server repricing", () => {
+	it("adopts the server's prices and blocks payment until the cashier reviews them", () => {
+		const cart = useCartStore();
+		cart.addItem(posItem({ rate: 90 }));
+		const rowId = cart.getInvoiceData("POS-1", "SHIFT-1").items[0].row_id;
+		expect(rowId).toBeTruthy();
+
+		cart.applyServerRepricing({
+			status: "reprice_required",
+			lines: [
+				{
+					row_id: rowId,
+					index: 0,
+					item_code: "ITEM-A",
+					quoted_rate: 90,
+					rate: 100,
+					price_list_rate: 100,
+					discount_percentage: 0,
+					discount_amount: 0,
+				},
+			],
+			additional_discount_percentage: 0,
+			discount_amount: 0,
+			discount_changed: false,
+			grand_total: 100,
+			rounded_total: 100,
+			message: "Prices changed",
+		});
+
+		expect(cart.items[0].rate).toBe(100);
+		expect(cart.items[0].pos_repriced_from).toBe(90);
+		expect(cart.items).toHaveLength(1);
+		expect(cart.pricingIssues[0]).toContain("Review the updated prices");
+
+		cart.acknowledgeRepricing();
+		expect(cart.pricingIssues).toHaveLength(0);
+		expect(cart.items[0].pos_repriced_from).toBeUndefined();
+	});
+});
+
+describe("server discount with POS Offers", () => {
+	it("blocks payment until the offers are removed, then takes the server's discount", () => {
+		const cart = useCartStore();
+		cart.addItem(posItem({ rate: 100 }));
+		cart.applyOffer({
+			name: "OFFER-1",
+			title: "10% off",
+			offer_type: "",
+			disabled: false,
+			offer: "Item Price",
+			apply_on: "Item Code",
+			item: "ITEM-A",
+			discount_type: "Discount Percentage",
+			discount_percentage: 10,
+		} as POSOffer);
+		expect(cart.offerItemDiscountTotal).toBeGreaterThan(0);
+
+		const response = {
+			status: "reprice_required" as const,
+			lines: [],
+			additional_discount_percentage: 5,
+			discount_amount: 0,
+			discount_changed: true,
+			offer_conflict: true,
+			grand_total: 95,
+			rounded_total: 95,
+			message: "A pricing rule sets this sale's invoice discount",
+		};
+		cart.applyServerRepricing(response);
+		cart.acknowledgeRepricing();
+		expect(cart.pricingIssues.join()).toContain("Remove the offers");
+
+		cart.removeOffer("OFFER-1");
+		expect(cart.pricingIssues).toHaveLength(0);
+		// The next answer, now without offers, is adopted like any other repricing.
+		cart.applyServerRepricing({ ...response, offer_conflict: false });
+		expect(cart.discountPercentage).toBe(5);
+	});
+});
+
+describe("zero payable", () => {
+	it("an invoice discount that wipes out the total is refused unless zero prices are allowed", () => {
+		const cart = useCartStore();
+		cart.addItem(posItem());
+		cart.setDiscount("percentage", 100);
+		expect(cart.pricingIssues.join()).toContain("totals zero");
 		pos.allowZeroRatedItems = true;
 		expect(cart.pricingIssues).toHaveLength(0);
 	});

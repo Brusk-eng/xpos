@@ -14,6 +14,7 @@ POS_PERMISSIONS = (
 	("print_draft_invoice", "Print Draft Invoice", "Billing & Invoicing"),
 	("shift_report", "Shift Report", "Billing & Invoicing"),
 	("view_expected_amount", "View Expected Amount", "Billing & Invoicing"),
+	("resolve_fiscal_check", "Resolve FBR Check", "Billing & Invoicing"),
 	# Discounts & Pricing
 	("apply_additional_discount", "Apply Additional Discount", "Discounts & Pricing"),
 	("show_edit_discount_field", "Edit Discount Field", "Discounts & Pricing"),

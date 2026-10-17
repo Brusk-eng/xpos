@@ -53,7 +53,7 @@ def get_customers(search_term: str = "", limit: int = 20, pos_profile: str = Non
 		)"""
 		values["search"] = f"%{search_term}%"
 
-	customers = frappe.db.sql(  # nosemgrep: frappe-sql-format-injection — conditions built from validated allowed-field lists, values parameterized
+	customers = frappe.db.sql(  # nosemgrep: frappe-sql-format-injection - conditions built from validated allowed-field lists, values parameterized
 		f"""
 		SELECT
 			c.name,
@@ -267,7 +267,7 @@ def create_customer(
 		customer.company = company
 
 	customer.insert(ignore_permissions=True)
-	referral = create_pos_referral_code(customer.name)
+	referral = create_pos_referral_code(customer.name, pos_profile)
 
 	if address_line1 and city:
 		make_address(
@@ -291,31 +291,36 @@ def create_customer(
 	}
 
 
-def create_pos_referral_code(customer: str) -> dict:
+def create_pos_referral_code(customer: str, pos_profile: str | None = None) -> dict:
 	"""``auto_create_referral_for_new_customers``: a Referral Code for a customer XPOS just created.
 
-	The profile comes from the caller's open shift, never from the request.
+	The profile is the one the till sent, checked against the caller's access and
+	open shift; without it, the caller's only open shift. Missing or invalid
+	referral setup is reported in ``referral_note`` and nothing is invented.
 	Re-running for the same customer and company never creates a second code.
 	"""
-	pos_profile = frappe.db.get_value(
+	user = frappe.session.user
+	open_profiles = frappe.get_all(
 		"POS Opening Shift",
-		{"user": frappe.session.user, "status": "Open", "docstatus": 1},
-		"pos_profile",
-		order_by="creation desc",
+		filters={"user": user, "status": "Open", "docstatus": 1},
+		pluck="pos_profile",
+		distinct=True,
 	)
-	if not pos_profile:
+	if pos_profile:
+		profile = resolve_pos_profile(pos_profile)
+		if profile.name not in open_profiles:
+			return {}
+	elif len(open_profiles) == 1:
+		profile = frappe.get_cached_doc("POS Profile", open_profiles[0])
+	else:
 		return {}
-	profile = frappe.get_cached_doc("POS Profile", pos_profile)
 	if not cint(profile.get("auto_create_referral_for_new_customers")):
 		return {}
 
 	company = frappe.get_cached_doc("Company", profile.company)
-	if not company.get("final_customer_offer"):
-		return {
-			"referral_note": _(
-				"No referral code was created: set a Final Customer Offer on company {0}."
-			).format(company.name)
-		}
+	problem = referral_setup_problem(company)
+	if problem:
+		return {"referral_note": _("No referral code was created: {0}").format(problem)}
 
 	# Serialise concurrent retries for this customer before checking for an existing code.
 	frappe.db.get_value("Customer", customer, "name", for_update=True)
@@ -330,14 +335,48 @@ def create_pos_referral_code(customer: str) -> dict:
 	primary_offer = company.get("primary_customer_offer")
 	if primary_offer and not frappe.db.exists("DocType", "XPOS Offer"):
 		primary_offer = None  # the field links to a DocType this app does not ship
-	doc = create_referral_code(
-		company.name,
-		customer,
-		company.final_customer_offer,
-		primary_offer,
-		company.get("referral_campaign"),
-	)
+	try:
+		doc = create_referral_code(
+			company.name,
+			customer,
+			company.final_customer_offer,
+			primary_offer,
+			company.get("referral_campaign"),
+		)
+	except (frappe.UniqueValidationError, frappe.DuplicateEntryError):
+		# Another request created it first (unique customer + company).
+		existing = frappe.db.get_value(
+			"Referral Code", {"customer": customer, "company": company.name}, "referral_code"
+		)
+		if not existing:
+			raise
+		return {"referral_code": existing}
 	return {"referral_code": doc.referral_code}
+
+
+def referral_setup_problem(company) -> str | None:
+	"""Why ``company`` cannot issue referral codes, or None when its setup is usable."""
+	from xpos.x_pos.doctype.referral_code.referral_code import has_customer_company_unique
+
+	if not has_customer_company_unique():
+		return _(
+			"some customers have more than one Referral Code. An administrator must resolve the "
+			"duplicates (see xpos.api.profile_preflight.print_report) and run bench migrate."
+		)
+	offer = company.get("final_customer_offer")
+	if not offer:
+		return _("set a Final Customer Offer on company {0}.").format(company.name)
+	row = frappe.db.get_value("POS Offer", offer, ["disabled", "company"], as_dict=True)
+	if not row:
+		return _("the Final Customer Offer {0} of company {1} does not exist.").format(offer, company.name)
+	if row.disabled:
+		return _("the Final Customer Offer {0} is disabled.").format(offer)
+	if row.company and row.company != company.name:
+		return _("the Final Customer Offer {0} belongs to company {1}.").format(offer, row.company)
+	campaign = company.get("referral_campaign")
+	if campaign and not frappe.db.exists("Campaign", campaign):
+		return _("the referral Campaign {0} does not exist.").format(campaign)
+	return None
 
 
 @frappe.whitelist()
@@ -444,7 +483,7 @@ def get_customer_addresses(customer: str):
 	return addresses
 
 
-@frappe.whitelist()  # nosemgrep: overusing-args — args is a JSON-encoded dict from the client, standard Frappe pattern
+@frappe.whitelist()  # nosemgrep: overusing-args - args is a JSON-encoded dict from the client, standard Frappe pattern
 def make_address(args: str | dict):
 	"""
 	Create a new address linked to a customer.

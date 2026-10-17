@@ -38,7 +38,6 @@ export const usePosStore = defineStore("pos", () => {
 	const showOpeningDialog = ref(false);
 	const openingData = ref<OpeningData | null>(null);
 	const showClosingDialog = ref(false);
-	const closingData = ref<ShiftSummary | null>(null);
 	const printFormats = ref<PrintFormat[]>([]);
 	const lastInvoiceName = ref("");
 	const isShiftOpen = computed(() => !!posOpeningShift.value);
@@ -469,11 +468,9 @@ export const usePosStore = defineStore("pos", () => {
 	async function fetchClosingData(): Promise<ShiftSummary | undefined> {
 		if (!posOpeningShift.value?.name) return;
 		try {
-			const data = await call<ShiftSummary>("xpos.api.shifts.get_shift_summary", {
+			return await call<ShiftSummary>("xpos.api.shifts.get_shift_summary", {
 				opening_shift: posOpeningShift.value.name,
 			});
-			closingData.value = data;
-			return data;
 		} catch (error) {
 			console.error("Error fetching closing data:", error);
 			throw error;
@@ -554,7 +551,6 @@ export const usePosStore = defineStore("pos", () => {
 		showOpeningDialog,
 		openingData,
 		showClosingDialog,
-		closingData,
 		printFormats,
 		lastInvoiceName,
 		invoiceType,

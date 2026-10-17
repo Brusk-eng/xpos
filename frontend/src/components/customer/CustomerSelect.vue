@@ -90,7 +90,7 @@
 
 					<div
 						v-else
-						class="flex h-full min-h-[18rem] flex-col items-center justify-center text-muted-foreground"
+						class="flex h-full min-h-72 flex-col items-center justify-center text-muted-foreground"
 					>
 						<Users class="w-12 h-12 mb-3 text-muted-foreground/30" />
 						<p class="text-sm font-medium">{{ __("No customers found") }}</p>
@@ -518,6 +518,7 @@ async function createAndSelect() {
 			address_line1: newCustomer.value.address_line1 || undefined,
 			city: newCustomer.value.city || undefined,
 			country: newCustomer.value.country || undefined,
+			pos_profile: posStore.profileName || undefined,
 		};
 
 		Object.keys(payload).forEach((key) => {

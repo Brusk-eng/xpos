@@ -120,6 +120,11 @@ def lock_credit_sources(pos, customer: str, account: str, requested: list[dict])
 	the same credit: the second waits, then sees the reduced balance.
 	"""
 	ensure_profile_allows(pos, "use_customer_credit", _("Customer credit"))
+
+	if not frappe.db.transaction_writes:
+		frappe.db.rollback()  # nothing written yet; only ends the read-only snapshot
+	frappe.db.get_value("Customer", customer, "name", for_update=True)
+
 	if get_invoice_type() != "Sales Invoice":
 		frappe.throw(_("Customer credit can only be used when XPOS creates Sales Invoices."))
 	if not credit_account_supported(pos.company, account):
@@ -241,3 +246,47 @@ def allocate_customer_credit(invoice_doc, credits: list[dict]) -> None:
 		reconcile_against_document(receipts)
 	if notes:
 		reconcile_dr_cr_note(notes, invoice_doc.company)
+
+
+def lock_credit_note_spend(doc, method=None) -> None:
+	"""``before_submit`` of Journal Entry and Payment Entry: a credit note cannot be spent twice.
+
+	ERPNext checks a credit note's balance with a plain read, which can predate a till's
+	committed allocation (REPEATABLE READ). Locking the note reads its latest balance and
+	queues behind any till still spending it.
+	"""
+	spend: dict[str, float] = {}
+	if doc.doctype == "Journal Entry":
+		for row in doc.get("accounts") or []:
+			if row.reference_type == CREDIT_NOTE and row.party_type == "Customer":
+				spend[row.reference_name] = spend.get(row.reference_name, 0) + flt(
+					row.debit_in_account_currency
+				)
+	else:
+		for row in doc.get("references") or []:
+			if row.reference_doctype == CREDIT_NOTE and doc.party_type == "Customer":
+				spend[row.reference_name] = spend.get(row.reference_name, 0) + abs(flt(row.allocated_amount))
+
+	# Only credit notes are locked: ordinary invoices a payment settles keep ERPNext's own locking.
+	# ``is_return`` cannot change after submit, so a plain read is enough to pick them out.
+	spent = [n for n, amount in spend.items() if n and amount > 0]
+	if not spent:
+		return
+	notes = frappe.get_all(CREDIT_NOTE, filters={"name": ("in", spent), "is_return": 1}, pluck="name")
+	for note in sorted(notes):
+		row = frappe.db.sql(
+			"""SELECT outstanding_amount FROM `tabSales Invoice`
+			WHERE name = %s AND docstatus = 1 FOR UPDATE""",
+			note,
+			as_dict=True,
+		)
+		if not row:
+			continue
+		available = max(-flt(row[0].outstanding_amount), 0)
+		if spend[note] - available > 0.005:
+			frappe.throw(
+				_("Credit Note {0} has only {1} left; it was spent elsewhere after you pulled it.").format(
+					note, flt(available, 2)
+				),
+				title=_("Customer credit changed"),
+			)

@@ -37,7 +37,18 @@
 					role="status"
 					class="ms-1 px-1 py-px rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
 				>
-					{{ __("Price unavailable") }}
+					{{
+						item.pos_price_state === "needs_connection"
+							? __("Needs connection for price")
+							: __("Price unavailable")
+					}}
+				</span>
+				<span
+					v-if="item.pos_repriced_from !== undefined"
+					role="status"
+					class="ms-1 px-1 py-px rounded text-[9px] font-semibold bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300"
+				>
+					{{ __("Price changed from {0}", [item.pos_repriced_from]) }}
 				</span>
 			</p>
 

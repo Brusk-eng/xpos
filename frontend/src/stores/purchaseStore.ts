@@ -427,10 +427,8 @@ export const usePurchaseStore = defineStore("purchase", () => {
 		const item = cartItems.value[index];
 		if (!item) return;
 		if (!item.taxes) {
-			// First tax assignment: create a new object so Vue tracks it as a property
 			item.taxes = { [taxType]: percent };
 		} else {
-			// Direct mutation on the existing reactive proxy — Vue tracks this key specifically
 			item.taxes[taxType] = percent;
 		}
 	}

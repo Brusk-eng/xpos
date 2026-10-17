@@ -222,6 +222,10 @@ export interface CartItem extends POSItem {
 	pos_rate_overridden?: boolean;
 	pos_price_key?: string;
 	pos_price_unavailable?: boolean;
+	/** Why the price is unavailable: offline without this customer's prices, or no price configured. */
+	pos_price_state?: "needs_connection" | "no_price";
+	/** Net rate the cashier last saw, when the server repriced this line. */
+	pos_repriced_from?: number;
 	pos_is_free_item?: boolean;
 	pos_free_item_rule?: string;
 	/** A stored-value gift card being sold, not a stock item. */
@@ -1276,3 +1280,29 @@ export const DOCSTATUS_MAP: Record<number, string> = {
 	1: "Submitted",
 	2: "Cancelled",
 };
+
+/** create_invoice answer when ERPNext's prices differ from what the cashier took payment for. */
+export interface RepriceLine {
+	row_id?: string;
+	index: number;
+	item_code: string;
+	quoted_rate: number;
+	rate: number | null;
+	price_list_rate: number | null;
+	discount_percentage: number | null;
+	discount_amount: number | null;
+}
+
+export interface RepriceResponse {
+	status: "reprice_required";
+	price_list?: string;
+	lines: RepriceLine[];
+	additional_discount_percentage: number;
+	discount_amount: number;
+	discount_changed: boolean;
+	/** A pricing rule set the invoice discount on a sale that has POS Offer discounts. */
+	offer_conflict?: boolean;
+	grand_total: number;
+	rounded_total: number;
+	message: string;
+}

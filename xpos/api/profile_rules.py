@@ -170,43 +170,57 @@ def offer_matches_item(offer, item: dict) -> bool:
 	return False
 
 
-def verified_offer_free_line(
-	pos, line: dict, paid_lines: list[dict], coupon_offers: set, posting_date
-) -> bool:
-	"""Re-derive a POS Offer free line on the server; the client's ``is_offer`` flag alone proves nothing."""
-	offer_name = line.get("offers")
+def live_offer(pos, offer_name: str | None, coupon_offers: set, posting_date):
+	"""The POS Offer if it is enabled, in scope for this profile and date, and coupon-unlocked when needed."""
 	if not offer_name or not frappe.db.exists("POS Offer", offer_name):
-		return False
+		return None
 	offer = frappe.get_cached_doc("POS Offer", offer_name)
-	if offer.disabled or offer.offer != "Give Product" or flt(offer.given_qty) <= 0:
-		return False
+	if offer.disabled:
+		return None
 	if offer.company and offer.company != pos.company:
-		return False
+		return None
 	if offer.pos_profile and offer.pos_profile != pos.name:
-		return False
+		return None
 	date = getdate(posting_date or nowdate())
 	if (offer.valid_from and getdate(offer.valid_from) > date) or (
 		offer.valid_upto and getdate(offer.valid_upto) < date
 	):
-		return False
+		return None
 	if cint(offer.coupon_based) and offer.name not in coupon_offers:
-		return False
+		return None
+	return offer
 
+
+def offer_matching_lines(offer, paid_lines: list[dict]) -> list[dict]:
+	"""Paid lines the offer applies to, empty when its qty/amount conditions are not met."""
 	if offer.apply_on == "Transaction":
 		matching = paid_lines
 	else:
 		matching = [i for i in paid_lines if offer_matches_item(offer, i)]
 	if not matching:
-		return False
+		return []
 	matched_qty = sum(abs(flt(i.get("qty"))) for i in matching)
 	matched_amt = sum(abs(flt(i.get("qty"))) * flt(i.get("rate")) for i in matching)
 	if (flt(offer.min_qty) and matched_qty < flt(offer.min_qty)) or (
 		flt(offer.max_qty) and matched_qty > flt(offer.max_qty)
 	):
-		return False
+		return []
 	if (flt(offer.min_amt) and matched_amt < flt(offer.min_amt)) or (
 		flt(offer.max_amt) and matched_amt > flt(offer.max_amt)
 	):
+		return []
+	return matching
+
+
+def verified_offer_free_line(
+	pos, line: dict, paid_lines: list[dict], coupon_offers: set, posting_date
+) -> bool:
+	"""Re-derive a POS Offer free line on the server; the client's ``is_offer`` flag alone proves nothing."""
+	offer = live_offer(pos, line.get("offers"), coupon_offers, posting_date)
+	if not offer or offer.offer != "Give Product" or flt(offer.given_qty) <= 0:
+		return False
+	matching = offer_matching_lines(offer, paid_lines)
+	if not matching:
 		return False
 
 	item_code = line.get("item_code")
@@ -238,6 +252,283 @@ def check_zero_price_line(pos, item_code: str, net_rate: float, verified_free: b
 			),
 			title=_("Zero price not allowed"),
 		)
+
+
+def manual_discount_cap(pos, user: str | None = None) -> float:
+	"""Largest manual discount (%) ``user`` may give through ``pos``.
+
+	The profile's Max Discount and the user's own Discount Limit both cap it.
+	A Discount Limit of 0 is the field default ("not set"), so it does not cap.
+	"""
+	user = user or frappe.session.user
+	limit = frappe.db.get_value(
+		"POS Profile User", {"parent": pos.name, "parenttype": "POS Profile", "user": user}, "discount_limit"
+	)
+	caps = [c for c in (flt(pos.get("max_discount_percentage_allowed")), flt(limit)) if c > 0]
+	return min(caps) if caps else 100.0
+
+
+def rule_line_discount_pct(pos, row) -> float:
+	"""Discount (%) of ``price_list_rate`` that a live Price pricing rule on this row gives."""
+	plr = flt(row.get("price_list_rate"))
+	best = 0.0
+	for rule_name in parse_rule_names(row.get("pricing_rules")):
+		rule = frappe.db.get_value(
+			"Pricing Rule",
+			rule_name,
+			[
+				"disable",
+				"selling",
+				"price_or_product_discount",
+				"company",
+				"rate_or_discount",
+				"discount_percentage",
+				"discount_amount",
+				"rate",
+			],
+			as_dict=True,
+		)
+		if not rule or rule.disable or not rule.selling or rule.price_or_product_discount != "Price":
+			continue
+		if rule.company and rule.company != pos.company:
+			continue
+		if rule.rate_or_discount == "Discount Percentage":
+			pct = flt(rule.discount_percentage)
+		elif plr and rule.rate_or_discount == "Discount Amount":
+			pct = flt(rule.discount_amount) / plr * 100
+		elif plr and rule.rate_or_discount == "Rate":
+			pct = (plr - flt(rule.rate)) / plr * 100
+		else:
+			pct = 0
+		best = max(best, pct)
+	return min(max(best, 0.0), 100.0)
+
+
+def offer_discounts(pos, offer_names, paid_lines: list[dict], coupon_offers: set, posting_date):
+	"""Server-derived POS Offer discounts: (item-level amount, grand-total %).
+
+	Mirrors the till's offer engine (Item Price and Grand Total offers) but only
+	for offers that are live for this profile, date and coupon.
+	"""
+	item_amount, total_pct = 0.0, 0.0
+	for name in dict.fromkeys(n for n in offer_names if n):
+		offer = live_offer(pos, name, coupon_offers, posting_date)
+		if not offer:
+			continue
+		matching = offer_matching_lines(offer, paid_lines)
+		if not matching:
+			continue
+		if offer.offer == "Grand Total":
+			total_pct += flt(offer.discount_percentage)
+		elif offer.offer == "Item Price" and offer.apply_on != "Transaction":
+			for line in matching:
+				qty, rate = abs(flt(line.get("qty"))), flt(line.get("rate"))
+				if offer.discount_type == "Rate":
+					item_amount += max(0.0, qty * rate - qty * flt(offer.rate))
+				elif offer.discount_type == "Discount Percentage":
+					item_amount += qty * rate * flt(offer.discount_percentage) / 100
+				elif offer.discount_type == "Discount Amount":
+					item_amount += flt(offer.discount_amount) * qty
+	return item_amount, min(total_pct, 100.0)
+
+
+def transaction_rule_discount(doc, base: float) -> float:
+	"""Invoice discount ERPNext's own transaction-level pricing rules applied in validate."""
+	best = 0.0
+	for row in doc.get("pricing_rules") or []:
+		if not row.pricing_rule or row.item_code or row.child_docname:
+			continue
+		rule = frappe.db.get_value(
+			"Pricing Rule",
+			row.pricing_rule,
+			["disable", "discount_percentage", "discount_amount"],
+			as_dict=True,
+		)
+		if rule and not rule.disable:
+			best = max(best, base * flt(rule.discount_percentage) / 100, flt(rule.discount_amount))
+	return best
+
+
+def validate_sale_discounts(pos, doc, sale_rows, offer_names, paid_lines, coupon_offers) -> None:
+	"""Check every discount on a validated sale against what the cashier may give.
+
+	Promotions are worked out here: customer discount, live POS Offers and
+	pricing rules ERPNext applied. Whatever exceeds them is a manual discount and
+	needs the matching POS permission and must stay within the manual cap. Client
+	labels such as ``discount_source`` are never trusted.
+	"""
+	from xpos.api.auth import user_has_pos_permission
+
+	cap = manual_discount_cap(pos)
+	tolerance = 0.005
+
+	line_manual = {}
+	for row in sale_rows:
+		plr = flt(row.price_list_rate)
+		if plr <= 0:
+			continue
+		effective = (1 - flt(row.rate) / plr) * 100
+		manual = effective - rule_line_discount_pct(pos, row)
+		if manual <= tolerance:
+			continue
+		if not user_has_pos_permission("show_edit_discount_field", pos_profile=pos.name):
+			frappe.throw(
+				_("Row {0}: you are not permitted to discount item {1}.").format(row.idx, row.item_code),
+				frappe.PermissionError,
+			)
+		if manual - cap > tolerance:
+			frappe.throw(
+				_("Item {0}: Discount {1}% exceeds maximum allowed {2}%").format(
+					row.item_code, flt(manual, 2), flt(cap, 2)
+				),
+				title=_("Discount not allowed"),
+			)
+		line_manual[row.name or row.idx] = manual
+
+	discount = flt(doc.discount_amount)
+	invoice_manual_pct = 0.0
+	if discount > tolerance:
+		base = (
+			flt(doc.grand_total) + discount
+			if (doc.apply_discount_on or "Grand Total") == "Grand Total"
+			else flt(doc.total)
+		)
+		item_offer, total_pct = offer_discounts(pos, offer_names, paid_lines, coupon_offers, doc.posting_date)
+		remaining = max(base - item_offer, 0)
+		# One invoice-level promotion applies; they never stack with each other.
+		invoice_promo = max(
+			remaining * total_pct / 100,
+			remaining * customer_discount_rate(pos, doc.customer) / 100,
+			transaction_rule_discount(doc, remaining),
+		)
+		promotional = item_offer + invoice_promo
+		excess = discount - promotional
+		if excess > max(tolerance, base * 0.00005):
+			if not user_has_pos_permission("apply_additional_discount", pos_profile=pos.name):
+				frappe.throw(
+					_("You are not permitted to give an additional discount of {0}.").format(flt(excess, 2)),
+					frappe.PermissionError,
+				)
+			left = base - promotional
+			invoice_manual_pct = excess / left * 100 if left > 0 else 100.0
+			if invoice_manual_pct - cap > tolerance:
+				frappe.throw(
+					_("Additional discount of {0}% exceeds maximum allowed {1}%").format(
+						flt(invoice_manual_pct, 2), flt(cap, 2)
+					),
+					title=_("Discount not allowed"),
+				)
+
+	if invoice_manual_pct and line_manual:
+		# A manual invoice discount on top of a manual line discount is one discount to the customer.
+		worst = max(line_manual.values())
+		combined = 100 - (100 - worst) * (100 - invoice_manual_pct) / 100
+		if combined - cap > tolerance:
+			frappe.throw(
+				_(
+					"Line and invoice discounts together give {0}%, more than the maximum allowed {1}%."
+				).format(flt(combined, 2), flt(cap, 2)),
+				title=_("Discount not allowed"),
+			)
+
+
+def check_zero_payable(pos, doc, sale_rows) -> None:
+	"""No sale line may end up free after all discounts unless the profile allows zero-price sales.
+
+	Uses ERPNext's ``net_amount``, which already carries the invoice discount, so
+	a 100% or fixed invoice discount cannot make an unauthorised free sale.
+	Server-verified free promotion lines are not in ``sale_rows``.
+	"""
+	if profile_flag(pos, "allow_zero_rated_items") or not sale_rows:
+		return
+	for row in sale_rows:
+		if flt(row.net_amount) <= 0:
+			frappe.throw(
+				_(
+					"Item {0} would be sold for nothing. Zero-price sale lines are not allowed on POS Profile {1}."
+				).format(row.item_code, pos.name),
+				title=_("Zero price not allowed"),
+			)
+	if flt(doc.grand_total) <= 0:
+		frappe.throw(
+			_("This sale totals zero. Zero-price sales are not allowed on POS Profile {0}.").format(pos.name),
+			title=_("Zero price not allowed"),
+		)
+
+
+def quoted_line_rate(line: dict) -> float:
+	"""The net rate the till showed for a line: its rate less its own discount."""
+	rate = flt(line.get("rate"))
+	if flt(line.get("discount_percentage")):
+		return rate * (1 - flt(line.get("discount_percentage")) / 100)
+	return rate - flt(line.get("discount_amount"))
+
+
+def repricing_changes(doc, quoted: list[tuple], data: dict) -> dict | None:
+	"""Compare what the cashier accepted with ERPNext's authoritative calculation.
+
+	``quoted`` holds ``(row, line, index)`` per submitted sale line. Returns a
+	reprice response when any line rate or the invoice discount moved, else None.
+	Comparisons are made at the row's own rate precision, so rounding alone
+	never counts as a change.
+	"""
+	lines = []
+	live_rows = {id(r) for r in doc.items}
+	for row, line, index in quoted:
+		precision = row.precision("rate") if id(row) in live_rows else 2
+		before = flt(quoted_line_rate(line), precision)
+		after = flt(row.rate, precision) if id(row) in live_rows else None
+		if after is None or abs(after - before) > 0.5 / 10**precision:
+			lines.append(
+				{
+					"row_id": line.get("row_id"),
+					"index": index,
+					"item_code": line.get("item_code"),
+					"quoted_rate": before,
+					"rate": after,
+					"price_list_rate": flt(row.price_list_rate) if after is not None else None,
+					"discount_percentage": flt(row.discount_percentage) if after is not None else None,
+					"discount_amount": flt(row.discount_amount) if after is not None else None,
+				}
+			)
+
+	sent_pct = flt(data.get("additional_discount_percentage"))
+	sent_amount = flt(data.get("discount_amount"))
+	currency_tolerance = 0.5 / 10 ** doc.precision("discount_amount")
+	if sent_pct:
+		discount_changed = abs(flt(doc.additional_discount_percentage) - sent_pct) > 0.005
+	else:
+		discount_changed = abs(flt(doc.discount_amount) - sent_amount) > currency_tolerance
+
+	if not lines and not discount_changed:
+		return None
+	# The till folds POS Offer discounts into the invoice discount, so an invoice discount
+	# set by ERPNext (a transaction pricing rule) replaces them; the two cannot be combined.
+	offer_names = {i.get("offers") for i in data.get("items") or []} | {
+		o.get("offer_name") for o in data.get("offers_detail") or []
+	}
+	offer_conflict = discount_changed and any(
+		frappe.db.get_value("POS Offer", name, "offer") in ("Grand Total", "Item Price")
+		for name in offer_names
+		if name
+	)
+	return {
+		"status": "reprice_required",
+		"price_list": doc.selling_price_list,
+		"lines": lines,
+		"additional_discount_percentage": flt(doc.additional_discount_percentage),
+		"discount_amount": flt(doc.discount_amount),
+		"discount_changed": discount_changed,
+		"offer_conflict": offer_conflict,
+		"grand_total": flt(doc.grand_total),
+		"rounded_total": flt(doc.rounded_total),
+		"message": _(
+			"A pricing rule sets this sale's invoice discount, which cannot be combined with POS Offers. "
+			"Remove the offers and take payment again."
+		)
+		if offer_conflict
+		else _("Prices changed since this sale was rung up. Review the new prices and take payment again."),
+	}
 
 
 def price_unavailable(item_code: str, price_list: str | None) -> None:
@@ -301,15 +592,3 @@ def customer_discount_rate(pos, customer: str | None) -> float:
 	rate = flt(frappe.db.get_value("Customer", customer, "discount"))
 	cap = flt(pos.get("max_discount_percentage_allowed"))
 	return min(rate, cap) if cap > 0 else rate
-
-
-def validate_customer_discount(pos, customer: str, percentage: float, amount: float) -> None:
-	"""A discount the till labels as the customer's must be exactly that customer's discount."""
-	expected = customer_discount_rate(pos, customer)
-	if not expected or amount or abs(flt(percentage, 2) - flt(expected, 2)) > 0.005:
-		frappe.throw(
-			_("The customer discount of {0}% does not match the {1}% allowed for customer {2}.").format(
-				flt(percentage, 2), flt(expected, 2), customer
-			),
-			title=_("Customer discount not allowed"),
-		)

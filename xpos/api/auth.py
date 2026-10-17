@@ -13,6 +13,7 @@ ALL_PERMISSION_KEYS = (
 	"print_draft_invoice",
 	"shift_report",
 	"view_expected_amount",
+	"resolve_fiscal_check",
 	"apply_additional_discount",
 	"show_edit_discount_field",
 	"allow_change_price",

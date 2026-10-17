@@ -147,7 +147,7 @@ test: add unit tests for pricing engine
 
 2. **Push** your branch and open a Pull Request against the `develop` branch.
 
-3. Fill out the PR template completely — describe what changed and why.
+3. Fill out the PR template completely - describe what changed and why.
 
 4. Ensure all CI checks pass (linting, type checking, tests).
 

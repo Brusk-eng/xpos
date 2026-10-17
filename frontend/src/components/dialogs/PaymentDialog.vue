@@ -843,7 +843,12 @@ import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { submitDurableInvoice } from "@/services/invoiceSubmission";
 import { useOfflineSale } from "@/composables/useOfflineSale";
 import { isElectron } from "@/services/electronBridge";
-import { fiscalizeViaLocalService } from "@/services/fbrLocalService";
+import {
+	completeLocalFiscalization,
+	FiscalUncertainError,
+	LocalFiscalRejected,
+} from "@/services/fbrLocalService";
+import { addPendingInvoice } from "@/services/dbBridge";
 import { checkGiftCard, hasGiftCardActivity } from "@/services/giftCards";
 import { hasPermission } from "@/services/userRights";
 import { useOfflineStore } from "@/stores/offlineStore";
@@ -906,6 +911,7 @@ import type {
 	InvoiceData,
 	InvoicePayment,
 	IssuedGiftCard,
+	RepriceResponse,
 	TenderLeg,
 } from "@/types/pos.types";
 import { isOnline, extractErrorMessage, isTabConflictError } from "@/utils";
@@ -1728,10 +1734,10 @@ async function submitPayment(withPrint: boolean = true) {
 				let response = await call<CreateInvoiceResult>("xpos.api.invoices.create_invoice", {
 					data: JSON.stringify(invoiceData),
 				});
-				if (response.status === "fbr_local_required") response = await finalizeWithLocalFbr(response);
-				return response;
+				return await finalizeWithLocalFbr(response);
 			},
 		);
+		if (handleRepricing(result)) return;
 
 		posStore.lastInvoiceName = result.name;
 
@@ -1750,7 +1756,9 @@ async function submitPayment(withPrint: boolean = true) {
 			}
 		}
 	} catch (error: unknown) {
-		if (isTabConflictError(error)) {
+		if (error instanceof FiscalUncertainError) {
+			await holdForFiscalCheck(error, invoiceData, true);
+		} else if (isTabConflictError(error)) {
 			showError(__("This tab was changed on another terminal. Reload it and try again."));
 			close();
 			cartStore.openDraftDialog();
@@ -1790,9 +1798,11 @@ async function submitGiftCardSale(invoiceData: InvoiceData, withPrint: boolean) 
 		result = await call<CreateInvoiceResult>("xpos.api.invoices.create_invoice", {
 			data: JSON.stringify(invoiceData),
 		});
-		if (result.status === "fbr_local_required") result = await finalizeWithLocalFbr(result);
+		result = await finalizeWithLocalFbr(result);
 	} catch (error) {
-		if (isNetworkError(error)) {
+		if (error instanceof FiscalUncertainError) {
+			await holdForFiscalCheck(error, invoiceData, false);
+		} else if (isNetworkError(error)) {
 			showError(
 				__(
 					"The connection dropped before the server answered. Press Pay again to finish this sale; it will not be charged twice.",
@@ -1804,6 +1814,7 @@ async function submitGiftCardSale(invoiceData: InvoiceData, withPrint: boolean) 
 		return;
 	}
 
+	if (handleRepricing(result)) return;
 	posStore.lastInvoiceName = result.name;
 	showSuccess(__("Invoice {0} saved successfully!", [result.name]));
 	if (result.issued_gift_cards?.length) cartStore.showIssuedGiftCards(result.issued_gift_cards);
@@ -1817,27 +1828,34 @@ async function submitGiftCardSale(invoiceData: InvoiceData, withPrint: boolean) 
 	}
 }
 
+function handleRepricing(result: CreateInvoiceResult): boolean {
+	if (result.status !== "reprice_required") return false;
+	cartStore.applyServerRepricing(result as unknown as RepriceResponse);
+	showError((result as unknown as RepriceResponse).message);
+	close();
+	return true;
+}
+
 interface CreateInvoiceResult {
 	name: string;
+	usin?: string;
 	issued_gift_cards?: IssuedGiftCard[];
 	status?: string;
 	doctype?: string;
 	fbr_payload?: Record<string, unknown>;
 	fbr_local_service_url?: string;
+	message?: string;
 }
 
+/** Finish a sale the server saved as a draft waiting for FBR; other answers pass through. */
 async function finalizeWithLocalFbr(pending: CreateInvoiceResult): Promise<CreateInvoiceResult> {
+	if (pending.status === "fbr_uncertain")
+		throw new FiscalUncertainError(pending.name || pending.usin || "", pending.message || "");
+	if (pending.status !== "fbr_local_required") return pending;
 	try {
-		const { invoiceNumber } = await fiscalizeViaLocalService(
-			pending.fbr_payload || {},
-			pending.fbr_local_service_url || "",
-		);
-		return await call<CreateInvoiceResult>("xpos.api.invoices.finalize_fiscal_invoice", {
-			name: pending.name,
-			fbr_invoice_number: invoiceNumber,
-			doctype: pending.doctype,
-		});
+		return await completeLocalFiscalization<CreateInvoiceResult>(pending);
 	} catch (err) {
+		if (!(err instanceof LocalFiscalRejected)) throw err;
 		await call("xpos.api.invoices.discard_draft_invoice", {
 			name: pending.name,
 			doctype: pending.doctype,
@@ -1845,11 +1863,30 @@ async function finalizeWithLocalFbr(pending: CreateInvoiceResult): Promise<Creat
 			/* best-effort cleanup */
 		});
 		throw new Error(
-			__("FBR fiscalization failed — both the FBR cloud and the local service are unavailable.") +
+			__("FBR fiscalization failed - both the FBR cloud and the local service are unavailable.") +
 				" " +
 				extractErrorMessage(err),
 		);
 	}
+}
+
+async function holdForFiscalCheck(error: FiscalUncertainError, invoiceData: InvoiceData, queued: boolean) {
+	if (!queued) {
+		await addPendingInvoice({
+			data: invoiceData,
+			receipt: cartStore.getReceiptSnapshot("", authStore.userFullName),
+			customer_name: invoiceData.customer,
+			grand_total: cartStore.grandTotal,
+		});
+	}
+	cartStore.clearAll();
+	close();
+	showError(
+		__("FBR did not confirm invoice {0}. Check it under Pending invoices before selling it again.", [
+			error.invoice,
+		]),
+	);
+	await offlineStore.syncPendingInvoices();
 }
 
 function close() {

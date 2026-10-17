@@ -121,7 +121,7 @@ export async function initDatabase(config?: Partial<DbConfig>): Promise<void> {
 	currentConfig = { ...persisted, ...(config || {}) };
 
 	log.info(
-		`DB init — host: ${currentConfig.host}, port: ${currentConfig.port}, user: ${currentConfig.user}, db: ${currentConfig.database}`,
+		`DB init - host: ${currentConfig.host}, port: ${currentConfig.port}, user: ${currentConfig.user}, db: ${currentConfig.database}`,
 	);
 
 	saveDbConfig(currentConfig);

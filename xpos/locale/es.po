@@ -603,8 +603,8 @@ msgid "Arrow keys to navigate"
 msgstr "Teclas de dirección para navegar"
 
 #: frontend/src/components/core/SortBy.vue:8
-msgid "Ascending — click to sort descending"
-msgstr "Ascendente — pulse para ordenar descendente"
+msgid "Ascending - click to sort descending"
+msgstr "Ascendente - pulse para ordenar descendente"
 
 #: xpos/api/invoices.py:345
 msgid "At least one item is required"
@@ -1071,8 +1071,8 @@ msgid "Cashier settlement is disabled"
 msgstr "El arqueo del cajero está desactivado"
 
 #: frontend/src/views/CashierView.vue:8
-msgid "Cashier — Unsettled Invoices"
-msgstr "Cajero — Facturas TPV pendientes de liquidar"
+msgid "Cashier - Unsettled Invoices"
+msgstr "Cajero - Facturas TPV pendientes de liquidar"
 
 #: frontend/src/components/dialogs/PaymentDialog.vue:544
 #: frontend/src/components/dialogs/PaymentDialog.vue:636
@@ -1941,8 +1941,8 @@ msgid "Deposit cancelled"
 msgstr "Ingreso cancelado"
 
 #: frontend/src/components/core/SortBy.vue:7
-msgid "Descending — click to sort ascending"
-msgstr "Descendente — haga clic para ordenar de forma ascendente"
+msgid "Descending - click to sort ascending"
+msgstr "Descendente - haga clic para ordenar de forma ascendente"
 
 #. Label of the description (Small Text) field in DocType 'POS Offer'
 #: xpos/x_pos/doctype/pos_offer/pos_offer.json
@@ -2456,7 +2456,7 @@ msgid "FBR did not return a fiscal invoice number."
 msgstr "La FBR no devolvió un número de factura fiscal."
 
 #: frontend/src/components/dialogs/PaymentDialog.vue:1688
-msgid "FBR fiscalization failed — both the FBR cloud and the local service are unavailable."
+msgid "FBR fiscalization failed - both the FBR cloud and the local service are unavailable."
 msgstr ""
 
 #: xpos/x_pos/integrations/fbr.py:170

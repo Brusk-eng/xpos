@@ -1,6 +1,6 @@
 # POS Profile Configuration
 
-The POS Profile is the central configuration hub for X POS. It controls every aspect of the POS behavior — from item display to payments, permissions, and advanced features.
+The POS Profile is the central configuration hub for X POS. It controls every aspect of the POS behavior - from item display to payments, permissions, and advanced features.
 
 How the pricing, delivery, closing, credit, printing and referral settings are enforced, and how existing profiles were migrated, is tracked in [POS Profile Settings: Implementation Status](pos-profile-settings-status.md).
 
@@ -17,7 +17,7 @@ How the pricing, delivery, closing, credit, printing and referral settings are e
 | Enable Quantity Input | Enable manual quantity input mode |
 | Hide Variant Items | Hide individual variant items in the grid |
 | Show Template Items | Show template (parent) items in the grid |
-| Hide Expected Amount | Blind closing: cashiers count without seeing expected amounts or differences, in the dialog or the shift APIs. Users with the *View Expected Amount* permission still see them |
+| Hide Expected Amount | Blind closing: cashiers count without seeing expected amounts or differences, in the dialog or the shift APIs. Users whose POS Role on this profile has *View Expected Amount* still see them; Desk access is supervisory (see the status page) |
 | Hide Closing Shift | Hide the close shift button |
 | Hide Images | Hide item images (text-only display) |
 | Hide Unavailable Items | Hide items with zero stock |
@@ -33,9 +33,9 @@ How the pricing, delivery, closing, credit, printing and referral settings are e
 | Allow Rate Change | Allow editing item rates in the cart |
 | Allow Discount Change | Allow editing item-level discounts |
 | Allow Additional Discount | Allow order-level additional discount |
-| Apply Customer Discount | Apply the customer's Discount (%) as the invoice discount, unless a pricing rule or offer sets it; capped by Maximum Discount Percentage |
+| Apply Customer Discount | Apply the customer's Discount (%) as the invoice discount, unless a pricing rule or offer sets it; capped by Maximum Discount Percentage. The server works the discount out itself; any discount beyond it needs the manual discount permissions |
 | Use Customer Price List | Price sale lines from the customer's (or customer group's) price list; a missing price blocks checkout |
-| Allow Zero Rated Items | Allow sale lines priced at zero, including 100% line discounts (price, not zero-rated tax). Verified pricing-rule and POS Offer free items are always allowed |
+| Allow Zero Rated Items | Allow sale lines that end at zero after all discounts, line or invoice level, and zero-total sales (price, not zero-rated tax). Server-verified pricing-rule and POS Offer free items are always allowed |
 
 ---
 
@@ -162,7 +162,7 @@ How the pricing, delivery, closing, credit, printing and referral settings are e
 | Setting | Description |
 |---|---|
 | Default Print Format | Default receipt/print format for the POS profile |
-| Print Format Rules | Print format per customer group; first matching row wins, else Default Print Format |
+| Print Format Rules | Print format per customer group (parent groups match too); first matching row wins, else Default Print Format. Online only; offline receipts use the fixed XPOS layout |
 | Print Discounts as Amounts | On receipts, show percentage-based discounts as currency amounts instead of percent labels |
 | Allowed Sales Persons | Restrict available sales persons |
 

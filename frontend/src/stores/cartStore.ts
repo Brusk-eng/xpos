@@ -20,6 +20,7 @@ import type {
 	OpenTab,
 	GiftCardRefund,
 	IssuedGiftCard,
+	RepriceResponse,
 } from "@/types/pos.types";
 import __ from "@/lib/translate";
 import {
@@ -1146,22 +1147,21 @@ export const useCartStore = defineStore("cart", () => {
 
 		const requestId = ++priceListRequestId;
 		if (!isOnline()) {
-			// Offline the only cached prices are the profile list's.
 			const cached = customer.value as Record<string, unknown> | null;
-			// Electron tills only know the customer's own list, not a customer-group one.
 			const cachedCustomerList = cached?.pos_price_list ?? cached?.default_price_list;
 			for (const line of stale) {
 				const profilePriced =
 					!key || !cachedCustomerList || cachedCustomerList === posStore.sellingPriceList;
-				if (profilePriced && !key) {
-					const cached = await getCachedItemByCode(line.item_code);
-					if (cached && (line.uom || line.stock_uom) === cached.stock_uom)
-						line.rate = normalizeItemRate(cached.rate);
-					else line.pos_price_unavailable = true;
-				} else if (!profilePriced) {
+				const cachedItem = profilePriced ? await getCachedItemByCode(line.item_code) : null;
+				if (cachedItem && (line.uom || line.stock_uom) === cachedItem.stock_uom) {
+					line.rate = normalizeItemRate(cachedItem.rate);
+					line.pos_price_unavailable = false;
+					line.pos_price_state = undefined;
+					line.pos_price_key = `${key}|${line.uom || line.stock_uom}`;
+				} else {
 					line.pos_price_unavailable = true;
+					line.pos_price_state = "needs_connection";
 				}
-				line.pos_price_key = `${key}|${line.uom || line.stock_uom}`;
 			}
 			return;
 		}
@@ -1192,6 +1192,7 @@ export const useCartStore = defineStore("cart", () => {
 			const unavailable = price === null || price === undefined;
 			line.rate = unavailable ? 0 : normalizeItemRate(price);
 			line.pos_price_unavailable = unavailable;
+			line.pos_price_state = unavailable ? "no_price" : undefined;
 			line.pos_price_key = `${key}|${line.uom || line.stock_uom}`;
 		}
 	}
@@ -1201,6 +1202,46 @@ export const useCartStore = defineStore("cart", () => {
 			console.error("Customer price list repricing failed:", error);
 		});
 	}, 150);
+
+	if (typeof window !== "undefined") {
+		window.addEventListener("online", () => {
+			if (items.value.some((i) => i.pos_price_state === "needs_connection"))
+				scheduleCustomerPriceList();
+		});
+	}
+
+	const repriceReview = ref<RepriceResponse | null>(null);
+	const offerConflict = ref(false);
+
+	function applyServerRepricing(response: RepriceResponse): void {
+		const key = customerPriceKey();
+		for (const change of response.lines) {
+			const item =
+				(change.row_id && items.value.find((i) => i.uid === change.row_id)) ||
+				items.value[change.index];
+			if (!item || item.item_code !== change.item_code || change.rate === null) continue;
+			item.pos_repriced_from = change.quoted_rate;
+			if (change.price_list_rate !== null) item.rate = normalizeItemRate(change.price_list_rate);
+			item.discount_percentage = change.discount_percentage || 0;
+			item.discount_amount = item.discount_percentage ? 0 : change.discount_amount || 0;
+			item.pos_price_unavailable = false;
+			item.pos_price_state = undefined;
+			// Priced by the server for this customer; the price-list watcher must not undo it.
+			item.pos_price_key = `${key}|${item.uom || item.stock_uom}`;
+		}
+		const hasOfferDiscount = offerItemDiscountTotal.value > 0 || offerGrandTotalDiscountPct.value > 0;
+		if (response.discount_changed && !hasOfferDiscount) {
+			discountPercentage.value = response.additional_discount_percentage || 0;
+			discountAmount.value = discountPercentage.value ? 0 : response.discount_amount || 0;
+		}
+		offerConflict.value = !!response.offer_conflict && hasOfferDiscount;
+		repriceReview.value = response;
+	}
+
+	function acknowledgeRepricing(): void {
+		repriceReview.value = null;
+		for (const item of items.value) item.pos_repriced_from = undefined;
+	}
 
 	watch(
 		() =>
@@ -1279,11 +1320,31 @@ export const useCartStore = defineStore("cart", () => {
 	const pricingIssues = computed<string[]>(() => {
 		if (isReturnMode.value) return [];
 		const issues: string[] = [];
+		if (repriceReview.value) {
+			issues.push(__("Prices changed. Review the updated prices before taking payment."));
+		}
+		if (
+			offerConflict.value &&
+			(offerItemDiscountTotal.value > 0 || offerGrandTotalDiscountPct.value > 0)
+		) {
+			issues.push(
+				__(
+					"A pricing rule sets this sale's invoice discount, which cannot be combined with POS Offers. Remove the offers to continue.",
+				),
+			);
+		}
+		let saleLines = 0;
 		for (const item of items.value) {
 			if (item.pos_is_free_item || item.pos_is_offer || item.gift_card_issue || item.gift_card)
 				continue;
+			saleLines++;
 			if (item.pos_price_unavailable && !item.pos_rate_overridden) {
-				issues.push(__("Price unavailable for {0}", [item.item_name || item.item_code]));
+				const name = item.item_name || item.item_code;
+				issues.push(
+					item.pos_price_state === "needs_connection"
+						? __("{0}: connect to the server to get this customer's price", [name])
+						: __("{0}: no price is configured in price list {1}", [name, cartPriceList.value]),
+				);
 				continue;
 			}
 			const netRate = item.discount_percentage
@@ -1296,6 +1357,9 @@ export const useCartStore = defineStore("cart", () => {
 					]),
 				);
 			}
+		}
+		if (saleLines && !issues.length && !posStore.allowZeroRatedItems && grandTotal.value <= 0) {
+			issues.push(__("This sale totals zero, which this POS Profile does not allow"));
 		}
 		return issues;
 	});
@@ -1354,6 +1418,8 @@ export const useCartStore = defineStore("cart", () => {
 		invoiceLocalId = "";
 		items.value = [];
 		effectivePriceList.value = "";
+		repriceReview.value = null;
+		offerConflict.value = false;
 		selectedCartIndex.value = -1;
 		discountPercentage.value = 0;
 		discountAmount.value = 0;
@@ -1597,6 +1663,7 @@ export const useCartStore = defineStore("cart", () => {
 			customer: customer.value?.name || "",
 			items: items.value.map(
 				(item: CartItem): InvoiceItem => ({
+					row_id: item.uid,
 					item_code: item.item_code,
 					item_name: item.item_name,
 					local_item_name: item.local_item_name,
@@ -1871,6 +1938,10 @@ export const useCartStore = defineStore("cart", () => {
 		revalidateStock,
 		pricingIssues,
 		cartPriceList,
+		repriceReview,
+		offerConflict,
+		applyServerRepricing,
+		acknowledgeRepricing,
 		customerDiscountPercentage,
 		applyCustomerPriceList,
 		getStockReservations,

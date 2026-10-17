@@ -70,11 +70,14 @@ def get_print_formats(doctype: str = "Sales Invoice"):
 	return [p.name for p in print_formats]
 
 
-def can_reprint(user: str | None = None) -> bool:
-	"""Whether ``user`` may reprint a posted POS invoice (the ``allow_reprint_invoice`` right)."""
+def can_reprint(user: str | None = None, pos_profile: str | None = None) -> bool:
+	"""Whether ``user`` may reprint a posted POS invoice (the ``allow_reprint_invoice`` right).
+
+	The right is the user's POS Role on the invoice's own profile.
+	"""
 	from xpos.api.auth import user_has_pos_permission
 
-	return user_has_pos_permission("allow_reprint_invoice", user)
+	return user_has_pos_permission("allow_reprint_invoice", user, pos_profile)
 
 
 def invoice_has_permission(doc, ptype: str, user: str) -> bool:
@@ -85,7 +88,24 @@ def invoice_has_permission(doc, ptype: str, user: str) -> bool:
 		return True
 	if cint(getattr(doc, "print_count", 0)) < 1:
 		return True
-	return can_reprint(user)
+	return can_reprint(user, getattr(doc, "pos_profile", None))
+
+
+def enforce_reprint_right(doc, method=None, *args, **kwargs) -> None:
+	"""``before_print``: a reprint of a POS receipt needs the reprint right.
+
+	Frappe's print view only needs *read*, so the ``has_permission`` hook alone
+	does not stop a cashier reprinting from ``/printview``. The rule applies to the
+	users of the invoice's own till profile; back-office Desk users keep printing.
+	"""
+	if not cint(doc.get("is_pos")) or cint(doc.get("print_count")) < 1 or not doc.get("pos_profile"):
+		return
+	user = frappe.session.user
+	on_till = frappe.db.exists(
+		"POS Profile User", {"parent": doc.pos_profile, "parenttype": "POS Profile", "user": user}
+	)
+	if on_till and not can_reprint(user, doc.pos_profile):
+		frappe.throw(_("You are not permitted to reprint this receipt."), frappe.PermissionError)
 
 
 @frappe.whitelist()
@@ -136,6 +156,7 @@ def mark_invoice_printed(doctype: str, name: str) -> dict:
 	"""Record that a POS receipt has printed, so later prints count as reprints."""
 	if doctype not in REPRINT_DOCTYPES:
 		frappe.throw(_("Unsupported doctype for print tracking: {0}").format(doctype))
+	frappe.has_permission(doctype, "read", doc=name, throw=True)
 	current = cint(frappe.db.get_value(doctype, name, "print_count"))
 	frappe.db.set_value(doctype, name, "print_count", current + 1, update_modified=False)
 	return {"name": name, "print_count": current + 1}

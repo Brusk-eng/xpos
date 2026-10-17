@@ -226,7 +226,6 @@ def get_items_count(pos_profile: str, search_term: str = "", item_group: str = "
 			values["lft"] = ig.lft
 			values["rgt"] = ig.rgt
 	elif pos.item_groups:
-		# POS Profile restricts to specific item groups — apply as baseline filter
 		allowed_names = [ig.item_group for ig in pos.item_groups]
 		all_groups: set[str] = set()
 		for group_name in allowed_names:

@@ -104,7 +104,10 @@ after_install = "xpos.install.after_install"
 # Migration
 # ---------
 
-after_migrate = ["xpos.patches.add_pos_query_indexes.execute"]
+after_migrate = [
+	"xpos.patches.add_pos_query_indexes.execute",
+	"xpos.x_pos.doctype.referral_code.referral_code.add_customer_company_unique",
+]
 
 # Uninstallation
 # ------------
@@ -148,9 +151,10 @@ has_permission = {
 
 # DocType Class
 # ---------------
-# Extend standard doctype classes (mixin — does not miss upstream fixes)
+# Extend standard doctype classes (mixin - does not miss upstream fixes)
 
 extend_doctype_class = {
+	"Sales Invoice": "xpos.x_pos.overrides.sales_invoice.XposSalesInvoice",
 	"POS Invoice": "xpos.x_pos.overrides.pos_invoice.CustomPOSInvoice",
 	"POS Invoice Merge Log": "xpos.x_pos.overrides.pos_invoice_merge_log.CustomPOSInvoiceMergeLog",
 }
@@ -160,14 +164,18 @@ extend_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"Journal Entry": {"before_submit": "xpos.api.customer_credit.lock_credit_note_spend"},
+	"Payment Entry": {"before_submit": "xpos.api.customer_credit.lock_credit_note_spend"},
 	"Sales Invoice": {
 		"validate": "xpos.x_pos.api.invoice.validate",
+		"before_print": "xpos.api.print_formats.enforce_reprint_right",
 		"before_submit": "xpos.x_pos.api.invoice.before_submit",
 		"before_cancel": "xpos.x_pos.api.invoice.before_cancel",
 		"on_cancel": "xpos.x_pos.api.invoice.on_cancel",
 	},
 	"POS Invoice": {
 		"validate": "xpos.x_pos.api.invoice.validate",
+		"before_print": "xpos.api.print_formats.enforce_reprint_right",
 		"before_submit": "xpos.x_pos.api.invoice.before_submit",
 		"before_cancel": "xpos.x_pos.api.invoice.before_cancel",
 		"on_cancel": "xpos.x_pos.api.invoice.on_cancel",

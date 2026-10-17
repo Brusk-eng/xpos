@@ -6,6 +6,7 @@ from frappe.utils import flt, json
 
 from xpos.api.utilities import get_invoice_type
 from xpos.x_pos.doctype.pos_closing_shift.closing_processing.data import (
+	ensure_opening_shift_read,
 	get_payments_entries,
 	get_pos_invoices,
 )
@@ -47,6 +48,7 @@ def get_closing_shift_overview(pos_opening_shift: str | dict):
 
 	if opening_shift_doc.doctype != "POS Opening Shift":
 		frappe.throw(_("Unable to resolve POS Opening Shift."))
+	ensure_opening_shift_read(opening_shift_doc.name)
 
 	pos_profile = opening_shift_doc.pos_profile
 	company = opening_shift_doc.company
