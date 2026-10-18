@@ -97,7 +97,8 @@ export const usePosStore = defineStore("pos", () => {
 
 	const sellingPriceList = computed(() => posProfile.value?.selling_price_list || "");
 
-	const invoiceType = computed(() => xpos.boot?.pos_settings?.invoice_type);
+	// Same fallback as xpos.api.utilities.get_invoice_type; boot is absent on the Vite dev server.
+	const invoiceType = computed(() => xpos.boot?.pos_settings?.invoice_type || "Sales Invoice");
 
 	const defaultPrintFormat = computed(
 		() => posProfile.value?.default_print_format || "XPOS Thermal Receipt",

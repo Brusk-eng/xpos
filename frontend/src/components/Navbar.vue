@@ -1,234 +1,171 @@
 <template>
-	<header class="h-14 bg-background border-b border-border flex items-center px-4 gap-3 shrink-0 z-30">
-		<Button variant="ghost" size="icon-sm" @click="toggleSidebar">
-			<Menu class="w-5 h-5" />
-		</Button>
-		<div class="flex items-center gap-2.5">
-			<img :src="isDark ? logoDark : logoLight" alt="X POS Logo" class="w-8 h-8" />
-			<span class="hidden md:inline">{{ __("X POS") }}</span>
-		</div>
-		<TooltipWrapper :content="__('Go to Desk')">
-			<Button
-				variant="outline"
-				size="icon-sm"
-				class="text-muted-foreground hover:text-foreground"
-				@click="goToDesk"
-			>
-				<LayoutDashboard class="w-4 h-4" />
-			</Button>
-		</TooltipWrapper>
-		<nav class="hidden md:flex items-center gap-1 ms-4">
+	<header
+		class="z-30 mx-3 mt-2 flex h-14 shrink-0 items-center gap-1.5 rounded-xl border border-border bg-card/70 px-2 shadow-raised backdrop-blur-sm lg:gap-2"
+	>
+		<!-- Keyboard-only entry to the invisible dock; pointers use the edge hover / swipe instead. -->
+		<button
+			type="button"
+			class="sr-only rounded-lg bg-card px-3 py-2 text-sm font-semibold focus-visible:not-sr-only focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+			@click="toggleSidebar"
+		>
+			{{ __("Open navigation") }}
+		</button>
+		<router-link
+			to="/pos"
+			class="flex shrink-0 items-center rounded-xl no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+		>
+			<XposLogo variant="full" version="v3" :size="32" class="hidden lg:inline-flex" />
+			<XposLogo :size="32" class="lg:hidden" />
+		</router-link>
+		<nav class="ms-2 hidden items-center gap-1 md:flex lg:ms-5" :aria-label="__('Main')">
 			<router-link
-				to="/pos"
+				v-for="link in navLinks"
+				:key="link.to"
+				:to="link.to"
+				:aria-current="link.active ? 'page' : undefined"
 				:class="
 					cn(
-						buttonVariants({
-							variant: $route.name === 'pos' ? 'secondary' : 'ghost',
-							size: 'sm',
-						}),
-						'gap-1.5 no-underline',
-						$route.name === 'pos' && 'bg-primary/10 text-primary hover:bg-primary/15',
+						'inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold no-underline transition-[background-color,border-color,box-shadow] duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus lg:px-3.5',
+						link.active
+							? 'border-primary bg-primary text-primary-foreground shadow-primary'
+							: 'border-transparent text-foreground hover:bg-surface-hover',
 					)
 				"
 			>
-				<LayoutGrid class="w-4 h-4" />
-				<span>{{ __("POS") }}</span>
-			</router-link>
-			<router-link
-				to="/orders"
-				:class="
-					cn(
-						buttonVariants({
-							variant: $route.name === 'orders' ? 'secondary' : 'ghost',
-							size: 'sm',
-						}),
-						'gap-1.5 no-underline',
-						$route.name === 'orders' && 'bg-primary/10 text-primary hover:bg-primary/15',
-					)
-				"
-			>
-				<FileText class="w-4 h-4" />
-				<span>{{ __("Orders") }}</span>
-			</router-link>
-			<router-link
-				to="/reports"
-				:class="
-					cn(
-						buttonVariants({
-							variant: $route.path.startsWith('/reports') ? 'secondary' : 'ghost',
-							size: 'sm',
-						}),
-						'gap-1.5 no-underline',
-						$route.path.startsWith('/reports') &&
-							'bg-primary/10 text-primary hover:bg-primary/15',
-					)
-				"
-			>
-				<BarChart3 class="w-4 h-4" />
-				<span>{{ __("Reports") }}</span>
+				<component :is="link.icon" class="size-4.5" aria-hidden="true" />
+				<span>{{ link.label }}</span>
 			</router-link>
 		</nav>
 
 		<div class="flex-1"></div>
 
-		<TooltipWrapper :content="__('Search Items (Ctrl+K)')">
+		<TooltipWrapper :content="__('Repeat invoice')" shortcut="Ctrl+G">
 			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground hover:text-foreground gap-1"
-				@click="openSearch"
-			>
-				<Search class="w-4 h-4" />
-				<span class="hidden lg:inline text-xs">{{ __("Search") }}</span>
-			</Button>
-		</TooltipWrapper>
-
-		<TooltipWrapper :content="__('Repeat Invoice (Ctrl+G)')">
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground hover:text-blue-500 gap-1"
+				variant="outline"
+				class="h-10 gap-2 rounded-lg px-2.5 xl:px-3.5"
+				:aria-label="__('Repeat invoice')"
 				@click="showRepeatDialog = true"
 			>
-				<Repeat class="w-4 h-4" />
-				<span class="hidden lg:inline text-xs">{{ __("Repeat") }}</span>
+				<Repeat class="size-4.5!" />
+				<span class="hidden xl:inline">{{ __("Repeat") }}</span>
 			</Button>
 		</TooltipWrapper>
 
 		<TooltipWrapper
 			v-if="posStore.allowReturn && hasPermission('sale_return')"
-			:content="__('Process Return')"
+			:content="__('Process return')"
+			shortcut="Ctrl+R"
 		>
 			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground hover:text-amber-500 gap-1"
+				variant="outline"
+				class="h-10 gap-2 rounded-lg px-2.5 xl:px-3.5"
+				:aria-label="__('Process return')"
 				@click="showReturnDialog = true"
 			>
-				<RotateCcw class="w-4 h-4" />
-				<span class="hidden lg:inline text-xs">{{ __("Return") }}</span>
+				<RotateCcw class="size-4.5!" />
+				<span class="hidden xl:inline">{{ __("Return") }}</span>
 			</Button>
 		</TooltipWrapper>
 
-		<TooltipWrapper
-			v-if="posStore.lastInvoiceName && hasPermission('allow_reprint_invoice')"
-			:content="__('Print Last Invoice')"
-		>
-			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground hover:text-foreground gap-1"
-				@click="printLastInvoice"
-			>
-				<Printer class="w-4 h-4" />
-			</Button>
-		</TooltipWrapper>
-
-		<div
-			v-if="posStore.useOfflineMode || offlineStore.hasPending || offlineStore.hasDeadLetters"
-			class="flex items-center gap-1"
-		>
-			<TooltipWrapper :content="offlineStore.statusLabel">
-				<Button
-					variant="ghost"
-					size="sm"
-					:class="['gap-1.5', offlineStore.statusColor]"
-					@click="handleOfflineAction"
-				>
-					<Loader2 v-if="offlineStore.isSyncing" class="w-4 h-4 animate-spin" />
-					<WifiOff v-else-if="!offlineStore.isOnline" class="w-4 h-4" />
-					<CloudUpload v-else-if="offlineStore.hasPending" class="w-4 h-4" />
-					<Wifi v-else class="w-4 h-4" />
-					<Badge
-						v-if="offlineStore.pendingCount > 0"
-						variant="destructive"
-						class="h-4 min-w-4 px-1 text-[10px] leading-none"
-					>
-						{{ offlineStore.pendingCount }}
-					</Badge>
-					<span class="hidden lg:inline text-xs">{{ offlineStore.statusLabel }}</span>
-				</Button>
-			</TooltipWrapper>
-		</div>
-
-		<OfflinePendingPanel :open="showOfflinePanel" @close="showOfflinePanel = false" />
-
-		<div class="hidden md:flex items-center">
-			<Badge variant="secondary" class="gap-1.5">
-				<Building2 class="w-3.5 h-3.5" />
-				{{ posStore.warehouse }}
-			</Badge>
-		</div>
+		<ConnectionStatus />
 
 		<Popover>
 			<PopoverTrigger as-child>
-				<Button variant="ghost" size="icon-sm" class="rounded-full">
-					<Avatar size="sm">
-						<img v-if="authStore.user?.image" :src="authStore.user.image" alt="User Avatar" />
-						<AvatarFallback v-else>
-							<User class="w-3.5 h-3.5" />
-						</AvatarFallback>
-					</Avatar>
+				<Button variant="outline" class="hidden h-10 gap-2 rounded-lg px-3 lg:inline-flex">
+					<Building2 class="size-4.5!" />
+					<span class="max-w-40 truncate">{{ posStore.warehouse }}</span>
+					<ChevronDown class="size-4! text-muted-foreground" />
 				</Button>
 			</PopoverTrigger>
-			<PopoverContentStyled class="w-56 p-2" align="end">
-				<div class="px-2 py-1.5 border-b border-border mb-1">
-					<p class="text-sm font-medium">{{ authStore.userFullName || __("User") }}</p>
-					<p class="text-xs text-muted-foreground">{{ authStore.userEmail }}</p>
+			<PopoverContentStyled class="w-72 p-3" align="end">
+				<dl class="space-y-2 text-sm">
+					<div>
+						<dt class="text-xs font-medium text-muted-foreground">{{ __("Warehouse") }}</dt>
+						<dd class="font-semibold">{{ posStore.warehouse }}</dd>
+					</div>
+					<div>
+						<dt class="text-xs font-medium text-muted-foreground">{{ __("POS Profile") }}</dt>
+						<dd class="font-semibold">{{ posStore.profileName }}</dd>
+					</div>
+					<div>
+						<dt class="text-xs font-medium text-muted-foreground">{{ __("Company") }}</dt>
+						<dd class="font-semibold">{{ posStore.companyName }}</dd>
+					</div>
+				</dl>
+			</PopoverContentStyled>
+		</Popover>
+
+		<Popover>
+			<PopoverTrigger as-child>
+				<Button variant="outline" size="icon" class="size-10 rounded-lg" :aria-label="__('Account')">
+					<Avatar v-if="authStore.user?.image" size="sm">
+						<img :src="authStore.user.image" alt="" />
+					</Avatar>
+					<User v-else class="size-5!" />
+				</Button>
+			</PopoverTrigger>
+			<PopoverContentStyled class="w-72 p-2" align="end" role="menu">
+				<div class="mb-2 flex items-center gap-3 rounded-xl bg-surface-sunken px-3 py-2.5">
+					<span
+						class="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
+					>
+						<User class="size-4.5" />
+					</span>
+					<div class="min-w-0">
+						<p class="truncate text-sm font-semibold">
+							{{ authStore.userFullName || __("User") }}
+						</p>
+						<p class="truncate text-xs text-muted-foreground">{{ authStore.userEmail }}</p>
+					</div>
 				</div>
-				<Button variant="ghost" size="sm" class="w-full justify-start gap-2" @click="toggleDarkMode">
-					<component
-						:is="themeIcon"
-						class="w-4 h-4"
-						:class="{
-							'text-amber-400': theme === 'dark',
-							'text-blue-400': theme === 'system',
-						}"
-					/>
+				<PopoverMenuItem shortcut="Ctrl+K" @click="openSearch">
+					<template #icon><Search /></template>
+					{{ __("Search Items") }}
+				</PopoverMenuItem>
+				<PopoverMenuItem
+					v-if="posStore.lastInvoiceName && hasPermission('allow_reprint_invoice')"
+					@click="printLastInvoice"
+				>
+					<template #icon><Printer /></template>
+					{{ __("Print Last Invoice") }}
+				</PopoverMenuItem>
+				<PopoverMenuItem @click="goToDesk">
+					<template #icon><LayoutDashboard /></template>
+					{{ __("Go to Desk") }}
+				</PopoverMenuItem>
+				<div class="my-1.5 h-px bg-border" role="separator" />
+				<PopoverMenuItem @click="toggleDarkMode">
+					<template #icon><component :is="themeIcon" /></template>
 					{{ themeTooltip.split(" (")[0] }}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					class="w-full justify-start gap-2"
-					@click="showShortcutsDialog = true"
-				>
-					<Keyboard class="w-4 h-4" />
+				</PopoverMenuItem>
+				<PopoverMenuItem @click="showShortcutsDialog = true">
+					<template #icon><Keyboard /></template>
 					{{ __("Keyboard Shortcuts") }}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					class="w-full justify-start gap-2"
-					@click="showAboutDialog = true"
-				>
-					<Info class="w-4 h-4" />
+				</PopoverMenuItem>
+				<PopoverMenuItem @click="showAboutDialog = true">
+					<template #icon><Info /></template>
 					{{ __("About X POS") }}
-				</Button>
-				<Button
-					variant="ghost"
-					size="sm"
-					class="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-					@click="handleSignOut"
-				>
-					<Power class="w-4 h-4" />
+				</PopoverMenuItem>
+				<div class="my-1.5 h-px bg-border" role="separator" />
+				<PopoverMenuItem destructive @click="handleSignOut">
+					<template #icon><Power /></template>
 					{{ __("Sign Out") }}
-				</Button>
+				</PopoverMenuItem>
 			</PopoverContentStyled>
 		</Popover>
 
 		<TooltipWrapper v-if="!posStore.hideClosingShift" :content="__('Close Shift')">
 			<Button
-				variant="ghost"
-				size="sm"
-				class="text-muted-foreground hover:text-destructive gap-1.5"
+				variant="outline"
+				class="h-10 gap-2 rounded-lg px-2.5 xl:px-3.5"
+				:aria-label="__('Close Shift')"
 				@click="
 					posStore.showClosingDialog = true;
 					posStore.fetchClosingData();
 				"
 			>
-				<LogOut class="w-4 h-4" />
-				<span class="hidden sm:inline">{{ __("Close Shift") }}</span>
+				<LogOut class="size-4.5!" />
+				<span class="hidden xl:inline">{{ __("Close Shift") }}</span>
 			</Button>
 		</TooltipWrapper>
 
@@ -248,11 +185,11 @@ import { usePaymentStore } from "@/stores/paymentStore";
 import { useAuthStore } from "@/stores/authStore";
 import { __ } from "@/lib/translate";
 import { hasPermission } from "@/services/userRights";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Popover, PopoverContentStyled, PopoverTrigger } from "@/components/ui/popover";
+import { XposLogo } from "@/components/ui/brand";
+import { Avatar } from "@/components/ui/avatar";
+import { Popover, PopoverContentStyled, PopoverMenuItem, PopoverTrigger } from "@/components/ui/popover";
 import ReturnDialog from "@/components/dialogs/ReturnDialog.vue";
 import RepeatInvoiceDialog from "@/components/dialogs/RepeatInvoiceDialog.vue";
 import {
@@ -269,36 +206,30 @@ import {
 	Repeat,
 	Printer,
 	Power,
-	Wifi,
-	WifiOff,
-	CloudUpload,
-	Loader2,
-	LayoutGrid,
 	FileText,
 	Search,
 	Info,
 	Keyboard,
-	Menu,
 	LayoutDashboard,
+	ShoppingCart,
+	ChevronDown,
 } from "lucide-vue-next";
-import OfflinePendingPanel from "@/components/offline/OfflinePendingPanel.vue";
+import ConnectionStatus from "@/components/ConnectionStatus.vue";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
-import { useOfflineStore } from "@/stores/offlineStore";
 
-import { useBranding } from "@/composables/useBranding";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { cn } from "@/lib/utils";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 
 const router = useRouter();
+const route = useRoute();
 const posStore = usePosStore();
 const { openInvoicePrintView } = usePrintInvoice();
 const paymentStore = usePaymentStore();
 const authStore = useAuthStore();
 
 const isDark = inject<Ref<boolean>>("isDark")!;
-const { logoLight, logoDark } = useBranding();
 const theme = inject<Ref<"light" | "dark" | "system">>("theme")!;
 const toggleDarkMode = inject<() => void>("toggleDarkMode")!;
 
@@ -313,23 +244,17 @@ const themeTooltip = computed(() => {
 	if (theme.value === "dark") return __("Theme: Dark (click to switch to System)");
 	return __("Theme: System ({0}) (click to switch to Light)", [isDark.value ? __("Dark") : __("Light")]);
 });
-const offlineStore = useOfflineStore();
+
+const navLinks = computed(() => [
+	{ to: "/pos", label: __("POS"), icon: ShoppingCart, active: route.name === "pos" },
+	{ to: "/orders", label: __("Orders"), icon: FileText, active: route.name === "orders" },
+	{ to: "/reports", label: __("Reports"), icon: BarChart3, active: route.path.startsWith("/reports") },
+]);
 
 const showReturnDialog = ref(false);
 const showRepeatDialog = ref(false);
-const showOfflinePanel = ref(false);
 const showAboutDialog = ref(false);
 const showShortcutsDialog = ref(false);
-
-function handleOfflineAction() {
-	if (offlineStore.hasPending || offlineStore.hasDeadLetters || !offlineStore.isOnline) {
-		showOfflinePanel.value = true;
-	}
-}
-
-function handleOpenOfflinePanel() {
-	showOfflinePanel.value = true;
-}
 
 function toggleSidebar() {
 	window.dispatchEvent(new CustomEvent("xpos:toggle-sidebar"));
@@ -364,14 +289,12 @@ onMounted(() => {
 	window.addEventListener("keydown", handleKeyboard);
 	window.addEventListener("xpos:show-repeat-dialog", handleShowRepeatDialog as EventListener);
 	window.addEventListener("xpos:show-return-dialog", handleShowReturnDialog as EventListener);
-	window.addEventListener("xpos:open-offline-panel", handleOpenOfflinePanel as EventListener);
 });
 
 onUnmounted(() => {
 	window.removeEventListener("keydown", handleKeyboard);
 	window.removeEventListener("xpos:show-repeat-dialog", handleShowRepeatDialog as EventListener);
 	window.removeEventListener("xpos:show-return-dialog", handleShowReturnDialog as EventListener);
-	window.removeEventListener("xpos:open-offline-panel", handleOpenOfflinePanel as EventListener);
 });
 
 function printLastInvoice() {

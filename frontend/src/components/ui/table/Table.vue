@@ -24,6 +24,7 @@ import __ from "@/lib/translate";
 import type { TableColumn as ChildTableColumn, TableRow as ChildTableRow, SelectOption } from "./types";
 import { formatNumber } from "@/utils/numberFormat";
 import Checkbox from "../checkbox/Checkbox.vue";
+import { EmptyState } from "../state";
 
 const props = withDefaults(
 	defineProps<{
@@ -733,30 +734,32 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 
 <template>
 	<div
-		class="child-table flex min-h-0 flex-col border border-border rounded-lg overflow-hidden bg-background"
+		class="child-table flex min-h-0 flex-col border border-border rounded-lg overflow-hidden bg-card shadow-raised"
 		@keydown="handleTableKeyDown"
 	>
 		<div
-			class="shrink-0 flex flex-col gap-2 px-3 py-2 bg-muted/50 border-b border-border sm:flex-row sm:items-center sm:justify-between"
+			class="shrink-0 flex flex-col gap-2 px-3 py-2 bg-surface-sunken border-b border-border sm:flex-row sm:items-center sm:justify-between"
 		>
 			<div class="flex items-center gap-2">
 				<span class="text-sm font-semibold text-foreground">
 					{{ __(label) }}
 				</span>
-				<span class="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+				<span
+					class="text-xs font-medium text-muted-foreground bg-card border border-border px-1.5 py-0.5 rounded-full tabular-nums"
+				>
 					{{ rows.length }}
 				</span>
 			</div>
 			<div class="flex w-full flex-wrap items-center gap-1.5 sm:w-auto sm:justify-end">
 				<template v-if="selectedIndices.size > 0">
-					<span class="text-[11px] font-medium text-blue-600 dark:text-blue-400 me-1">
+					<span class="text-xs font-semibold text-primary me-1">
 						{{ selectedIndices.size }} {{ __("selected") }}
 					</span>
 					<TooltipWrapper :content="__('Delete selected')">
 						<Button
 							variant="ghost"
 							size="icon"
-							class="h-7 w-7 text-destructive hover:bg-destructive/10"
+							class="h-7 w-7 text-destructive hover:bg-destructive-soft"
 							@click="deleteSelected"
 						>
 							<Trash2 class="w-3.5 h-3.5" />
@@ -791,24 +794,21 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 		</div>
 
 		<div ref="tableContainerRef" class="ct-table-container flex-1 min-h-0 overflow-auto">
-			<div v-if="rows.length === 0" class="flex h-full min-h-45 items-center justify-center px-8 py-12">
-				<div class="text-center text-muted-foreground">
-					<Package class="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
-					<p class="font-medium text-sm">{{ __(emptyMessage) }}</p>
-					<p class="text-xs mt-1">{{ __(emptyDescription) }}</p>
-					<Button v-if="showAddRow" variant="outline" size="sm" class="mt-3" @click="addRow">
+			<div v-if="rows.length === 0" class="flex h-full min-h-45 items-center justify-center">
+				<EmptyState :icon="Package" :title="__(emptyMessage)" :description="__(emptyDescription)">
+					<Button v-if="showAddRow" variant="outline" size="sm" @click="addRow">
 						<Plus class="w-3.5 h-3.5 me-1" />
 						{{ __("Add First Row") }}
 					</Button>
-				</div>
+				</EmptyState>
 			</div>
 
 			<table v-else class="w-full text-sm ct-table" :style="{ minWidth: minWidth }">
-				<thead class="sticky top-0 z-20 bg-muted border-b border-border">
-					<tr class="text-xs text-muted-foreground uppercase tracking-wider">
+				<thead class="sticky top-0 z-20 bg-surface-sunken border-b border-border">
+					<tr class="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
 						<th
 							v-if="showCheckboxes"
-							class="w-8 px-2 py-2 bg-muted"
+							class="w-8 px-2 py-2 bg-surface-sunken"
 							:style="frozenStyles.get('__checkbox')"
 							:class="{ 'ct-frozen-last': lastFrozenFieldname === '__checkbox' }"
 						>
@@ -820,7 +820,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 						</th>
 						<th
 							v-if="showRowNumbers"
-							class="px-2 py-2 text-center w-10 bg-muted"
+							class="px-2 py-2 text-center w-10 bg-surface-sunken"
 							:style="frozenStyles.get('__rownumber')"
 							:class="{ 'ct-frozen-last': lastFrozenFieldname === '__rownumber' }"
 						>
@@ -833,7 +833,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 							:class="[
 								getAlignClass(col.align),
 								col.width,
-								col.frozen === 'left' ? 'bg-muted' : '',
+								col.frozen === 'left' ? 'bg-surface-sunken' : '',
 								lastFrozenFieldname === col.fieldname ? 'ct-frozen-last' : '',
 							]"
 							:style="frozenStyles.get(col.fieldname)"
@@ -852,9 +852,9 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 					<tr
 						v-for="(row, rowIndex) in rows"
 						:key="`row-${rowIndex}`"
-						class="hover:bg-muted/50 transition-colors ct-row group"
+						class="hover:bg-surface-hover/50 transition-colors ct-row group"
 						:class="{
-							'bg-blue-50/40 dark:bg-blue-900/10': selectedIndices.has(rowIndex),
+							'bg-surface-selected/60': selectedIndices.has(rowIndex),
 							'ct-row-dragging': draggingRowIndex === rowIndex,
 							'ct-row-drop-before':
 								dragOverRowIndex === rowIndex && dragInsertPosition === 'before',
@@ -866,7 +866,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 					>
 						<td
 							v-if="showCheckboxes"
-							class="px-2 py-1 bg-background group-hover:bg-muted/50"
+							class="px-2 py-1 bg-card group-hover:bg-surface-hover/50"
 							:style="frozenStyles.get('__checkbox')"
 							:class="{ 'ct-frozen-last': lastFrozenFieldname === '__checkbox' }"
 						>
@@ -878,7 +878,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 
 						<td
 							v-if="showRowNumbers"
-							class="px-2 py-1 text-center text-xs text-muted-foreground tabular-nums bg-background group-hover:bg-muted/50"
+							class="px-2 py-1 text-center text-xs text-muted-foreground tabular-nums bg-card group-hover:bg-surface-hover/50"
 							:style="frozenStyles.get('__rownumber')"
 							:class="{ 'ct-frozen-last': lastFrozenFieldname === '__rownumber' }"
 						>
@@ -905,7 +905,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 							class="px-2 py-1"
 							:class="[
 								getAlignClass(col.align),
-								col.frozen === 'left' ? 'bg-background group-hover:bg-muted/50' : '',
+								col.frozen === 'left' ? 'bg-card group-hover:bg-surface-hover/50' : '',
 								lastFrozenFieldname === col.fieldname ? 'ct-frozen-last' : '',
 							]"
 							:style="frozenStyles.get(col.fieldname)"
@@ -1073,7 +1073,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 									<Button
 										variant="ghost"
 										size="icon"
-										class="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+										class="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive-soft"
 										@click.stop="deleteRow(rowIndex)"
 									>
 										<Trash2 class="w-3 h-3" />
@@ -1090,7 +1090,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 			v-if="rows.length > 0 && keyboardNavigation"
 			class="shrink-0 flex flex-col gap-2 px-3 py-1.5 border-t border-border bg-muted/30 sm:flex-row sm:items-center sm:justify-between"
 		>
-			<span class="text-[10px] text-muted-foreground">
+			<span class="text-xs text-muted-foreground">
 				{{ __("Arrow keys to navigate") }} &middot; {{ __("Enter for next row") }} &middot;
 				<template v-if="showRowDragHandle">{{ __("Drag row number to reorder") }} &middot; </template>
 				{{ __("Ctrl+D to duplicate") }} &middot;
@@ -1100,7 +1100,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 			<button
 				v-if="showAddRow"
 				type="button"
-				class="self-start text-[11px] text-primary hover:underline"
+				class="self-start text-xs font-medium text-primary hover:underline"
 				@click="addRow"
 			>
 				+ {{ __("Add Row") }}
@@ -1114,9 +1114,9 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 					class="fixed inset-0 z-9999 flex items-center justify-center p-4"
 					@click.self="showColumnSettingsModal = false"
 				>
-					<div class="absolute inset-0 bg-black/50" @click="showColumnSettingsModal = false" />
+					<div class="absolute inset-0 bg-scrim/55" @click="showColumnSettingsModal = false" />
 					<div
-						class="relative bg-background border border-border rounded-lg shadow-xl w-full max-w-sm max-h-[80vh] flex flex-col"
+						class="relative bg-card border border-border rounded-lg shadow-overlay w-full max-w-sm max-h-[80vh] flex flex-col"
 					>
 						<div class="flex items-center justify-between px-4 py-3 border-b border-border">
 							<h3 class="text-sm font-semibold text-foreground">
@@ -1170,9 +1170,9 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 					class="fixed inset-0 z-9999 flex items-center justify-center p-4"
 					@click.self="closeRowEditor"
 				>
-					<div class="absolute inset-0 bg-black/50" @click="closeRowEditor" />
+					<div class="absolute inset-0 bg-scrim/55" @click="closeRowEditor" />
 					<div
-						class="relative bg-background border border-border rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col"
+						class="relative bg-card border border-border rounded-xl shadow-overlay w-full max-w-lg max-h-[85vh] flex flex-col"
 					>
 						<div class="flex items-center justify-between px-5 py-3.5 border-b border-border">
 							<h3 class="text-sm font-semibold text-foreground">
@@ -1212,7 +1212,7 @@ function handleTableKeyDown(event: KeyboardEvent): void {
 										<Button
 											variant="ghost"
 											size="icon-sm"
-											class="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+											class="h-8 w-8 text-destructive hover:bg-destructive-soft hover:text-destructive"
 											@click="deleteEditorRow"
 										>
 											<Trash2 class="w-3.5 h-3.5" />

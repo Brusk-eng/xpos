@@ -1,11 +1,7 @@
 <template>
 	<div
-		class="group flex items-start gap-2 rounded-xl border-2 p-2 transition-all duration-200 scroll-mt-1 focus:outline-none"
-		:class="
-			isSelected
-				? 'border-primary bg-primary/5 shadow-[0_0_0_1px_hsl(var(--primary)/0.18),0_10px_30px_-18px_hsl(var(--primary)/0.9)] dark:bg-primary/10'
-				: 'border-transparent hover:bg-muted/50 dark:hover:bg-accent/50'
-		"
+		class="scroll-mt-1 rounded-2xl border bg-surface-raised p-3 shadow-raised transition-[border-color,box-shadow] duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+		:class="isSelected ? 'border-primary ring-1 ring-primary/40' : 'border-border'"
 		:data-cart-index="index"
 		tabindex="0"
 		@focusin="selectRow"
@@ -13,234 +9,269 @@
 		@keydown.delete="handleDeleteKey"
 		@keydown="handleRowKeydown"
 	>
-		<div class="w-9 h-9 rounded-md bg-muted overflow-hidden shrink-0 flex items-center justify-center">
-			<img
-				v-if="item.image"
-				:src="item.image"
-				:alt="item.item_name"
-				class="w-full h-full object-cover"
-			/>
-			<Package v-else class="w-4 h-4 text-muted-foreground/40" />
-		</div>
-
-		<div class="flex-1 min-w-0">
-			<p class="text-[11px] font-medium text-foreground leading-tight truncate">
-				{{ item.item_name }}
-				<span
-					v-if="item.pos_is_free_item"
-					class="ms-1 px-1 py-px rounded text-[9px] font-semibold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400"
-				>
-					{{ __("Free") }}
-				</span>
-				<span
-					v-if="item.pos_price_unavailable && !item.pos_rate_overridden"
-					role="status"
-					class="ms-1 px-1 py-px rounded text-[9px] font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300"
-				>
-					{{
-						item.pos_price_state === "needs_connection"
-							? __("Needs connection for price")
-							: __("Price unavailable")
-					}}
-				</span>
-				<span
-					v-if="item.pos_repriced_from !== undefined"
-					role="status"
-					class="ms-1 px-1 py-px rounded text-[9px] font-semibold bg-sky-100 dark:bg-sky-900/40 text-sky-800 dark:text-sky-300"
-				>
-					{{ __("Price changed from {0}", [item.pos_repriced_from]) }}
-				</span>
-			</p>
-
-			<div class="flex items-center gap-1 mt-0.5 flex-wrap">
-				<template v-if="hasPermission('allow_change_price') && !item.pos_is_free_item">
-					<span class="text-[11px] text-muted-foreground">{{ currencySymbol }}</span>
-					<input
-						ref="rateInput"
-						:value="item.rate"
-						type="number"
-						min="0"
-						:step="rateStep"
-						class="w-16 h-5 text-[11px] font-medium text-foreground bg-transparent border-b border-dashed border-border focus:outline-none focus:border-primary dark:border-muted-foreground/40 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-						@change="onRateChange"
-						@keydown.up.prevent="focusAdjacentItem(-1, 'rate')"
-						@keydown.down.prevent="focusAdjacentItem(1, 'rate')"
-						@keydown="blockInvalidNumericKeys"
-					/>
-				</template>
-				<p v-else class="text-[11px] text-muted-foreground">
-					{{ moneyRate(item.rate) }}
-				</p>
-
-				<span class="text-[11px] text-muted-foreground">/</span>
-				<button
-					v-if="hasMultipleUOMs"
-					ref="uomToggleRef"
-					@click="showUOMSelector = !showUOMSelector"
-					@keydown.left.prevent="cycleUOM(-1)"
-					@keydown.right.prevent="cycleUOM(1)"
-					@keydown.space.prevent="showUOMSelector = !showUOMSelector"
-					@keydown.enter.prevent="showUOMSelector = !showUOMSelector"
-					@keydown.escape="showUOMSelector = false"
-					class="text-[11px] text-primary hover:underline focus:outline-none"
-					:title="'Left/Right to cycle · Enter to open · U to toggle'"
-				>
-					{{ item.uom || item.stock_uom }}
-					<ChevronDown class="w-3 h-3 inline-block" />
-				</button>
-				<span v-else class="text-[11px] text-muted-foreground">
-					{{ item.uom || item.stock_uom }}
-				</span>
+		<div class="flex gap-3">
+			<div
+				class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card"
+			>
+				<img
+					v-if="item.image"
+					:src="item.image"
+					:alt="item.item_name"
+					class="h-full w-full object-contain p-1"
+				/>
+				<Package v-else class="size-5 text-muted-foreground/60" />
 			</div>
 
-			<div
-				v-if="showUOMSelector && itemUOMs.length > 0"
-				ref="uomContainerRef"
-				class="mt-1 p-1.5 bg-muted rounded-md"
-				@keydown="handleUOMContainerKeydown"
-			>
-				<div class="text-[9px] text-muted-foreground mb-1 ms-0.5">
-					← → cycle &bull; 1–{{ itemUOMs.length }} select &bull; Esc close
+			<div class="min-w-0 flex-1">
+				<div class="flex items-start gap-2">
+					<div class="min-w-0 flex-1">
+						<p class="line-clamp-2 text-[0.9375rem] font-semibold leading-snug text-foreground">
+							{{ item.item_name }}
+						</p>
+						<p class="truncate font-mono text-xs text-muted-foreground">{{ item.item_code }}</p>
+					</div>
+					<Popover v-model:open="menuOpen">
+						<PopoverTrigger as-child>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="-me-1 size-9 shrink-0"
+								:aria-label="__('Line options')"
+							>
+								<MoreVertical class="size-5!" />
+							</Button>
+						</PopoverTrigger>
+						<PopoverContentStyled class="w-56 p-1.5" align="end" role="menu">
+							<PopoverMenuItem
+								v-if="hasMultipleUOMs"
+								shortcut="U"
+								@click="
+									menuOpen = false;
+									showUOMSelector = !showUOMSelector;
+								"
+							>
+								<template #icon><Ruler /></template>
+								{{ __("Change unit") }}
+							</PopoverMenuItem>
+							<PopoverMenuItem
+								v-if="hasPermission('show_edit_discount_field') && !item.pos_is_free_item"
+								@click="
+									menuOpen = false;
+									showDiscountInput = !showDiscountInput;
+								"
+							>
+								<template #icon><Percent /></template>
+								{{ hasItemDiscount ? __("Edit discount") : __("Add discount") }}
+							</PopoverMenuItem>
+							<PopoverMenuItem
+								destructive
+								shortcut="Del"
+								@click="
+									menuOpen = false;
+									$emit('remove', index);
+								"
+							>
+								<template #icon><Trash2 /></template>
+								{{ __("Remove") }}
+							</PopoverMenuItem>
+						</PopoverContentStyled>
+					</Popover>
 				</div>
-				<div class="flex flex-wrap gap-1">
-					<button
-						v-for="(u, i) in itemUOMs"
-						:key="u.uom"
-						:data-uom="u.uom"
-						@click="selectUOM(u)"
-						@keydown.left.prevent="focusUOMButton($event, -1)"
-						@keydown.right.prevent="focusUOMButton($event, 1)"
-						@keydown.enter.prevent="selectUOM(u)"
-						class="px-2 py-0.5 rounded text-[10px] font-medium transition-all"
-						:class="
-							(item.uom || item.stock_uom) === u.uom
-								? 'bg-primary text-primary-foreground'
-								: 'bg-background border border-border hover:border-primary/40'
-						"
-					>
-						<span class="text-[9px] opacity-50 me-0.5">{{ i + 1 }}.</span>
-						{{ u.uom }}
-						<span v-if="u.conversion_factor !== 1" class="text-[9px] opacity-70">
-							(×{{ u.conversion_factor }})
+
+				<div class="mt-2 flex items-center gap-2">
+					<div class="flex min-w-0 flex-1 items-baseline gap-1 whitespace-nowrap">
+						<template v-if="hasPermission('allow_change_price') && !item.pos_is_free_item">
+							<span class="text-sm font-bold text-foreground">{{ currencySymbol }}</span>
+							<input
+								ref="rateInput"
+								:value="item.rate"
+								type="number"
+								min="0"
+								:step="rateStep"
+								:aria-label="__('Rate')"
+								:style="{ width: `${String(item.rate ?? '').length + 2}ch` }"
+								class="min-w-[4ch] rounded-md border border-transparent bg-transparent px-1 text-base font-bold text-foreground tabular-nums hover:border-border focus:bg-card focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+								@change="onRateChange"
+								@keydown.up.prevent="focusAdjacentItem(-1, 'rate')"
+								@keydown.down.prevent="focusAdjacentItem(1, 'rate')"
+								@keydown="blockInvalidNumericKeys"
+							/>
+						</template>
+						<span v-else class="text-base font-bold text-foreground tabular-nums">
+							{{ moneyRate(item.rate) }}
 						</span>
-					</button>
-				</div>
-			</div>
+						<span class="text-xs text-muted-foreground">/</span>
+						<button
+							v-if="hasMultipleUOMs"
+							ref="uomToggleRef"
+							@click="showUOMSelector = !showUOMSelector"
+							@keydown.left.prevent="cycleUOM(-1)"
+							@keydown.right.prevent="cycleUOM(1)"
+							@keydown.space.prevent="showUOMSelector = !showUOMSelector"
+							@keydown.enter.prevent="showUOMSelector = !showUOMSelector"
+							@keydown.escape="showUOMSelector = false"
+							class="inline-flex items-center gap-0.5 truncate rounded text-xs font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+							:title="__('Left/Right to cycle · Enter to open · U to toggle')"
+						>
+							{{ item.uom || item.stock_uom }}
+							<ChevronDown class="size-3.5" />
+						</button>
+						<span v-else class="truncate text-xs text-muted-foreground">{{
+							item.uom || item.stock_uom
+						}}</span>
+					</div>
 
-			<div class="flex items-center gap-1 mt-1 flex-wrap">
-				<template v-if="item.pos_is_free_item">
-					<span class="text-[10px] font-semibold text-muted-foreground px-1">
+					<div
+						v-if="item.pos_is_free_item"
+						class="shrink-0 text-sm font-semibold text-muted-foreground"
+					>
 						{{ __("Qty") }}: {{ qty(item.qty) }}
-					</span>
-				</template>
-				<template v-else>
-					<Button variant="secondary" size="icon-sm" class="w-5 h-5" @click="decrementQty">
-						<Minus class="w-2.5 h-2.5" />
-					</Button>
-					<input
-						ref="qtyInput"
-						:value="item.qty"
-						type="number"
-						min="0"
-						data-testid="cart-qty"
-						class="w-9 h-5 text-center text-[10px] font-semibold text-foreground bg-muted/50 rounded border border-border focus:outline-none focus:ring-1 focus:ring-ring dark:bg-accent/50 dark:border-muted-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-1"
-						@change="onQtyChange"
-						@keydown.up.prevent="focusAdjacentItem(-1, 'qty')"
-						@keydown.down.prevent="focusAdjacentItem(1, 'qty')"
-						@keydown="blockInvalidNumericKeys"
-					/>
-					<Button
-						variant="secondary"
-						size="icon-sm"
-						class="w-5 h-5 bg-primary/10 text-primary hover:bg-primary/20"
-						@click="incrementQty"
-					>
-						<Plus class="w-2.5 h-2.5" />
-					</Button>
-				</template>
+					</div>
+					<div v-else class="flex shrink-0 items-center gap-1.5">
+						<Button
+							variant="outline"
+							size="icon"
+							class="size-9 rounded-xl"
+							:aria-label="__('Decrease quantity')"
+							@click="decrementQty"
+						>
+							<Minus class="size-4!" />
+						</Button>
+						<input
+							ref="qtyInput"
+							:value="item.qty"
+							type="number"
+							min="0"
+							data-testid="cart-qty"
+							:aria-label="__('Quantity')"
+							class="h-9 w-12 rounded-xl border border-border bg-card text-center text-base font-semibold text-foreground shadow-inset tabular-nums focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+							@change="onQtyChange"
+							@keydown.up.prevent="focusAdjacentItem(-1, 'qty')"
+							@keydown.down.prevent="focusAdjacentItem(1, 'qty')"
+							@keydown="blockInvalidNumericKeys"
+						/>
+						<Button
+							variant="outline"
+							size="icon"
+							class="size-9 rounded-xl text-primary"
+							:aria-label="__('Increase quantity')"
+							@click="incrementQty"
+						>
+							<Plus class="size-4!" />
+						</Button>
+					</div>
 
-				<span
-					v-if="isAutoDiscount"
-					class="ms-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-400 border border-sky-300 dark:border-sky-700"
-					:title="autoDiscountTitle"
-				>
-					{{ __("Auto") }}
-				</span>
-
-				<template v-if="hasPermission('show_edit_discount_field') && !item.pos_is_free_item">
-					<button
-						@click="showDiscountInput = !showDiscountInput"
-						class="ms-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all"
-						:class="
-							hasItemDiscount
-								? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700'
-								: 'bg-muted text-muted-foreground hover:bg-emerald-50 dark:hover:bg-emerald-900/20'
-						"
-					>
-						<Percent class="w-3 h-3 inline-block" />
-						{{ hasItemDiscount ? formatDiscount : "Disc" }}
-					</button>
-				</template>
-			</div>
-
-			<div
-				v-if="showDiscountInput && hasPermission('show_edit_discount_field')"
-				class="mt-1.5 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-md border border-emerald-200 dark:border-emerald-800"
-			>
-				<div class="flex items-center gap-2">
-					<button
-						@click="discountType = 'percentage'"
-						class="px-2 py-0.5 rounded text-[10px] font-medium transition-all"
-						:class="
-							discountType === 'percentage'
-								? 'bg-emerald-600 text-white'
-								: 'bg-white dark:bg-muted border border-emerald-300 dark:border-emerald-700'
-						"
-					>
-						%
-					</button>
-					<button
-						@click="discountType = 'amount'"
-						class="px-2 py-0.5 rounded text-[10px] font-medium transition-all"
-						:class="
-							discountType === 'amount'
-								? 'bg-emerald-600 text-white'
-								: 'bg-white dark:bg-muted border border-emerald-300 dark:border-emerald-700'
-						"
-					>
-						{{ currencySymbol }}
-					</button>
-					<input
-						v-model.number="discountInput"
-						type="number"
-						min="0"
-						:max="discountType === 'percentage' ? maxDiscount || 100 : undefined"
-						step="0.5"
-						placeholder="0"
-						class="flex-1 h-6 text-center text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-white dark:bg-muted rounded border border-emerald-300 dark:border-emerald-700 focus:outline-none focus:ring-1 focus:ring-emerald-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-						@blur="applyDiscount"
-						@keydown.enter="applyDiscount"
-						@keydown="blockInvalidNumericKeys"
-					/>
+					<div class="flex min-w-20 shrink-0 flex-col items-end">
+						<span
+							class="text-base font-bold text-foreground tabular-nums"
+							data-testid="cart-amount"
+						>
+							{{ money(lineTotal) }}
+						</span>
+						<span
+							v-if="hasItemDiscount"
+							class="text-xs font-medium text-success-soft-foreground tabular-nums"
+						>
+							-{{ money(discountAmount) }}
+						</span>
+					</div>
 				</div>
 			</div>
 		</div>
 
-		<div class="flex flex-col items-end gap-0.5 shrink-0">
-			<span class="text-xs font-bold text-foreground tabular-nums" data-testid="cart-amount">
-				{{ money(lineTotal) }}
-			</span>
-			<span v-if="hasItemDiscount" class="text-[9px] text-emerald-600 dark:text-emerald-400">
-				-{{ money(discountAmount) }}
-			</span>
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				class="md:opacity-0 md:group-hover:opacity-100 w-5 h-5 md:w-4 md:h-4 text-muted-foreground hover:text-destructive transition-all"
-				@click="$emit('remove', index)"
+		<div v-if="statusBadges.length" class="mt-2 flex flex-wrap gap-1.5 ps-15">
+			<Badge
+				v-for="badge in statusBadges"
+				:key="badge.label"
+				:variant="badge.variant"
+				size="sm"
+				:title="badge.title"
+				:role="badge.status ? 'status' : undefined"
 			>
-				<Trash2 class="w-3.5 h-3.5" />
+				{{ badge.label }}
+			</Badge>
+		</div>
+
+		<div
+			v-if="needsSerial"
+			class="mt-3 flex items-center gap-3 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-info-soft-foreground"
+			role="status"
+		>
+			<Box class="size-5 shrink-0" />
+			<div class="min-w-0">
+				<p class="text-sm font-semibold">{{ __("Serial required") }}</p>
+				<p class="text-xs">{{ __("This product requires a serial number.") }}</p>
+			</div>
+		</div>
+
+		<div
+			v-if="showUOMSelector && itemUOMs.length > 0"
+			ref="uomContainerRef"
+			class="mt-3 rounded-xl border border-border bg-surface-sunken p-2"
+			@keydown="handleUOMContainerKeydown"
+		>
+			<p class="mb-1.5 text-xs text-muted-foreground">
+				← → {{ __("cycle") }} &bull; 1–{{ itemUOMs.length }} {{ __("select") }} &bull; Esc
+				{{ __("close") }}
+			</p>
+			<div class="flex flex-wrap gap-1.5">
+				<button
+					v-for="(u, i) in itemUOMs"
+					:key="u.uom"
+					:data-uom="u.uom"
+					@click="selectUOM(u)"
+					@keydown.left.prevent="focusUOMButton($event, -1)"
+					@keydown.right.prevent="focusUOMButton($event, 1)"
+					@keydown.enter.prevent="selectUOM(u)"
+					class="h-9 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+					:class="
+						(item.uom || item.stock_uom) === u.uom
+							? 'border-primary bg-primary text-primary-foreground'
+							: 'border-border bg-card hover:bg-surface-hover'
+					"
+				>
+					<span class="me-1 text-xs opacity-60">{{ i + 1 }}.</span>
+					{{ u.uom }}
+					<span v-if="u.conversion_factor !== 1" class="text-xs opacity-70"
+						>(×{{ u.conversion_factor }})</span
+					>
+				</button>
+			</div>
+		</div>
+
+		<div
+			v-if="showDiscountInput && hasPermission('show_edit_discount_field')"
+			class="mt-3 flex items-center gap-2 rounded-xl border border-success/25 bg-success-soft p-2"
+		>
+			<Button
+				size="sm"
+				:variant="discountType === 'percentage' ? 'success' : 'outline'"
+				:aria-pressed="discountType === 'percentage'"
+				@click="discountType = 'percentage'"
+			>
+				%
 			</Button>
+			<Button
+				size="sm"
+				:variant="discountType === 'amount' ? 'success' : 'outline'"
+				:aria-pressed="discountType === 'amount'"
+				@click="discountType = 'amount'"
+			>
+				{{ currencySymbol }}
+			</Button>
+			<input
+				v-model.number="discountInput"
+				type="number"
+				min="0"
+				:max="discountType === 'percentage' ? maxDiscount || 100 : undefined"
+				step="0.5"
+				placeholder="0"
+				:aria-label="__('Discount')"
+				class="h-control-compact min-w-0 flex-1 rounded-lg border border-border bg-card px-3 text-center text-sm font-semibold text-foreground shadow-inset focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+				@blur="applyDiscount"
+				@keydown.enter="applyDiscount"
+				@keydown="blockInvalidNumericKeys"
+			/>
 		</div>
 	</div>
 </template>
@@ -252,7 +283,19 @@ import { hasPermission } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
 import { useItemStore } from "@/stores/itemStore";
 import { Button } from "@/components/ui/button";
-import { Package, Minus, Plus, Trash2, Percent, ChevronDown } from "lucide-vue-next";
+import { Badge, type BadgeVariants } from "@/components/ui/badge";
+import { Popover, PopoverContentStyled, PopoverMenuItem, PopoverTrigger } from "@/components/ui/popover";
+import {
+	Package,
+	Minus,
+	Plus,
+	Trash2,
+	Percent,
+	ChevronDown,
+	MoreVertical,
+	Ruler,
+	Box,
+} from "lucide-vue-next";
 import type { ItemUOM } from "@/types/pos.types";
 import __ from "@/lib/translate";
 import { useMoney } from "@/composables/useMoney";
@@ -276,6 +319,37 @@ const uomContainerRef = ref<HTMLDivElement | null>(null);
 
 const showUOMSelector = ref(false);
 const showDiscountInput = ref(false);
+const menuOpen = ref(false);
+
+const needsSerial = computed(() => !!props.item.has_serial_no && !props.item.serial_no);
+
+const statusBadges = computed(() => {
+	const badges: { label: string; variant: BadgeVariants["variant"]; title?: string; status?: boolean }[] =
+		[];
+	if (props.item.pos_is_free_item) badges.push({ label: __("Free"), variant: "success" });
+	if (props.item.pos_price_unavailable && !props.item.pos_rate_overridden) {
+		badges.push({
+			label:
+				props.item.pos_price_state === "needs_connection"
+					? __("Needs connection for price")
+					: __("Price unavailable"),
+			variant: "warning",
+			status: true,
+		});
+	}
+	if (props.item.pos_repriced_from !== undefined) {
+		badges.push({
+			label: __("Price changed from {0}", [props.item.pos_repriced_from]),
+			variant: "info",
+			status: true,
+		});
+	}
+	if (isAutoDiscount.value)
+		badges.push({ label: __("Auto"), variant: "info", title: autoDiscountTitle.value });
+	if (hasItemDiscount.value)
+		badges.push({ label: __("Discount {0}", [formatDiscount.value]), variant: "success" });
+	return badges;
+});
 const discountType = ref<"percentage" | "amount">("percentage");
 const discountInput = ref(0);
 const itemUOMs = ref<ItemUOM[]>([]);

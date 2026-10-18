@@ -3,11 +3,7 @@
 		class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-muted p-4"
 	>
 		<div class="mb-8 text-center">
-			<img
-				:src="isDark ? logoLight : logoDark"
-				alt="X POS Logo"
-				class="w-16 h-16 mx-auto mb-4 rounded-2xl text-primary-foreground flex items-center justify-center"
-			/>
+			<XposLogo :size="64" class="mx-auto mb-4" />
 			<h1 class="text-2xl font-bold text-foreground">X POS</h1>
 			<p class="text-muted-foreground text-sm mt-1">Point of Sale System</p>
 		</div>
@@ -104,9 +100,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { User, Lock, Eye, EyeOff, LogIn, Loader2, AlertCircle } from "lucide-vue-next";
-import { useBranding } from "@/composables/useBranding";
+import { XposLogo } from "@/components/ui/brand";
 const isDark = inject("isDark")! as boolean;
-const { logoLight, logoDark } = useBranding();
 
 const router = useRouter();
 const authStore = useAuthStore();

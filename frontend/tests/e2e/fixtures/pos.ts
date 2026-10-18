@@ -236,7 +236,6 @@ export function defaultRoutes(): Record<string, unknown> {
 				search_batch_no: 0,
 			},
 		},
-		"xpos.api.settings.get_xpos_branding": null,
 		"xpos.api.print_formats.get_print_formats": [],
 		"xpos.api.print_formats.get_receipt_context": null,
 		"xpos.api.items.get_pos_items": ITEMS,

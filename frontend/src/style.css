@@ -4,49 +4,147 @@
 @config "../tailwind.config.js";
 
 @layer base {
+	/*
+	 * Pearl design tokens.
+	 * Colour tokens are bare HSL triples (`H S% L%`) consumed as `hsl(var(--x))`.
+	 */
 	:root {
-		--background: 0 0% 100%;
-		--foreground: 222.2 84% 4.9%;
-		--card: 0 0% 100%;
-		--card-foreground: 222.2 84% 4.9%;
+		--background: 216 27.8% 92.9%;
+		--foreground: 219 60.5% 14.9%;
+		--card: 216 38.5% 97.5%;
+		--card-foreground: 219 60.5% 14.9%;
 		--popover: 0 0% 100%;
-		--popover-foreground: 222.2 84% 4.9%;
-		--primary: 243 75% 59%;
-		--primary-foreground: 210 40% 98%;
-		--secondary: 210 40% 96.1%;
-		--secondary-foreground: 222.2 47.4% 11.2%;
-		--muted: 210 40% 96.1%;
-		--muted-foreground: 215.4 16.3% 46.9%;
-		--accent: 210 40% 96.1%;
-		--accent-foreground: 222.2 47.4% 11.2%;
-		--destructive: 0 84.2% 60.2%;
-		--destructive-foreground: 210 40% 98%;
-		--border: 214.3 31.8% 91.4%;
-		--input: 214.3 31.8% 91.4%;
-		--ring: 243 75% 59%;
+		--popover-foreground: 219 60.5% 14.9%;
+		--primary: 224 76.3% 48%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 217 27.7% 90.8%;
+		--secondary-foreground: 219 60.5% 14.9%;
+		--muted: 217 27.7% 90.8%;
+		--muted-foreground: 220 21.3% 36.9%;
+		--accent: 220 60% 93%;
+		--accent-foreground: 225 75.6% 30%;
+		--destructive: 3 72.4% 44.1%;
+		--destructive-foreground: 0 0% 100%;
+		--border: 215 23.5% 84.1%;
+		--input: 217 14.4% 51%;
+		--ring: 224 76.3% 48%;
 		--radius: 0.625rem;
+
+		/* Surfaces: raised controls/cards, sunken fields, interaction fills */
+		--surface-raised: 216 45% 98.8%;
+		--surface-sunken: 217 27.7% 90.8%;
+		--surface-hover: 218 33% 88.5%;
+		--surface-pressed: 218 28% 84%;
+		--surface-selected: 220 75% 92.2%;
+		--surface-selected-foreground: 225 75.6% 35.3%;
+		--surface-inverse: 219 60.5% 14.9%;
+		--surface-inverse-foreground: 216 45% 97%;
+		--border-strong: 217 14.4% 51%;
+		--focus: 224 76.3% 48%;
+
+		/* Semantic states: solid fill + soft (tinted) fill */
+		--success: 142 71.6% 29%;
+		--success-foreground: 0 0% 100%;
+		--success-soft: 141 41.7% 90.6%;
+		--success-soft-foreground: 142 70.7% 22.7%;
+		--warning: 27 93.1% 34.1%;
+		--warning-foreground: 0 0% 100%;
+		--warning-soft: 33 81.8% 91.4%;
+		--warning-soft-foreground: 27 85.9% 27.8%;
+		--info: 203 88.2% 33.3%;
+		--info-foreground: 0 0% 100%;
+		--info-soft: 204 66.7% 91.8%;
+		--info-soft-foreground: 203 84.3% 27.5%;
+		--destructive-soft: 4 77.8% 92.9%;
+		--destructive-soft-foreground: 3 75.1% 34.7%;
+
+		/* Elevation and inset depth (never the only interactive cue: pair with a border) */
+		--shadow-raised:
+			inset 0 1px 0 0 rgb(255 255 255 / 0.85), 0 1px 2px 0 rgb(15 31 61 / 0.08),
+			0 2px 6px -2px rgb(15 31 61 / 0.1);
+		--shadow-raised-hover:
+			inset 0 1px 0 0 rgb(255 255 255 / 0.9), 0 2px 4px 0 rgb(15 31 61 / 0.1),
+			0 6px 14px -4px rgb(15 31 61 / 0.14);
+		--shadow-pressed: inset 0 2px 4px 0 rgb(15 31 61 / 0.16);
+		--shadow-inset: inset 0 1px 2px 0 rgb(15 31 61 / 0.1);
+		--shadow-primary:
+			inset 0 1px 0 0 rgb(255 255 255 / 0.2), 0 1px 2px 0 rgb(29 78 216 / 0.25),
+			0 3px 8px -2px rgb(29 78 216 / 0.3);
+		--shadow-overlay: 0 16px 40px -12px rgb(15 31 61 / 0.3), 0 4px 12px -4px rgb(15 31 61 / 0.14);
+		--scrim: 219 60% 8%;
+
+		/* Sizing: comfortable touch targets, compact desktop variant */
+		--control-h: 2.5rem;
+		--control-h-compact: 2rem;
+		--control-h-touch: 2.75rem;
+
+		/* Motion */
+		--duration-fast: 120ms;
+		--duration-base: 180ms;
+		--ease-standard: cubic-bezier(0.2, 0, 0, 1);
+	}
+
+	@media (pointer: coarse) {
+		:root {
+			--control-h: 2.75rem;
+			--control-h-compact: 2.25rem;
+		}
 	}
 
 	.dark {
-		--background: 224 71% 4%;
-		--foreground: 210 40% 98%;
-		--card: 224 50% 10%;
-		--card-foreground: 210 40% 98%;
-		--popover: 224 50% 10%;
-		--popover-foreground: 210 40% 98%;
-		--primary: 243 75% 65%;
-		--primary-foreground: 210 40% 98%;
-		--secondary: 217 33% 17.5%;
-		--secondary-foreground: 210 40% 98%;
-		--muted: 217 33% 15%;
-		--muted-foreground: 215 20% 70%;
-		--accent: 217 33% 20%;
-		--accent-foreground: 210 40% 98%;
-		--destructive: 0 62.8% 55%;
-		--destructive-foreground: 210 40% 98%;
-		--border: 215 25% 27%;
-		--input: 215 25% 27%;
-		--ring: 243 75% 65%;
+		--background: 220 48.8% 8.4%;
+		--foreground: 216 45.5% 93.5%;
+		--card: 220 42.9% 12.4%;
+		--card-foreground: 216 45.5% 93.5%;
+		--popover: 221 43.2% 15.9%;
+		--popover-foreground: 216 45.5% 93.5%;
+		--primary: 223 78.2% 55.1%;
+		--primary-foreground: 0 0% 100%;
+		--secondary: 219 34% 18%;
+		--secondary-foreground: 216 45.5% 93.5%;
+		--muted: 219 34% 16%;
+		--muted-foreground: 217 23.4% 69.8%;
+		--accent: 221 45% 22%;
+		--accent-foreground: 222 89.2% 88%;
+		--destructive: 3 74.8% 59.6%;
+		--destructive-foreground: 220 48.8% 8.4%;
+		--border: 218 31.6% 22.4%;
+		--input: 218 18.1% 44.5%;
+		--ring: 222 85% 66%;
+
+		--surface-raised: 220 38% 16%;
+		--surface-sunken: 220 46.2% 10.2%;
+		--surface-hover: 219 34% 20%;
+		--surface-pressed: 219 34% 24%;
+		--surface-selected: 221 51.9% 21.2%;
+		--surface-selected-foreground: 222 89.2% 85.5%;
+		--surface-inverse: 216 45.5% 93.5%;
+		--surface-inverse-foreground: 220 48.8% 8.4%;
+		--border-strong: 218 18.1% 44.5%;
+		--focus: 222 85% 66%;
+
+		--success: 144 48.1% 47.6%;
+		--success-foreground: 220 48.8% 8.4%;
+		--success-soft: 145 43.3% 13.1%;
+		--success-soft-foreground: 143 54.2% 67.5%;
+		--warning: 34 72.3% 56.1%;
+		--warning-foreground: 220 48.8% 8.4%;
+		--warning-soft: 35 56.5% 13.5%;
+		--warning-soft-foreground: 35 81.6% 72.4%;
+		--info: 202 70.8% 58.4%;
+		--info-foreground: 220 48.8% 8.4%;
+		--info-soft: 205 60.5% 14.9%;
+		--info-soft-foreground: 203 79.7% 74.9%;
+		--destructive-soft: 2 45% 15.7%;
+		--destructive-soft-foreground: 4 80.2% 78.2%;
+
+		--shadow-raised: inset 0 1px 0 0 rgb(255 255 255 / 0.05), 0 1px 2px 0 rgb(0 0 0 / 0.4);
+		--shadow-raised-hover: inset 0 1px 0 0 rgb(255 255 255 / 0.07), 0 3px 8px -2px rgb(0 0 0 / 0.5);
+		--shadow-pressed: inset 0 2px 4px 0 rgb(0 0 0 / 0.45);
+		--shadow-inset: inset 0 1px 2px 0 rgb(0 0 0 / 0.45);
+		--shadow-primary: inset 0 1px 0 0 rgb(255 255 255 / 0.14), 0 1px 3px 0 rgb(0 0 0 / 0.45);
+		--shadow-overlay: 0 16px 40px -12px rgb(0 0 0 / 0.7), 0 4px 12px -4px rgb(0 0 0 / 0.5);
+		--scrim: 222 60% 3%;
 	}
 
 	* {
@@ -66,7 +164,7 @@
 @keyframes dialog-panel-in {
 	from {
 		opacity: 0;
-		transform: translateY(-50px);
+		transform: translateY(8px) scale(0.98);
 	}
 	to {
 		opacity: 1;
@@ -85,11 +183,11 @@
 
 @layer components {
 	.dialog-panel[data-state="open"] {
-		animation: dialog-panel-in 0.3s cubic-bezier(0, 0, 0.2, 1);
+		animation: dialog-panel-in 0.18s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	.dialog-overlay[data-state="open"] {
-		animation: dialog-overlay-in 0.3s cubic-bezier(0, 0, 0.2, 1);
+		animation: dialog-overlay-in 0.18s cubic-bezier(0.2, 0, 0, 1);
 	}
 
 	.dialog-panel[data-state="closed"],
@@ -117,7 +215,9 @@
 
 .slide-up-enter-active,
 .slide-up-leave-active {
-	transition: all 0.3s ease-out;
+	transition:
+		opacity 0.3s ease-out,
+		transform 0.3s ease-out;
 }
 
 .slide-up-enter-from,
@@ -128,7 +228,9 @@
 
 .list-enter-active,
 .list-leave-active {
-	transition: all 0.3s ease;
+	transition:
+		opacity 0.3s ease,
+		transform 0.3s ease;
 }
 
 .list-enter-from,
@@ -179,13 +281,43 @@
 	scrollbar-color: hsl(var(--border)) transparent;
 }
 
+.xpos-scrollbar-none {
+	scrollbar-width: none;
+}
+
+.xpos-scrollbar-none::-webkit-scrollbar {
+	display: none;
+}
+
 [data-radix-popper-content-wrapper] {
 	z-index: 9999 !important;
 }
 
 @layer components {
 	.xpos-skeleton {
-		@apply bg-muted rounded-lg animate-pulse;
+		@apply bg-muted rounded-lg;
+	}
+
+	@media (prefers-reduced-motion: no-preference) {
+		.xpos-skeleton {
+			@apply animate-pulse;
+		}
+	}
+
+	.tabular-nums {
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+/* Reduced motion: drop transitions/animations; spinners keep turning so loading stays visible. */
+@media (prefers-reduced-motion: reduce) {
+	*:not(.animate-spin),
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
 	}
 }
 

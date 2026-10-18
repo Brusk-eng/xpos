@@ -3,13 +3,13 @@
 		v-bind="$attrs"
 		:class="
 			cn(
-				'relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 ps-2 pe-8 text-sm outline-none focus:bg-accent focus:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+				'relative flex min-h-10 w-full cursor-default select-none items-center rounded-xl py-1.5 ps-3 pe-8 text-sm outline-none focus:bg-surface-hover data-[highlighted]:bg-surface-hover data-[state=checked]:bg-surface-selected data-[state=checked]:font-semibold data-[state=checked]:text-surface-selected-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-55',
 				$attrs.class as string,
 			)
 		"
 		:value="value"
 	>
-		<span class="absolute end-2 flex h-3.5 w-3.5 items-center justify-center">
+		<span class="absolute end-2 flex h-4 w-4 items-center justify-center">
 			<SelectItemIndicator>
 				<Check class="h-4 w-4" />
 			</SelectItemIndicator>

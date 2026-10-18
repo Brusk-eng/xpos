@@ -19,6 +19,16 @@ export default defineConfig({
 		viewportHeight: 900,
 		defaultCommandTimeout: 8000,
 		retries: { runMode: 1, openMode: 0 },
-		setupNodeEvents() {},
+		setupNodeEvents(on) {
+			on("before:browser:launch", (browser, launchOptions) => {
+				if (browser.name === "electron") {
+					launchOptions.preferences.width = 1920;
+					launchOptions.preferences.height = 1200;
+				} else if (browser.family === "chromium") {
+					launchOptions.args.push("--window-size=1920,1200");
+				}
+				return launchOptions;
+			});
+		},
 	},
 });

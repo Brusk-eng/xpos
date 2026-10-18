@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, type HTMLAttributes } from "vue";
 import { cn } from "@/lib/utils";
+import { inputVariants, type InputVariants } from "@/components/ui/input";
 import {
 	floatPrecision,
 	formatNumber as formatBySystem,
@@ -22,6 +23,7 @@ export interface NumberInputProps {
 	allowDecimal?: boolean;
 	selectOnFocus?: boolean;
 	disableSpinner?: boolean;
+	size?: InputVariants["size"];
 }
 
 const props = withDefaults(defineProps<NumberInputProps>(), {
@@ -177,12 +179,7 @@ defineExpose({ inputRef, focus, select, setValue });
 		:placeholder="placeholder"
 		:disabled="disabled"
 		:readonly="readonly"
-		:class="
-			cn(
-				'flex h-9 w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50',
-				props.class,
-			)
-		"
+		:class="cn(inputVariants({ size }), 'tabular-nums', props.class)"
 		@focus="onFocus"
 		@blur="onBlur"
 		@input="onInput"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { cn } from "@/lib/utils";
+import { __, cn } from "@/lib/utils";
 import {
 	DialogClose,
 	DialogContent,
@@ -25,12 +25,12 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
 <template>
 	<DialogPortal to="body">
-		<DialogOverlay class="dialog-overlay fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm" />
+		<DialogOverlay class="dialog-overlay fixed inset-0 z-9999 bg-scrim/35" />
 		<DialogContent
 			v-bind="forwarded"
 			:class="
 				cn(
-					'dialog-panel fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-9999 flex flex-col border bg-background shadow-lg overflow-hidden rounded-xl max-h-[90vh] w-[90vw]',
+					'dialog-panel fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-9999 flex flex-col rounded-3xl border border-border bg-surface-raised text-card-foreground shadow-overlay overflow-hidden max-h-[90vh] w-[90vw]',
 					props.class,
 				)
 			"
@@ -39,10 +39,10 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
 			<DialogClose
 				v-if="!hideClose"
-				class="absolute inset-e-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+				class="absolute inset-e-4 top-4 inline-flex size-10 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground shadow-raised transition-[background-color,box-shadow,color] duration-fast hover:bg-surface-hover hover:text-foreground active:shadow-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:pointer-events-none"
 			>
 				<X class="w-5 h-5" />
-				<span class="sr-only">Close</span>
+				<span class="sr-only">{{ __("Close") }}</span>
 			</DialogClose>
 		</DialogContent>
 	</DialogPortal>

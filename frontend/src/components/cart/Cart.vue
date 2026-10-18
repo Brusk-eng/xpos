@@ -26,165 +26,144 @@
 			</Button>
 		</div>
 
-		<div class="shrink-0 px-4 pt-4 pb-3 border-b">
-			<div class="flex flex-wrap items-center justify-between mb-3 gap-2">
-				<h2 class="shrink-0 text-base font-bold text-foreground flex items-center gap-2">
-					<ShoppingCart class="w-5 h-5 text-primary dark:text-primary" />
-					{{ __("Cart") }}
-					<Badge v-if="cartStore.itemCount > 0" variant="secondary" class="text-[10px]">
-						{{ cartStore.itemCount }}
-					</Badge>
-				</h2>
-				<div class="flex flex-1 min-w-50 items-center justify-end gap-2">
-					<Autocomplete
-						v-if="posStore.salesPersonEnabled && !cartStore.isReturnMode"
-						v-model="cartStore.salesPerson"
-						doctype="Sales Person"
-						query="xpos.api.customers.sales_person_query"
-						:filters="{ pos_profile: posStore.profileName }"
-						:placeholder="__('Sales Person')"
-						:open-on-focus="true"
-						:clearable="true"
-						:compact="true"
-						:min-chars="0"
-						class="min-w-0 flex-1 max-w-44"
-					/>
-					<Button
-						v-if="cartStore.customer && !cartStore.isReturnMode"
-						variant="outline"
-						size="sm"
-						class="shrink-0 w-fit justify-start gap-2 border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/20"
-						@click="customerStore.showLoyaltyDialog = true"
+		<div class="shrink-0 space-y-2.5 px-4 pt-3 pb-2">
+			<div class="flex items-center justify-between gap-3">
+				<h2 class="flex shrink-0 items-center gap-2.5 text-lg font-bold text-foreground">
+					<ShoppingCart class="size-6 text-primary" />
+					{{ __("Current sale") }}
+					<span
+						class="rounded-lg border border-border bg-surface-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground tabular-nums"
+						data-testid="cart-item-count"
 					>
-						<Gift class="w-4 h-4" />
-						{{ __("Loyalty Program") }}
-					</Button>
-				</div>
+						{{ unitsLabel }} &middot; {{ productsLabel }}
+					</span>
+				</h2>
+				<Autocomplete
+					v-if="posStore.salesPersonEnabled && !cartStore.isReturnMode"
+					v-model="cartStore.salesPerson"
+					doctype="Sales Person"
+					query="xpos.api.customers.sales_person_query"
+					:filters="{ pos_profile: posStore.profileName }"
+					:placeholder="__('Sales Person')"
+					:open-on-focus="true"
+					:clearable="true"
+					:min-chars="0"
+					class="min-w-0 max-w-52 flex-1"
+				/>
 			</div>
 
-			<div class="w-full flex items-center gap-2">
+			<div
+				class="flex items-center gap-3 rounded-2xl border border-border bg-surface-raised p-2.5 shadow-raised"
+				:class="cartStore.isReturnMode && 'bg-muted'"
+			>
 				<button
-					@click="handleCustomerClick"
-					class="flex-[0.9] flex items-center gap-3 p-2.5 rounded-lg border transition-all duration-200 group"
-					:class="
-						cartStore.isReturnMode
-							? 'border-border bg-muted/50 cursor-not-allowed dark:border-muted-foreground/30'
-							: 'border-dashed border-border hover:border-primary hover:bg-primary/5 dark:border-muted-foreground/30 dark:hover:border-primary'
-					"
+					type="button"
+					class="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed"
 					:disabled="cartStore.isReturnMode"
+					@click="handleCustomerClick"
 				>
-					<Avatar size="sm" class="group-hover:ring-2 group-hover:ring-primary/20 transition-all">
+					<Avatar class="size-10">
 						<img
 							v-if="cartStore.customer && cartStore.customer.image"
 							:src="cartStore.customer.image as string"
 							:alt="cartStore.customer.customer_name"
-							class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+							class="h-full w-full object-cover"
 							loading="lazy"
 						/>
 						<AvatarFallback>
-							<User class="w-3.5 h-3.5" />
+							<User class="size-5" />
 						</AvatarFallback>
 					</Avatar>
-					<div class="text-start flex-1 min-w-0">
-						<p class="text-sm font-medium text-foreground truncate">
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-base font-semibold text-foreground">
 							{{ cartStore.customerName }}
 						</p>
-						<template v-if="cartStore.customer">
-							<div class="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-								<template v-if="cartStore.customer.mobile_no">
-									<Phone class="w-3 h-3 shrink-0" />
-									<span class="truncate">{{ cartStore.customer.mobile_no }}</span>
-								</template>
-								<template v-if="cartStore.customer.email_id">
-									<Mail
-										class="w-3 h-3 shrink-0"
-										:class="{ 'ms-1': cartStore.customer.mobile_no }"
-									/>
-									<span class="truncate">{{ cartStore.customer.email_id }}</span>
-								</template>
-							</div>
-							<p
-								v-if="!cartStore.customer.mobile_no && !cartStore.customer.email_id"
-								class="text-[11px] text-muted-foreground"
-							>
-								{{
-									cartStore.isReturnMode
-										? __("Customer locked for return")
-										: __("Click to change customer")
-								}}
-							</p>
-						</template>
-						<p v-else class="text-[11px] text-muted-foreground">
-							{{ __("Click to select customer") }}
+						<p class="truncate text-sm text-muted-foreground">
+							<template v-if="cartStore.isReturnMode">{{
+								__("Customer locked for return")
+							}}</template>
+							<template v-else-if="!cartStore.customer">{{
+								__("Click to select customer")
+							}}</template>
+							<template v-else-if="cartStore.customer.mobile_no || cartStore.customer.email_id">
+								{{ cartStore.customer.mobile_no || cartStore.customer.email_id }}
+							</template>
+							<template v-else>{{ __("Customer") }}</template>
 						</p>
 					</div>
-					<Lock v-if="cartStore.isReturnMode" class="w-4 h-4 text-muted-foreground/50" />
-					<ChevronDown v-else class="w-4 h-4 text-muted-foreground/50" />
 				</button>
-				<button
-					v-if="cartStore.customer && !cartStore.isReturnMode"
-					class="flex-[0.1] flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 group border-dashed border-border hover:border-primary hover:bg-primary/5 dark:border-muted-foreground/30 dark:hover:border-primary"
-					@click.stop="handleEditCustomer"
-					title="Edit Customer"
-				>
-					<Pencil class="w-full" />
-				</button>
+				<Lock v-if="cartStore.isReturnMode" class="size-5 shrink-0 text-muted-foreground" />
+				<template v-else>
+					<TooltipWrapper v-if="cartStore.customer" :content="__('Loyalty Program')">
+						<Button
+							variant="ghost"
+							size="icon"
+							:aria-label="__('Loyalty Program')"
+							@click="customerStore.showLoyaltyDialog = true"
+						>
+							<Gift class="size-5!" />
+						</Button>
+					</TooltipWrapper>
+					<TooltipWrapper v-if="cartStore.customer" :content="__('Edit Customer')">
+						<Button
+							variant="ghost"
+							size="icon"
+							:aria-label="__('Edit Customer')"
+							@click="handleEditCustomer"
+						>
+							<Pencil class="size-5!" />
+						</Button>
+					</TooltipWrapper>
+					<Button
+						variant="secondary"
+						class="h-10 shrink-0 rounded-xl border-transparent bg-accent px-4 font-semibold text-accent-foreground hover:bg-accent/80"
+						@click="handleCustomerClick"
+					>
+						{{ cartStore.customer ? __("Change") : __("Select") }}
+					</Button>
+				</template>
 			</div>
 
-			<div v-if="showCreditInfo" class="mt-3 grid grid-cols-2 gap-2">
-				<div
-					class="rounded-lg border p-2.5"
-					:class="isOverCreditLimit ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'"
-				>
-					<p class="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-						{{ __("Balance") }}
-					</p>
-					<p
-						class="text-2xl font-extrabold"
-						:class="isOverCreditLimit ? 'text-destructive' : 'text-foreground'"
-					>
-						{{ money(customerBalance ?? 0) }}
-					</p>
-				</div>
-				<div
-					class="rounded-lg border p-2.5"
-					:class="isOverCreditLimit ? 'border-destructive/40 bg-destructive/5' : 'border-border bg-muted/30'"
-				>
-					<p class="text-[10px] uppercase tracking-wide text-muted-foreground font-medium">
-						{{ __("Credit Limit") }}
-					</p>
-					<p
-						class="text-2xl font-extrabold"
-						:class="isOverCreditLimit ? 'text-destructive' : 'text-foreground'"
-					>
+			<div
+				v-if="showCreditInfo"
+				class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border px-3 py-2 text-sm"
+				:class="
+					isOverCreditLimit
+						? 'border-destructive/30 bg-destructive-soft text-destructive-soft-foreground'
+						: 'border-border bg-surface-sunken'
+				"
+			>
+				<span>
+					<span class="text-muted-foreground">{{ __("Balance") }}</span>
+					<span class="ms-1.5 font-bold tabular-nums">{{ money(customerBalance ?? 0) }}</span>
+				</span>
+				<span>
+					<span class="text-muted-foreground">{{ __("Credit Limit") }}</span>
+					<span class="ms-1.5 font-bold tabular-nums">
 						{{ customerCreditLimit > 0 ? money(customerCreditLimit) : __("No Limit") }}
-					</p>
-				</div>
-				<p
-					v-if="isOverCreditLimit"
-					class="col-span-2 flex items-center gap-1.5 text-xs font-semibold text-destructive"
-				>
+					</span>
+				</span>
+				<p v-if="isOverCreditLimit" class="flex w-full items-center gap-1.5 text-xs font-semibold">
 					<AlertTriangle class="w-3.5 h-3.5 shrink-0" />
-					{{ __("This sale exceeds the credit limit by {0}", [money(projectedBalance - customerCreditLimit)]) }}
+					{{
+						__("This sale exceeds the credit limit by {0}", [
+							money(projectedBalance - customerCreditLimit),
+						])
+					}}
 				</p>
 			</div>
 		</div>
 
 		<div ref="cartScrollContainer" class="flex-1 overflow-y-auto px-4 xpos-scrollbar">
-			<div
+			<EmptyState
 				v-if="cartStore.isEmpty"
-				class="flex flex-col items-center justify-center h-full text-center py-8"
-			>
-				<div class="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
-					<ShoppingCart class="w-10 h-10 text-muted-foreground/40" />
-				</div>
-				<p class="text-sm font-medium text-muted-foreground">{{ __("Cart is empty") }}</p>
-				<p class="text-xs text-muted-foreground/70 mt-1">
-					{{ __("Click on items to add them here") }}
-				</p>
-			</div>
+				:icon="ShoppingCart"
+				:title="__('Cart is empty')"
+				:description="__('Click on items to add them here')"
+				class="h-full"
+			/>
 
-			<div v-else class="space-y-0.5 py-0.5">
+			<div v-else class="space-y-3 py-1">
 				<CartItem
 					v-for="(item, index) in cartStore.items"
 					:key="
@@ -268,29 +247,18 @@ import { useMoney } from "@/composables/useMoney";
 import CartItem from "./CartItem.vue";
 import CartSummary from "./CartSummary.vue";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Autocomplete } from "@/components/ui/autocomplete";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import {
-	ShoppingCart,
-	User,
-	ChevronDown,
-	RotateCcw,
-	X,
-	Lock,
-	Gift,
-	Phone,
-	Mail,
-	Pencil,
-	AlertTriangle,
-} from "lucide-vue-next";
+import { EmptyState } from "@/components/ui/state";
+import { TooltipWrapper } from "@/components/ui/tooltip";
+import { ShoppingCart, User, RotateCcw, X, Lock, Gift, Pencil, AlertTriangle } from "lucide-vue-next";
 import __ from "@/lib/translate";
 import CustomerEditDialog from "@/components/dialogs/CustomerEditDialog.vue";
 
 const posStore = usePosStore();
 const cartStore = useCartStore();
 const customerStore = useCustomerStore();
-const { money } = useMoney();
+const { money, qty } = useMoney();
 
 const cartScrollContainer = ref<HTMLElement | null>(null);
 
@@ -325,11 +293,12 @@ watch(
 					behavior: "smooth",
 				});
 
-				const lastChild = container.querySelector(".space-y-1 > :last-child") as HTMLElement | null;
+				const rows = container.querySelectorAll<HTMLElement>("[data-cart-index]");
+				const lastChild = rows[rows.length - 1];
 				if (lastChild) {
-					lastChild.classList.add("ring-2", "ring-primary/50", "rounded-xl");
+					lastChild.classList.add("ring-2", "ring-primary/50");
 					setTimeout(() => {
-						lastChild.classList.remove("ring-2", "ring-primary/50", "rounded-xl");
+						lastChild.classList.remove("ring-2", "ring-primary/50");
 					}, 800);
 				}
 			});
@@ -344,6 +313,15 @@ watch(
 	},
 	{ immediate: true },
 );
+
+const unitsLabel = computed(() => {
+	const units = cartStore.items.reduce((sum, item) => sum + Math.abs(Number(item.qty) || 0), 0);
+	return units === 1 ? __("1 unit") : __("{0} units", [qty(units)]);
+});
+const productsLabel = computed(() => {
+	const products = new Set(cartStore.items.map((item) => item.item_code)).size;
+	return products === 1 ? __("1 product") : __("{0} products", [products]);
+});
 
 const customerFinancials = computed(() =>
 	cartStore.customer && customerStore.selectedCustomerInfo?.name === cartStore.customer.name

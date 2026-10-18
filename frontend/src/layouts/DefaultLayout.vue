@@ -11,51 +11,32 @@
 
 		<nav
 			v-if="!isElectron()"
-			class="md:hidden shrink-0 bg-background/95 backdrop-blur-md border-t border-border z-40 safe-bottom"
+			class="safe-bottom z-40 shrink-0 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
+			:aria-label="__('Main')"
 		>
-			<div class="flex items-center justify-around h-14">
+			<div class="flex h-14 items-stretch justify-around px-1">
 				<router-link
-					to="/pos"
+					v-for="link in links"
+					:key="link.to"
+					:to="link.to"
+					:aria-current="link.active ? 'page' : undefined"
 					:class="[
-						'flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors no-underline min-w-[4rem]',
-						route.path === '/pos'
-							? 'text-primary bg-primary/10'
-							: 'text-muted-foreground active:bg-muted',
+						'relative flex min-w-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
+						link.active
+							? 'text-primary before:absolute before:inset-x-5 before:top-0 before:h-0.5 before:rounded-full before:bg-primary'
+							: 'text-muted-foreground active:bg-surface-pressed',
 					]"
 				>
-					<LayoutGrid class="w-5 h-5" />
-					<span class="text-[10px] font-medium">{{ __("POS") }}</span>
-				</router-link>
-				<router-link
-					to="/orders"
-					:class="[
-						'flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors no-underline min-w-[4rem]',
-						route.path === '/orders'
-							? 'text-primary bg-primary/10'
-							: 'text-muted-foreground active:bg-muted',
-					]"
-				>
-					<FileText class="w-5 h-5" />
-					<span class="text-[10px] font-medium">{{ __("Orders") }}</span>
-				</router-link>
-				<router-link
-					to="/reports"
-					:class="[
-						'flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors no-underline min-w-[4rem]',
-						route.path.startsWith('/reports')
-							? 'text-primary bg-primary/10'
-							: 'text-muted-foreground active:bg-muted',
-					]"
-				>
-					<BarChart3 class="w-5 h-5" />
-					<span class="text-[10px] font-medium">{{ __("Reports") }}</span>
+					<component :is="link.icon" class="size-5" aria-hidden="true" />
+					<span class="text-[0.6875rem] font-semibold">{{ link.label }}</span>
 				</router-link>
 				<button
+					type="button"
+					class="flex min-w-16 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-muted-foreground transition-colors active:bg-surface-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
 					@click="openSidebar"
-					class="flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-xl text-muted-foreground active:bg-muted transition-colors min-w-[4rem]"
 				>
-					<AlignJustify class="w-5 h-5" />
-					<span class="text-[10px] font-medium">{{ __("Menu") }}</span>
+					<AlignJustify class="size-5" aria-hidden="true" />
+					<span class="text-[0.6875rem] font-semibold">{{ __("Menu") }}</span>
 				</button>
 			</div>
 		</nav>
@@ -67,11 +48,18 @@ import Navbar from "@/components/Navbar.vue";
 import Sidebar from "@/components/Sidebar.vue";
 import MenuBar from "@/components/MenuBar.vue";
 import { isElectron } from "@/services/electronBridge";
+import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { LayoutGrid, FileText, BarChart3, AlignJustify } from "lucide-vue-next";
 import __ from "@/lib/translate";
 
 const route = useRoute();
+
+const links = computed(() => [
+	{ to: "/pos", label: __("POS"), icon: LayoutGrid, active: route.path === "/pos" },
+	{ to: "/orders", label: __("Orders"), icon: FileText, active: route.path === "/orders" },
+	{ to: "/reports", label: __("Reports"), icon: BarChart3, active: route.path.startsWith("/reports") },
+]);
 
 function openSidebar() {
 	window.dispatchEvent(new CustomEvent("xpos:toggle-sidebar"));

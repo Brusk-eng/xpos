@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 128 128" role="img" aria-label="XPOS">
+	<title>XPOS</title>
+	<defs><linearGradient id="xpos-tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2563EB"/><stop offset="1" stop-color="#1D4ED8"/></linearGradient></defs>
+	<rect width="128" height="128" fill="url(#xpos-tile)"/>
+	<path d="M67.5 43.75L74 34L94 34L77.5 58.75ZM50.5 69.25L60.5 84.25L54 94L34 94Z" fill="#C7D7FE"/><path d="M34 34L54 34L94 94L74 94Z" fill="#fff"/>
+</svg>

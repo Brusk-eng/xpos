@@ -28,6 +28,6 @@ const forwardedProps = computed(() => ({
 			)
 		"
 	>
-		<ScrollAreaThumb class="relative flex-1 rounded-full bg-border" />
+		<ScrollAreaThumb class="relative flex-1 rounded-full bg-border-strong/40" />
 	</ScrollAreaScrollbar>
 </template>

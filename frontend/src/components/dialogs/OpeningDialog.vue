@@ -4,11 +4,7 @@
 	>
 		<div class="w-full max-w-md animate-in fade-in zoom-in-95 duration-300 my-auto">
 			<div class="text-center mb-8">
-				<img
-					:src="logoLight"
-					alt="X POS Logo"
-					class="w-16 h-16 mx-auto mb-4 rounded-2xl text-primary-foreground flex items-center justify-center"
-				/>
+				<XposLogo :size="64" class="mx-auto mb-4" />
 				<h1 class="text-2xl font-bold text-primary-foreground mb-1">X POS</h1>
 				<p class="text-primary-foreground/70 text-sm">{{ __("Open your shift to get started") }}</p>
 			</div>
@@ -147,10 +143,9 @@ import { useSyncStatus } from "@/composables/useSyncStatus";
 import { isElectron } from "@/services/electronBridge";
 import __ from "@/lib/translate";
 import { Select } from "../ui/select";
-import { useBranding } from "@/composables/useBranding";
+import { XposLogo } from "@/components/ui/brand";
 
 const isElectronMode = isElectron();
-const { logoLight } = useBranding();
 
 interface ProfileOption {
 	name: string;

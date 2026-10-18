@@ -58,6 +58,9 @@
 				</div>
 			</Transition>
 		</div>
+		<div class="ms-auto flex items-center pe-1">
+			<ConnectionStatus compact />
+		</div>
 	</div>
 
 	<AboutDialog :open="showAboutDialog" @close="showAboutDialog = false" />
@@ -78,6 +81,7 @@ import __ from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
+import ConnectionStatus from "@/components/ConnectionStatus.vue";
 import {
 	ShoppingCart,
 	Printer,
