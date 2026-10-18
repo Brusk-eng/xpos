@@ -1,22 +1,15 @@
 <template>
 	<Transition name="xpos-splash-fade">
-		<div v-if="show" class="xpos-splash" :style="{ backgroundColor: background }">
-			<img :src="isDark ? logoDark : logoLight" alt="X POS" class="xpos-splash__logo" />
+		<div v-if="show" class="xpos-splash">
+			<XposLogo :size="96" class="xpos-splash__logo" />
 		</div>
 	</Transition>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref } from "vue";
-
-import { useBranding } from "@/composables/useBranding";
+import { XposLogo } from "@/components/ui/brand";
 
 defineProps<{ show: boolean }>();
-
-const isDark = inject<Ref<boolean>>("isDark")!;
-const { logoLight, logoDark, splashBackground } = useBranding();
-
-const background = computed(() => splashBackground.value || "hsl(var(--background))");
 </script>
 
 <style scoped>
@@ -27,6 +20,7 @@ const background = computed(() => splashBackground.value || "hsl(var(--backgroun
 	display: flex;
 	align-items: center;
 	justify-content: center;
+	background-color: hsl(var(--background));
 }
 
 .xpos-splash__logo {

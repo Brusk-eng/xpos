@@ -2,6 +2,7 @@
 import { computed, ref, watch, nextTick, type HTMLAttributes } from "vue";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, X } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
+import { inputVariants } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContentStyled } from "@/components/ui/popover";
 import { __, cn } from "@/lib/utils";
 
@@ -571,7 +572,8 @@ function clearValue() {
 					:disabled="disabled"
 					:class="
 						cn(
-							'h-9 w-full justify-start gap-2 px-3 text-start font-normal',
+							inputVariants(),
+							'items-center justify-start gap-2 text-start font-normal hover:bg-surface-sunken active:translate-y-0',
 							!formattedDisplay && 'text-muted-foreground',
 							props.class,
 						)
@@ -612,8 +614,8 @@ function clearValue() {
 										: `${DATE_DISPLAY_FORMAT} HH:mm`
 							"
 							:disabled="disabled"
-							class="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-							:class="validationError && 'border-destructive ring-destructive'"
+							:class="inputVariants({ size: 'compact' })"
+							:aria-invalid="validationError ? 'true' : undefined"
 							@keydown="onInputKeydown"
 							@blur="onInputCommit"
 						/>
@@ -621,10 +623,10 @@ function clearValue() {
 					<p v-if="validationError" class="mt-1 text-xs text-destructive">
 						{{ validationError }}
 					</p>
-					<p v-else class="mt-1 text-[10px] text-muted-foreground">
+					<p v-else class="mt-1 text-xs text-muted-foreground">
 						Type directly or press
 						<kbd
-							class="mx-0.5 inline-flex h-4 items-center rounded border bg-muted px-1 font-mono text-[10px]"
+							class="mx-0.5 inline-flex h-4 items-center rounded border bg-muted px-1 font-mono text-xs"
 							>T</kbd
 						>
 						for {{ mode === "time" ? "now" : "today" }}
@@ -673,7 +675,7 @@ function clearValue() {
 							<div
 								v-for="dh in dayHeaders"
 								:key="dh"
-								class="text-center text-[11px] font-medium text-muted-foreground py-1"
+								class="text-center text-xs font-medium text-muted-foreground py-1"
 							>
 								{{ dh }}
 							</div>

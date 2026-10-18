@@ -1,164 +1,196 @@
 <template>
-	<div class="flex flex-col h-full overflow-hidden">
+	<div class="flex h-full flex-col overflow-hidden">
 		<div
-			class="md:hidden shrink-0 flex items-center bg-muted/60 border-b border-border mx-3 mt-2 mb-0 rounded-xl overflow-hidden"
+			class="mx-3 mt-2 flex shrink-0 items-center gap-1 rounded-xl border border-border bg-surface-sunken p-1 shadow-inset lg:hidden"
+			role="tablist"
+			:aria-label="__('Point of sale')"
 		>
 			<button
-				@click="activeTab = 'items'"
-				class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-xl"
+				id="pos-tab-items"
+				role="tab"
+				aria-controls="pos-products"
+				:aria-selected="activeTab === 'items'"
+				:tabindex="activeTab === 'items' ? 0 : -1"
+				class="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
 				:class="
 					activeTab === 'items'
-						? 'bg-background text-foreground shadow-sm'
+						? 'border border-border bg-card text-foreground shadow-raised'
 						: 'text-muted-foreground'
 				"
+				@click="activeTab = 'items'"
+				@keydown.left.prevent="switchTab"
+				@keydown.right.prevent="switchTab"
 			>
-				<Package class="w-4 h-4" />
-				{{ __("Items") }}
+				<Package class="size-4" aria-hidden="true" />
+				{{ __("Products") }}
 			</button>
 			<button
-				@click="activeTab = 'cart'"
-				class="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold transition-all rounded-xl"
+				id="pos-tab-cart"
+				role="tab"
+				aria-controls="pos-cart"
+				:aria-selected="activeTab === 'cart'"
+				:tabindex="activeTab === 'cart' ? 0 : -1"
+				class="flex h-10 flex-1 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
 				:class="
-					activeTab === 'cart' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground'
+					activeTab === 'cart'
+						? 'border border-border bg-card text-foreground shadow-raised'
+						: 'text-muted-foreground'
 				"
+				@click="activeTab = 'cart'"
+				@keydown.left.prevent="switchTab"
+				@keydown.right.prevent="switchTab"
 			>
-				<ShoppingCart class="w-4 h-4" />
-				{{ __("Cart") }}
+				<ShoppingCart class="size-4" aria-hidden="true" />
+				{{ __("Current sale") }}
 				<span
 					v-if="cartStore.itemCount > 0"
-					class="inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold rounded-full"
-					:class="
-						activeTab === 'cart'
-							? 'bg-primary text-primary-foreground'
-							: 'bg-primary/80 text-primary-foreground'
-					"
+					class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-bold text-primary-foreground tabular-nums"
 				>
 					{{ cartStore.itemCount }}
-				</span>
-				<span
-					v-if="cartStore.itemCount > 0"
-					class="text-[10px] font-medium leading-none"
-					:class="activeTab === 'cart' ? 'text-primary' : 'text-muted-foreground'"
-				>
-					{{ mobileCartTotal }}
 				</span>
 			</button>
 		</div>
 
-		<div class="flex flex-1 overflow-hidden">
-			<div
+		<div
+			ref="rowRef"
+			class="flex min-h-0 flex-1 overflow-hidden p-3 pt-2 lg:pt-3"
+			:style="{ '--cart-w': `${cartWidth}px` }"
+		>
+			<section
+				id="pos-products"
 				ref="itemsPanelRef"
+				aria-labelledby="pos-tab-items"
 				:class="[
-					'flex flex-col min-w-0 border-e border-border bg-background',
-					'md:flex md:flex-1 md:max-w-[calc(100%-560px)] xl:max-w-[calc(100%-520px)]',
-					activeTab === 'items' ? 'flex flex-1' : 'hidden',
+					'min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card/50 shadow-raised lg:flex',
+					activeTab === 'items' ? 'flex' : 'hidden',
 				]"
 				@focusin="activeZone = 'items'"
 				@click="activeZone = 'items'"
 			>
-				<div class="shrink-0 p-3 sm:p-4 pb-1.5 sm:pb-2 space-y-2">
+				<div class="shrink-0 space-y-1.5 p-3 pb-1.5">
 					<div class="flex items-center gap-2">
-						<div class="flex-1 min-w-0">
-							<SearchBar
-								ref="searchBarRef"
-								@search="onSearch"
-								@enter="onSearchEnter"
-								@navigate="onNavigate"
-							/>
-						</div>
-						<div class="hidden sm:block w-52 shrink-0">
-							<BarcodeScanner ref="barcodeScannerRef" @scanned="onBarcodeScan" />
-						</div>
-						<button
-							class="sm:hidden shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10 text-primary active:bg-primary/20 transition-colors"
-							@click="showCameraScanner = true"
-						>
-							<ScanLine class="w-5 h-5" />
-						</button>
-						<div class="hidden sm:flex items-center gap-1 border rounded-lg p-1">
-							<Button
-								:variant="viewMode === 'grid' ? 'default' : 'ghost'"
-								size="icon"
-								class="h-8 w-8"
-								@click="viewMode = 'grid'"
-							>
-								<LayoutGrid class="h-4 w-4" />
-							</Button>
-							<Button
-								:variant="viewMode === 'list' ? 'default' : 'ghost'"
-								size="icon"
-								class="h-8 w-8"
-								@click="viewMode = 'list'"
-							>
-								<List class="h-4 w-4" />
-							</Button>
-						</div>
-					</div>
-					<div class="flex items-center gap-2 overflow-x-auto pb-1 xpos-scrollbar">
-						<Autocomplete
-							:model-value="itemStore.selectedGroup"
-							:options="groupAutocompleteOptions"
-							:placeholder="__('Search item groups...')"
-							:show-search-icon="true"
-							:max-visible="12"
-							:empty-text="__('No groups found')"
-							class="w-40 sm:w-52 shrink-0 mt-2"
-							@update:model-value="selectGroup($event)"
+						<SearchBar
+							ref="searchBarRef"
+							class="flex-1"
+							@search="onSearch"
+							@enter="onSearchEnter"
+							@navigate="onNavigate"
+							@scan="handleScanButton"
 						/>
-						<Button
-							:variant="itemStore.selectedGroup === 'All Item Groups' ? 'default' : 'outline'"
-							size="sm"
-							class="rounded-full shrink-0 mt-2"
-							@click="selectGroup('All Item Groups')"
+						<div
+							class="hidden h-12 shrink-0 items-center gap-0.5 rounded-xl border border-border bg-surface-sunken p-1 shadow-inset sm:flex"
+							role="group"
+							:aria-label="__('View')"
 						>
-							{{ __("All Groups") }}
-						</Button>
-						<Button
-							v-for="group in topGroups"
-							:key="group.name"
-							:variant="itemStore.selectedGroup === group.name ? 'default' : 'outline'"
-							size="sm"
-							class="rounded-full shrink-0 mt-2"
-							@click="selectGroup(group.name)"
-						>
-							{{ __(group.name) }}
-						</Button>
+							<TooltipWrapper :content="__('Grid view')" shortcut="F5">
+								<button
+									type="button"
+									class="inline-flex size-10 items-center justify-center rounded-lg transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+									:class="
+										viewMode === 'grid'
+											? 'border border-border bg-card text-foreground shadow-raised'
+											: 'text-muted-foreground hover:text-foreground'
+									"
+									:aria-label="__('Grid view')"
+									:aria-pressed="viewMode === 'grid'"
+									@click="setViewMode('grid')"
+								>
+									<LayoutGrid class="size-4.5" />
+								</button>
+							</TooltipWrapper>
+							<TooltipWrapper :content="__('List view')" shortcut="F5">
+								<button
+									type="button"
+									class="inline-flex size-10 items-center justify-center rounded-lg transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+									:class="
+										viewMode === 'list'
+											? 'border border-border bg-card text-foreground shadow-raised'
+											: 'text-muted-foreground hover:text-foreground'
+									"
+									:aria-label="__('List view')"
+									:aria-pressed="viewMode === 'list'"
+									@click="setViewMode('list')"
+								>
+									<List class="size-4.5" />
+								</button>
+							</TooltipWrapper>
+						</div>
 					</div>
+					<CategoryBar
+						:groups="itemStore.itemGroups"
+						:parent-groups="itemStore.parentGroups"
+						:selected="itemStore.selectedGroup"
+						@select="selectGroup"
+						@picked="searchBarRef?.focus()"
+					/>
 				</div>
 
-				<div class="flex-1 overflow-y-auto p-2 sm:p-4 pt-1 sm:pt-2 xpos-scrollbar">
+				<div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1 xpos-scrollbar">
 					<ItemGrid
 						:items="itemStore.items"
 						:is-loading="itemStore.isLoading"
+						:load-error="itemStore.loadError"
+						:has-filters="hasFilters"
+						:hide-images="posStore.hideImages"
 						:currency-symbol="posStore.currencySymbol"
 						:view-mode="viewMode"
 						:highlighted-index="highlightedIndex"
 						@select-item="handleAddItem"
 						@show-detail="handleShowDetail"
 						@load-more="handleLoadMore"
+						@retry="reloadItems"
+						@clear-filters="clearFilters"
 					/>
 				</div>
-			</div>
-			<div
-				ref="cartPanelRef"
-				class="hidden md:flex w-140 xl:w-130 flex-col bg-background dark:bg-card shrink-0"
-				@focusin="activeZone = 'cart'"
-				@click="activeZone = 'cart'"
-			>
-				<Cart />
-			</div>
 
-			<div
-				ref="mobileCartPanelRef"
+				<div v-if="cartStore.itemCount > 0" class="shrink-0 border-t border-border p-2 lg:hidden">
+					<button
+						type="button"
+						class="flex h-12 w-full items-center justify-between gap-3 rounded-xl bg-primary px-4 text-primary-foreground shadow-primary transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+						data-testid="checkout-bar"
+						@click="showCart"
+					>
+						<span class="flex items-center gap-2 text-sm font-semibold">
+							<ShoppingCart class="size-4.5" aria-hidden="true" />
+							{{
+								cartStore.itemCount === 1
+									? __("1 item")
+									: __("{0} items", [cartStore.itemCount])
+							}}
+						</span>
+						<span class="flex items-center gap-2 text-base font-bold tabular-nums">
+							{{ __("Review sale") }} · {{ mobileCartTotal }}
+							<ChevronRight class="size-4.5 rtl:rotate-180" aria-hidden="true" />
+						</span>
+					</button>
+				</div>
+			</section>
+
+			<PaneSplitter
+				v-model="cartWidth"
+				data-testid="cart-splitter"
+				class="mx-0.5 hidden lg:flex"
+				:min="cartBounds.min"
+				:max="cartBounds.max"
+				:default-value="cartBounds.preferred"
+				:label="__('Resize cart')"
+				@commit="saveCartWidth"
+			/>
+
+			<section
+				id="pos-cart"
+				ref="cartPanelRef"
+				tabindex="-1"
+				aria-labelledby="pos-tab-cart"
 				:class="[
-					'md:hidden flex flex-col flex-1 bg-background dark:bg-card overflow-hidden',
-					activeTab === 'cart' ? 'flex' : 'hidden',
+					'min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card/50 shadow-raised focus:outline-none lg:flex lg:w-(--cart-w) lg:flex-none',
+					activeTab === 'cart' ? 'flex flex-1' : 'hidden',
 				]"
 				@focusin="activeZone = 'cart'"
 				@click="activeZone = 'cart'"
 			>
 				<Cart />
-			</div>
+			</section>
 
 			<CameraBarcodeDialog
 				:open="showCameraScanner"
@@ -184,15 +216,16 @@ import { useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showError, isNetworkError } from "@/services/api";
-import { cacheItemTax, getCachedItemTax } from "@/services/dbBridge";
+import { cacheItemTax, getCachedItemTax, getSetting, setSetting } from "@/services/dbBridge";
 import SearchBar from "@/components/items/SearchBar.vue";
-import BarcodeScanner from "@/components/items/BarcodeScanner.vue";
 import ItemGrid from "@/components/items/ItemGrid.vue";
 import CommandSearch from "@/components/items/CommandSearch.vue";
+import CategoryBar from "@/components/items/CategoryBar.vue";
 import Cart from "@/components/cart/Cart.vue";
-import { Button } from "@/components/ui/button";
-import { Autocomplete } from "@/components/ui/autocomplete";
-import { LayoutGrid, List, Search, ShoppingCart, Package, ScanLine } from "lucide-vue-next";
+import PaneSplitter from "@/components/core/PaneSplitter.vue";
+import { TooltipWrapper } from "@/components/ui/tooltip";
+import { ALL_GROUPS } from "@/composables/useCategoryTree";
+import { ChevronRight, LayoutGrid, List, ShoppingCart, Package } from "lucide-vue-next";
 
 import CameraBarcodeDialog from "@/components/dialogs/CameraBarcodeDialog.vue";
 import type { POSItem } from "@/types/pos.types";
@@ -220,28 +253,96 @@ watch(
 );
 
 const searchBarRef = ref<InstanceType<typeof SearchBar> | null>(null);
-const barcodeScannerRef = ref<InstanceType<typeof BarcodeScanner> | null>(null);
 const commandSearchRef = ref<InstanceType<typeof CommandSearch> | null>(null);
-const itemsPanelRef = ref<HTMLDivElement | null>(null);
-const cartPanelRef = ref<HTMLDivElement | null>(null);
-const mobileCartPanelRef = ref<HTMLDivElement | null>(null);
+const itemsPanelRef = ref<HTMLElement | null>(null);
+const cartPanelRef = ref<HTMLElement | null>(null);
+const rowRef = ref<HTMLElement | null>(null);
 const activeZone = ref<"items" | "cart">("items");
 const highlightedIndex = ref(-1);
 
-const topGroups = computed(() => {
-	const groups = itemStore.parentGroups.filter((g) => g.name !== "All Item Groups");
-	return groups.slice(0, 12);
+const hasFilters = computed(() => !!itemStore.searchTerm || itemStore.selectedGroup !== ALL_GROUPS);
+
+/**
+ * Cart width on wide screens. The cashier's preferred width is stored with the other
+ * terminal settings; what is shown is clamped so the catalogue keeps at least 32rem.
+ */
+const CART_SETTING = "pos_cart_width";
+const rowWidth = ref(0);
+const preferredCartWidth = ref<number | null>(null);
+const cartBounds = computed(() => {
+	const row = rowWidth.value || 1280;
+	// Below ~27rem the cart's own rows (customer, line stepper) start to collide.
+	const min = 432;
+	const max = Math.max(min, Math.min(640, row * 0.45, row - 512 - 16));
+	const preferred = Math.round(Math.min(max, Math.max(min, Math.min(520, row * 0.34))));
+	return { min, max, preferred };
+});
+const cartWidth = computed({
+	get: () => {
+		const { min, max, preferred } = cartBounds.value;
+		return Math.round(Math.min(max, Math.max(min, preferredCartWidth.value ?? preferred)));
+	},
+	set: (value: number) => {
+		preferredCartWidth.value = value;
+	},
 });
 
-const groupAutocompleteOptions = computed(() => {
-	const allOption = { label: __("All Groups"), value: "All Item Groups" };
-	const groupOptions = itemStore.parentGroups
-		.filter((g) => g.name !== "All Item Groups")
-		.map((g) => ({ label: __(g.name), value: g.name }));
-	return [allOption, ...groupOptions];
-});
+let rowObserver: ResizeObserver | null = null;
+
+function saveCartWidth(value: number) {
+	setSetting(CART_SETTING, String(Math.round(value)), "ui").catch(() => {});
+}
+
+async function loadCartWidth() {
+	try {
+		const saved = Number(await getSetting(CART_SETTING));
+		if (saved > 0) preferredCartWidth.value = saved;
+	} catch {
+		/* keep the default width */
+	}
+}
+
+function switchTab() {
+	activeTab.value = activeTab.value === "items" ? "cart" : "items";
+	nextTick(() => document.getElementById(`pos-tab-${activeTab.value}`)?.focus());
+}
+
+function showCart() {
+	activeTab.value = "cart";
+	nextTick(() => cartPanelRef.value?.focus());
+}
+
+function setViewMode(mode: "grid" | "list") {
+	viewMode.value = mode;
+	scrollHighlightedIntoView();
+}
+
+function scrollHighlightedIntoView() {
+	if (highlightedIndex.value < 0) return;
+	nextTick(() => {
+		const el = document.querySelector(`[data-item-index="${highlightedIndex.value}"]`);
+		el?.scrollIntoView({ block: "nearest" });
+	});
+}
+
+function reloadItems() {
+	itemStore.fetchItems(posStore.profileName);
+}
+
+function clearFilters() {
+	searchBarRef.value?.clear();
+	itemStore.setSearchTerm("");
+	itemStore.setSelectedGroup(ALL_GROUPS);
+	itemStore.fetchItems(posStore.profileName);
+	nextTick(() => searchBarRef.value?.focus());
+}
 
 onMounted(() => {
+	loadCartWidth();
+	if (rowRef.value && typeof ResizeObserver !== "undefined") {
+		rowObserver = new ResizeObserver(([entry]) => (rowWidth.value = entry.contentRect.width));
+		rowObserver.observe(rowRef.value);
+	}
 	if (posStore.isReady) {
 		loadInitialData();
 	}
@@ -250,10 +351,11 @@ onMounted(() => {
 	window.addEventListener("xpos:focus-barcode", handleFocusBarcode as EventListener);
 	window.addEventListener("xpos:focus-search", handleFocusSearch as EventListener);
 	window.addEventListener("xpos:open-command-search", handleOpenCommandSearch as EventListener);
-	nextTick(() => barcodeScannerRef.value?.focus());
+	nextTick(() => searchBarRef.value?.focus());
 });
 
 onUnmounted(() => {
+	rowObserver?.disconnect();
 	document.removeEventListener("keydown", handleGlobalKeydown);
 	window.removeEventListener("xpos:toggle-view", handleToggleView as EventListener);
 	window.removeEventListener("xpos:focus-barcode", handleFocusBarcode as EventListener);
@@ -262,11 +364,20 @@ onUnmounted(() => {
 });
 
 function handleToggleView() {
-	viewMode.value = viewMode.value === "grid" ? "list" : "grid";
+	setViewMode(viewMode.value === "grid" ? "list" : "grid");
 }
 
 function handleFocusBarcode() {
-	barcodeScannerRef.value?.focus();
+	searchBarRef.value?.select();
+}
+
+/** Touch devices open the camera scanner; with a pointer the field itself takes hardware scans. */
+function handleScanButton() {
+	if (window.matchMedia?.("(pointer: coarse)").matches) {
+		showCameraScanner.value = true;
+		return;
+	}
+	searchBarRef.value?.select();
 }
 
 function handleFocusSearch() {
@@ -291,16 +402,16 @@ watch(
 	},
 );
 
+// Item dialogs hand focus back to search so the next scan lands there.
 watch(
-	() => itemStore.showItemDetail,
-	(open) => {
-		if (!open && highlightedIndex.value >= 0) {
-			nextTick(() => {
-				searchBarRef.value?.focus();
-				const el = document.querySelector(`[data-item-index="${highlightedIndex.value}"]`);
-				el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-			});
-		}
+	() => [itemStore.showItemDetail, itemStore.showVariantPicker, showCameraScanner.value],
+	(open, wasOpen) => {
+		if (open.some(Boolean) || !wasOpen?.some(Boolean)) return;
+		nextTick(() => {
+			if (document.activeElement?.closest("[role='dialog']")) return;
+			searchBarRef.value?.focus();
+			scrollHighlightedIntoView();
+		});
 	},
 );
 
@@ -318,7 +429,7 @@ async function loadInitialData() {
 
 	cartStore.refreshPricingSnapshot(true).catch(() => {});
 
-	nextTick(() => barcodeScannerRef.value?.focus());
+	nextTick(() => searchBarRef.value?.focus());
 }
 
 function onSearch(term: string) {
@@ -327,14 +438,22 @@ function onSearch(term: string) {
 }
 
 async function onSearchEnter(val: string) {
-	if (highlightedIndex.value >= 0 && highlightedIndex.value < itemStore.items.length) {
+	// The highlight belongs to the search that produced it; new text (e.g. a scan) is looked up instead.
+	const highlightIsCurrent = val === (itemStore.searchTerm || "").trim();
+	if (
+		highlightIsCurrent &&
+		highlightedIndex.value >= 0 &&
+		highlightedIndex.value < itemStore.items.length
+	) {
 		handleShowDetail(itemStore.items[highlightedIndex.value]);
 		return;
 	}
 
 	if (!val) return;
 
-	onSearch(val);
+	// One field for both: a matching barcode adds the item. Text stays a search; a barcode-shaped
+	// value (6+ digits) that matches nothing still reports "not found", as the scanner field did.
+	await onBarcodeScan(val, !/^\d{6,}$/.test(val));
 }
 
 async function onCameraScan(barcode: string) {
@@ -342,10 +461,10 @@ async function onCameraScan(barcode: string) {
 	await onBarcodeScan(barcode);
 }
 
-async function onBarcodeScan(barcode: string) {
+async function onBarcodeScan(barcode: string, fallbackToSearch = false) {
 	if (!barcode) return;
 
-	barcodeScannerRef.value?.setScanning(true);
+	searchBarRef.value?.setScanning(true);
 	try {
 		const result = await itemStore.searchByBarcode(barcode, posStore.profileName);
 		if (result && result.item_code) {
@@ -369,16 +488,23 @@ async function onBarcodeScan(barcode: string) {
 			} else {
 				handleAddItem(item);
 			}
-			barcodeScannerRef.value?.showSuccess();
+			searchBarRef.value?.showSuccess();
+			if (itemStore.searchTerm) onSearch("");
+		} else if (fallbackToSearch) {
+			onSearch(barcode);
 		} else {
 			showError(__(`Item not found for barcode: ${barcode}`));
-			barcodeScannerRef.value?.showError();
+			searchBarRef.value?.showError();
 		}
 	} catch (err) {
-		showError(__("Barcode lookup failed"));
-		barcodeScannerRef.value?.showError();
+		if (fallbackToSearch) {
+			onSearch(barcode);
+		} else {
+			showError(__("Barcode lookup failed"));
+			searchBarRef.value?.showError();
+		}
 	} finally {
-		barcodeScannerRef.value?.setScanning(false);
+		searchBarRef.value?.setScanning(false);
 	}
 }
 
@@ -406,21 +532,15 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 	const isInput = tag === "input" || tag === "textarea" || tag === "select";
 	const isInDialog = document.activeElement?.closest("[role='dialog']");
 
-	if (e.key === "F1") {
+	if (e.key === "F1" || e.key === "F2") {
 		e.preventDefault();
 		activeZone.value = "items";
-		barcodeScannerRef.value?.focus();
-		return;
-	}
-	if (e.key === "F2") {
-		e.preventDefault();
-		activeZone.value = "items";
-		searchBarRef.value?.focus();
+		searchBarRef.value?.select();
 		return;
 	}
 	if (e.key === "F5") {
 		e.preventDefault();
-		viewMode.value = viewMode.value === "grid" ? "list" : "grid";
+		handleToggleView();
 		return;
 	}
 

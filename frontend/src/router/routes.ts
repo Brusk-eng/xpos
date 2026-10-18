@@ -138,6 +138,17 @@ const routes: RouteRecordRaw[] = [
 		component: () => import("@/views/PriceChecker.vue"),
 		meta: { title: "Price Checker", requiresAuth: true, fullScreen: true },
 	},
+	// Pearl component showcase: development builds only, tree-shaken from production.
+	...(import.meta.env.DEV
+		? [
+				{
+					path: "/showcase",
+					name: "showcase",
+					component: () => import("@/views/dev/ComponentShowcase.vue"),
+					meta: { title: "Showcase", requiresAuth: false, fullScreen: true },
+				},
+			]
+		: []),
 ];
 
 export default routes;

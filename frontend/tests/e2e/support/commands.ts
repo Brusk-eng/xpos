@@ -20,6 +20,10 @@ export interface BootOptions {
 	customer?: string;
 	/** Item whose tile signals the grid has rendered. Override when the fixture swaps the catalogue. */
 	readyItem?: string;
+	/** Skip waiting for `readyItem`, for specs where the catalogue is expected to fail or be empty. */
+	skipReadyWait?: boolean;
+	/** Extra setup on the app's window before it loads, e.g. a stored theme. */
+	beforeLoad?: (win: Window) => void;
 	/**
 	 * Currency masters for `window.xpos.boot`.
 	 *
@@ -71,13 +75,16 @@ Cypress.Commands.add("bootPos", (options: BootOptions = {}) => {
 					__messages: {},
 				},
 			};
+			options.beforeLoad?.(win);
 		},
 	});
 
 	// The item grid rendering is the signal that the shift/profile boot landed.
-	cy.contains("[data-item-index], .cursor-pointer, button", options.readyItem || "Espresso Beans", {
-		timeout: 20000,
-	}).should("exist");
+	if (!options.skipReadyWait) {
+		cy.contains("[data-item-index], .cursor-pointer, button", options.readyItem || "Espresso Beans", {
+			timeout: 20000,
+		}).should("exist");
+	}
 
 	if (!options.skipCustomer) {
 		cy.selectCustomer(options.customer || "Ada Lovelace");
@@ -101,9 +108,8 @@ Cypress.Commands.add("scanBarcode", (barcode: string) => {
 });
 
 /**
- * PosView renders <Cart /> twice - a desktop panel and a mobile one - and both
- * stay in the DOM, hidden by CSS. Every cart assertion must scope to the panel
- * that is actually on screen or it sees each row twice.
+ * Cart rows that are on screen. PosView mounts one <Cart />, but below the lg breakpoint it sits
+ * behind the "Current sale" tab, so assertions still scope to what is visible.
  */
 Cypress.Commands.add("cartRows", () => {
 	return cy.get("[data-cart-index]:visible");

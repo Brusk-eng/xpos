@@ -1,138 +1,146 @@
 <template>
-	<Card
-		class="group relative overflow-hidden select-none transition-all duration-200"
+	<article
+		class="group relative flex min-w-0 flex-col rounded-2xl border bg-card transition-[border-color,box-shadow] duration-fast ease-standard"
 		:class="[
-			isOutOfStock && !allowNegativeStock
-				? 'cursor-not-allowed opacity-60 grayscale-[30%]'
+			isUnavailable
+				? 'border-border'
 				: highlighted
-					? 'cursor-pointer shadow-md border-orange-400 ring-2 ring-orange-400/50 -translate-y-0.5 bg-orange-50/50 dark:bg-orange-500/10 dark:border-orange-500 dark:ring-orange-500/40'
-					: 'cursor-pointer hover:shadow-md hover:border-primary/30 hover:-translate-y-0.5 dark:border-border dark:hover:border-primary/50',
+					? 'border-primary shadow-raised-hover ring-2 ring-primary/40'
+					: 'border-border shadow-raised hover:border-border-strong hover:shadow-raised-hover',
 		]"
-		@click="handleClick"
+		:data-state="isUnavailable ? 'unavailable' : isTemplate ? 'template' : undefined"
 	>
-		<div class="relative aspect-[4/3] bg-muted overflow-hidden rounded-t-xl">
-			<img
-				v-if="item.image && !hideImages"
-				:src="item.image"
-				:alt="item.item_name"
-				class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-				loading="lazy"
-			/>
-			<div
-				v-else
-				class="w-full h-full flex items-center justify-center bg-gradient-to-br from-muted to-muted/50"
+		<button
+			type="button"
+			class="flex min-w-0 flex-1 select-none flex-col rounded-2xl p-2 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+			:class="isUnavailable ? 'cursor-not-allowed' : 'cursor-pointer motion-safe:active:scale-[0.99]'"
+			:aria-label="actionLabel"
+			:aria-disabled="isUnavailable || undefined"
+			data-testid="item-add"
+			@click="handleClick"
+		>
+			<span
+				class="relative block aspect-4/3 w-full overflow-hidden rounded-xl bg-surface-sunken"
+				:class="isUnavailable && 'opacity-50 grayscale'"
 			>
-				<Package class="w-10 h-10 text-muted-foreground/40" />
-			</div>
-
-			<Badge
-				v-if="showStock && !isNonStockItem && item.actual_qty !== undefined"
-				:variant="stockVariant"
-				class="absolute top-2 end-2 text-[10px]"
-			>
-				{{ stockLabel }}
-			</Badge>
-
-			<div
-				v-if="isOutOfStock && !allowNegativeStock"
-				class="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center"
-			>
-				<div
-					class="bg-destructive/90 text-destructive-foreground px-3 py-1.5 rounded-full text-xs font-bold shadow-lg flex items-center gap-1.5"
-				>
-					<AlertCircle class="w-3.5 h-3.5" />
-					{{ __("Out of Stock") }}
-				</div>
-			</div>
-
-			<div
-				class="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-all duration-300 flex items-center justify-center gap-2"
-			>
-				<div
-					v-if="!isOutOfStock || allowNegativeStock"
-					class="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 shadow-lg"
-				>
-					<Plus class="w-5 h-5" />
-				</div>
-				<div
-					class="w-10 h-10 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 shadow-lg delay-75"
-					@click.stop="$emit('showDetail', item)"
-				>
-					<Info class="w-5 h-5" />
-				</div>
-			</div>
-		</div>
-
-		<CardContent class="p-2.5">
-			<p class="text-xs font-medium text-foreground leading-tight line-clamp-2 mb-1">
-				{{ item.item_name }}
-			</p>
-			<p v-if="showItemCode" class="text-[10px] text-muted-foreground mb-1 truncate font-mono">
-				{{ item.item_code }}
-			</p>
-			<div class="flex items-center justify-between">
-				<span class="text-sm font-bold text-primary dark:text-primary-foreground tabular-nums">
-					{{ money(item.rate) }}
+				<img
+					v-if="showImage"
+					:src="item.image as string"
+					alt=""
+					width="160"
+					height="120"
+					loading="lazy"
+					decoding="async"
+					class="absolute inset-0 h-full w-full object-contain p-1.5"
+					@error="imageFailed = true"
+				/>
+				<span v-else class="absolute inset-0 flex items-center justify-center" aria-hidden="true">
+					<Package class="size-8 text-muted-foreground/50" />
 				</span>
-				<span class="text-[10px] text-muted-foreground dark:text-muted-foreground/90 truncate ms-1">
-					{{ item.item_group }}
+				<span
+					v-if="isTemplate"
+					class="absolute start-1.5 top-1.5 inline-flex items-center gap-1 rounded-md border border-info/30 bg-info-soft px-1.5 py-0.5 text-[0.6875rem] font-semibold text-info-soft-foreground"
+				>
+					<Layers class="size-3" aria-hidden="true" />
+					{{ __("Variants") }}
 				</span>
-			</div>
-		</CardContent>
-	</Card>
+			</span>
+
+			<span class="mt-2 flex min-w-0 flex-1 flex-col px-0.5">
+				<span
+					class="line-clamp-2 min-h-10 text-sm font-semibold leading-5 text-foreground"
+					:class="isUnavailable && 'text-muted-foreground'"
+					:title="item.item_name"
+					dir="auto"
+				>
+					{{ item.item_name }}
+				</span>
+				<span
+					v-if="showItemCode"
+					class="mt-0.5 truncate font-mono text-[0.6875rem] text-muted-foreground"
+					:title="item.item_code"
+				>
+					{{ item.item_code }}
+				</span>
+				<span class="mt-auto flex items-end justify-between gap-2 pt-2">
+					<span class="min-w-0">
+						<span
+							v-if="priceMissing"
+							class="block text-sm font-semibold text-warning-soft-foreground"
+							data-testid="price-missing"
+						>
+							{{ __("No price") }}
+						</span>
+						<span
+							v-else
+							class="block truncate text-base font-bold leading-tight text-foreground tabular-nums"
+						>
+							{{ money(item.rate) }}
+						</span>
+						<span
+							v-if="hasStockFigure"
+							class="mt-1.5 inline-flex rounded-md border px-1.5 py-0.5 text-[0.6875rem] font-semibold leading-none tabular-nums"
+							:class="STOCK_TONE_CLASS[stockTone]"
+						>
+							{{ stockLabel }}
+						</span>
+					</span>
+					<span
+						v-if="!isUnavailable"
+						class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-primary transition-colors group-hover:bg-primary/90"
+						aria-hidden="true"
+					>
+						<ChevronRight v-if="isTemplate" class="size-4 rtl:rotate-180" stroke-width="2.5" />
+						<Plus v-else class="size-4" stroke-width="2.5" />
+					</span>
+				</span>
+			</span>
+		</button>
+
+		<button
+			type="button"
+			class="absolute end-3.5 top-3.5 inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-raised backdrop-blur-sm transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+			:aria-label="__('Details for {0}', [item.item_name])"
+			data-testid="item-details"
+			@click="$emit('showDetail', item)"
+		>
+			<Info class="size-4" />
+		</button>
+	</article>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { usePosStore } from "@/stores/posStore";
+import { toRef } from "vue";
 import { useMoney } from "@/composables/useMoney";
-import { formatQty } from "@/utils/numberFormat";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Package, Plus, Info, AlertCircle } from "lucide-vue-next";
+import { STOCK_TONE_CLASS, useItemTileState } from "@/composables/useItemTileState";
+import { ChevronRight, Info, Layers, Package, Plus } from "lucide-vue-next";
+import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 
 const props = defineProps({
-	item: { type: Object, required: true },
+	item: { type: Object as () => POSItem, required: true },
 	currencySymbol: { type: String, default: "$" },
 	highlighted: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["click", "showDetail"]);
 
-const posStore = usePosStore();
 const { money } = useMoney();
-
-const showStock = computed(() => true);
-const showItemCode = computed(() => posStore.displayItemCode);
-const allowNegativeStock = computed(() => posStore.stockSettings?.allow_negative_stock);
-const hideImages = computed(() => posStore.hideImages);
-
-const isNonStockItem = computed(() => Number(props.item.is_stock_item) === 0);
-
-const isOutOfStock = computed(() => {
-	if (isNonStockItem.value) return false;
-	const qty = props.item.actual_qty;
-	return qty !== undefined && qty <= 0;
-});
-
-const stockVariant = computed(() => {
-	const qty = props.item.actual_qty || 0;
-	if (qty <= 0) return "destructive" as const;
-	if (qty <= 5) return "warning" as const;
-	return "secondary" as const;
-});
-
-const stockLabel = computed(() => {
-	const stock = props.item.actual_qty || 0;
-	if (stock <= 0) return "Out";
-	return stock > 999 ? "999+" : formatQty(stock);
-});
+const {
+	showItemCode,
+	hasStockFigure,
+	isUnavailable,
+	isTemplate,
+	priceMissing,
+	stockTone,
+	stockLabel,
+	imageFailed,
+	showImage,
+	actionLabel,
+} = useItemTileState(toRef(props, "item"));
 
 function handleClick() {
-	if (isOutOfStock.value && !allowNegativeStock.value) {
-		return;
-	}
+	if (isUnavailable.value) return;
 	emit("click", props.item);
 }
 </script>

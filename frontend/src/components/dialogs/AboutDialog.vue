@@ -10,7 +10,7 @@
 		<DialogContent class="max-w-md">
 			<DialogHeader>
 				<DialogTitle class="flex items-center gap-3">
-					<img :src="isDark ? logoDark : logoLight" alt="X POS Logo" class="w-10 h-10" />
+					<XposLogo :size="40" />
 					<span>{{ __("X POS") }}</span>
 				</DialogTitle>
 			</DialogHeader>
@@ -138,7 +138,7 @@ import { call } from "@/services/api";
 import { __ } from "@/lib/translate";
 import { Github, Globe, Loader2, Mail } from "lucide-vue-next";
 
-import { useBranding } from "@/composables/useBranding";
+import { XposLogo } from "@/components/ui/brand";
 
 const COMPANY = {
 	name: "Kodlyft",
@@ -156,7 +156,6 @@ defineEmits<{
 }>();
 
 const isDark = inject<Ref<boolean>>("isDark")!;
-const { logoLight, logoDark } = useBranding();
 const posStore = usePosStore();
 const isElectronEnv = isElectron();
 

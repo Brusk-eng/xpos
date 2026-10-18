@@ -19,8 +19,8 @@ export default defineConfig({
 				name: "X POS - Point of Sale",
 				short_name: "X POS",
 				description: "Modern Point of Sale application with offline support",
-				theme_color: "#f97316",
-				background_color: "#ffffff",
+				theme_color: "#1d4ed8",
+				background_color: "#e8ecf2",
 				display: "standalone",
 				orientation: "any",
 				scope: "/xpos/",
@@ -39,10 +39,10 @@ export default defineConfig({
 						type: "image/svg+xml",
 					},
 					{
-						src: "pwa-512x512.svg",
+						src: "pwa-maskable-512x512.svg",
 						sizes: "512x512",
 						type: "image/svg+xml",
-						purpose: "any maskable",
+						purpose: "maskable",
 					},
 				],
 				screenshots: [

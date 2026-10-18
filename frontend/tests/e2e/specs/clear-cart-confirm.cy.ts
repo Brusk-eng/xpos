@@ -1,6 +1,7 @@
 describe("clear cart confirmation", () => {
 	it("disables the button when the cart is empty", () => {
 		cy.bootPos();
+		cy.get("[data-testid='cart-more']:visible").click();
 		cy.get("[data-testid='clear-cart']:visible").should("be.disabled");
 	});
 
@@ -9,6 +10,7 @@ describe("clear cart confirmation", () => {
 		cy.addItemToCart("Espresso Beans");
 		cy.cartRows().should("have.length", 1);
 
+		cy.get("[data-testid='cart-more']:visible").click();
 		cy.get("[data-testid='clear-cart']:visible").click();
 		cy.contains("[role='dialog']", "Clear cart?").should("be.visible");
 
@@ -22,6 +24,7 @@ describe("clear cart confirmation", () => {
 		cy.addItemToCart("Espresso Beans");
 		cy.cartRows().should("have.length", 1);
 
+		cy.get("[data-testid='cart-more']:visible").click();
 		cy.get("[data-testid='clear-cart']:visible").click();
 		cy.get("[role='dialog']").contains("button", "Clear Cart").click();
 

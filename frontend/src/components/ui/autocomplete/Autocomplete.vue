@@ -2,7 +2,8 @@
 import { computed, ref, watch, nextTick, type HTMLAttributes } from "vue";
 import { Search, X, ChevronDown, Loader2, Check } from "lucide-vue-next";
 import { PopoverRoot, PopoverPortal, PopoverContent, PopoverAnchor } from "radix-vue";
-import { cn } from "@/lib/utils";
+import { __, cn } from "@/lib/utils";
+import { inputVariants } from "@/components/ui/input";
 import { call, getValue } from "@/services/api";
 
 export interface AutocompleteOption {
@@ -386,8 +387,8 @@ defineExpose({ focus, select, getInputEl, inputRef });
 						:disabled="disabled"
 						:class="
 							cn(
-								'flex w-full rounded-lg border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-all placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent disabled:cursor-not-allowed disabled:opacity-50',
-								compact ? 'h-7 text-xs' : 'h-8',
+								inputVariants({ size: compact ? 'compact' : 'default' }),
+								open && 'ring-4 ring-primary/12',
 								effectiveShowSearchIcon && 'ps-9',
 								effectiveClearable && modelValue ? (compact ? 'pe-12' : 'pe-16') : 'pe-8',
 							)
@@ -402,24 +403,24 @@ defineExpose({ focus, select, getInputEl, inputRef });
 							v-if="effectiveClearable && modelValue"
 							type="button"
 							tabindex="-1"
-							class="p-0.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+							class="p-1 rounded-md hover:bg-destructive-soft text-muted-foreground hover:text-destructive-soft-foreground transition-colors"
 							@mousedown.prevent="clearSelection"
 						>
-							<X class="h-3.5 w-3.5" />
+							<X class="h-4 w-4" />
 						</button>
 						<Loader2 v-if="isLoading" class="h-4 w-4 text-muted-foreground animate-spin" />
 						<button
 							v-else
 							type="button"
 							tabindex="-1"
-							class="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+							class="p-1 rounded-md hover:bg-surface-hover text-muted-foreground hover:text-foreground transition-colors"
 							@mousedown.prevent="
 								open = !open;
 								if (open && isLinkMode) void searchLink(query);
 							"
 						>
 							<ChevronDown
-								class="h-4 w-4 transition-transform duration-200"
+								class="h-4 w-4 transition-transform duration-base"
 								:class="{ 'rotate-180': open }"
 							/>
 						</button>
@@ -432,7 +433,7 @@ defineExpose({ focus, select, getInputEl, inputRef });
 					align="start"
 					side="bottom"
 					:side-offset="4"
-					class="z-99999 w-(--radix-popover-trigger-width) min-w-55 max-h-70 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
+					class="z-99999 w-(--radix-popover-trigger-width) min-w-55 max-h-70 overflow-y-auto rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-overlay outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2"
 					@open-auto-focus.prevent
 					@focus-outside.prevent
 				>
@@ -441,7 +442,7 @@ defineExpose({ focus, select, getInputEl, inputRef });
 						class="flex items-center justify-center py-6 text-sm text-muted-foreground"
 					>
 						<Loader2 class="h-5 w-5 text-primary animate-spin" />
-						<span class="ms-2">Searching...</span>
+						<span class="ms-2">{{ __("Searching...") }}</span>
 					</div>
 
 					<div v-else-if="filteredOptions.length === 0" class="py-6 text-center">
@@ -452,7 +453,7 @@ defineExpose({ focus, select, getInputEl, inputRef });
 					<template v-else>
 						<template v-for="(groupOptions, groupName) in groupedOptions.groups" :key="groupName">
 							<div
-								class="px-3 py-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider bg-muted/40 border-b border-border/50 sticky top-0"
+								class="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide bg-muted/60 border-b border-border/50 sticky top-0"
 							>
 								{{ groupName }}
 							</div>
@@ -462,13 +463,14 @@ defineExpose({ focus, select, getInputEl, inputRef });
 								:data-autocomplete-index="flatVisibleOptions.indexOf(option)"
 								type="button"
 								:disabled="option.disabled"
-								class="flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-start text-sm transition-colors outline-none cursor-pointer"
+								class="flex w-full min-h-9 items-center gap-2.5 rounded-md border-s-2 px-2 py-2 text-start text-sm transition-colors outline-none cursor-pointer"
 								:class="[
 									flatVisibleOptions.indexOf(option) === highlightedIndex
-										? 'bg-accent text-accent-foreground'
-										: 'hover:bg-accent/50',
+										? 'border-primary bg-surface-hover'
+										: 'border-transparent hover:bg-surface-hover/60',
 									option.disabled && 'opacity-50! cursor-not-allowed!',
-									option.value === modelValue && 'font-medium text-primary',
+									option.value === modelValue &&
+										'font-semibold text-surface-selected-foreground',
 								]"
 								role="option"
 								:aria-selected="option.value === modelValue"
@@ -497,13 +499,14 @@ defineExpose({ focus, select, getInputEl, inputRef });
 							:data-autocomplete-index="flatVisibleOptions.indexOf(option)"
 							type="button"
 							:disabled="option.disabled"
-							class="flex w-full items-center gap-2.5 rounded-sm px-2 py-2 text-start text-sm transition-colors outline-none cursor-pointer"
+							class="flex w-full min-h-9 items-center gap-2.5 rounded-md border-s-2 px-2 py-2 text-start text-sm transition-colors outline-none cursor-pointer"
 							:class="[
 								flatVisibleOptions.indexOf(option) === highlightedIndex
-									? 'bg-accent text-accent-foreground'
-									: 'hover:bg-accent/50',
+									? 'border-primary bg-surface-hover'
+									: 'border-transparent hover:bg-surface-hover/60',
 								option.disabled && 'opacity-50! cursor-not-allowed!',
-								option.value === modelValue && 'font-medium text-primary',
+								option.value === modelValue &&
+									'font-semibold text-surface-selected-foreground',
 							]"
 							role="option"
 							:aria-selected="option.value === modelValue"
@@ -527,14 +530,14 @@ defineExpose({ focus, select, getInputEl, inputRef });
 						v-if="filteredOptions.length > maxVisible"
 						class="px-3 py-2 text-xs text-center text-muted-foreground border-t border-border bg-muted/30 rounded-b-lg"
 					>
-						{{ filteredOptions.length - maxVisible }} more - type to refine
+						{{ __("{0} more - type to refine", [filteredOptions.length - maxVisible]) }}
 					</div>
 
 					<div
 						v-else-if="query && matchCount > 0 && matchCount <= maxVisible"
-						class="px-3 py-1.5 text-[11px] text-center text-muted-foreground border-t border-border/50 bg-muted/20 rounded-b-lg"
+						class="px-3 py-1.5 text-xs text-center text-muted-foreground border-t border-border/50 bg-muted/20 rounded-b-lg"
 					>
-						{{ matchCount }} {{ matchCount === 1 ? "match" : "matches" }}
+						{{ matchCount === 1 ? __("1 match") : __("{0} matches", [matchCount]) }}
 					</div>
 				</PopoverContent>
 			</PopoverPortal>

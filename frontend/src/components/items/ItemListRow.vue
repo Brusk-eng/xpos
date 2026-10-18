@@ -1,140 +1,150 @@
 <template>
 	<div
-		class="flex items-center gap-3 p-2 rounded-lg transition-colors group border"
+		class="group flex min-w-0 items-center gap-1 border-b border-border/70 pe-1.5 transition-colors duration-fast"
 		:class="[
-			isOutOfStock && !allowNegativeStock
-				? 'cursor-not-allowed opacity-60 bg-muted/30 border-border'
-				: highlighted
-					? 'cursor-pointer bg-orange-50 dark:bg-orange-500/10 border-orange-400 dark:border-orange-500 ring-2 ring-orange-400/50 dark:ring-orange-500/40'
-					: 'cursor-pointer hover:bg-muted/50 border-transparent hover:border-border',
+			highlighted ? 'bg-surface-selected' : 'hover:bg-surface-hover/60',
+			isUnavailable && 'text-muted-foreground',
 		]"
-		@click="handleClick"
+		:data-state="isUnavailable ? 'unavailable' : isTemplate ? 'template' : undefined"
 	>
-		<div class="w-14 h-14 shrink-0 rounded-lg bg-muted overflow-hidden relative">
-			<img
-				v-if="item.image && !hideImages"
-				:src="item.image"
-				:alt="item.item_name"
-				class="w-full h-full object-cover"
-				loading="lazy"
-			/>
-			<div v-else class="w-full h-full flex items-center justify-center">
-				<Package class="w-6 h-6 text-muted-foreground/40" />
-			</div>
-
-			<div
-				v-if="isOutOfStock && !allowNegativeStock"
-				class="absolute inset-0 bg-background/70 flex items-center justify-center"
-			>
-				<AlertCircle class="w-5 h-5 text-destructive" />
-			</div>
-		</div>
-
-		<div class="flex-1 min-w-0">
-			<p class="text-sm font-medium text-foreground truncate">
-				{{ item.item_name }}
-			</p>
-			<div class="flex items-center gap-2 text-xs text-muted-foreground">
-				<span v-if="showItemCode" class="font-mono truncate">{{ item.item_code }}</span>
-				<span v-if="showItemCode && item.item_group" class="hidden sm:inline">•</span>
-				<span class="truncate">{{ item.item_group }}</span>
-			</div>
-		</div>
-
-		<TooltipWrapper
-			v-if="showStock && !isNonStockItem && item.actual_qty !== undefined"
-			:content="isOutOfStock ? __('Out of Stock') : formatQty(item.actual_qty)"
-		>
-			<Badge :variant="stockVariant" class="shrink-0 text-[10px]">
-				<template v-if="isOutOfStock">
-					<AlertCircle class="w-3 h-3 me-1" />
-					{{ __("Out of Stock") }}
-				</template>
-				<template v-else>
-					{{ stockLabel }}
-				</template>
-			</Badge>
-		</TooltipWrapper>
-
-		<div class="shrink-0 text-end">
-			<span class="text-sm font-bold text-primary tabular-nums">
-				{{ money(item.rate) }}
-			</span>
-		</div>
-
 		<button
-			class="shrink-0 w-8 h-8 rounded-full bg-secondary text-secondary-foreground flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity hover:bg-secondary/80"
-			@click.stop="$emit('showDetail', item)"
+			type="button"
+			class="flex min-h-12 min-w-0 flex-1 select-none items-center gap-3 rounded-lg py-1.5 ps-2 pe-1 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
+			:class="isUnavailable ? 'cursor-not-allowed' : 'cursor-pointer'"
+			:aria-label="actionLabel"
+			:aria-disabled="isUnavailable || undefined"
+			data-testid="item-add"
+			@click="handleClick"
 		>
-			<Info class="w-4 h-4" />
+			<span class="grid min-w-0 flex-1 items-center gap-3" :class="itemRowGrid(showThumbColumn)">
+				<span
+					v-if="showThumbColumn"
+					class="relative flex size-9 items-center justify-center overflow-hidden rounded-md border border-border bg-surface-sunken"
+					:class="isUnavailable && 'opacity-50 grayscale'"
+					aria-hidden="true"
+				>
+					<img
+						v-if="showImage"
+						:src="item.image as string"
+						alt=""
+						width="36"
+						height="36"
+						loading="lazy"
+						decoding="async"
+						class="absolute inset-0 h-full w-full object-contain p-0.5"
+						@error="imageFailed = true"
+					/>
+					<Package v-else class="size-4 text-muted-foreground/60" />
+				</span>
+
+				<span class="min-w-0">
+					<span class="flex min-w-0 items-center gap-1.5">
+						<span
+							class="truncate text-sm font-semibold text-foreground"
+							:title="item.item_name"
+							dir="auto"
+						>
+							{{ item.item_name }}
+						</span>
+						<span
+							v-if="isTemplate"
+							class="inline-flex shrink-0 items-center gap-1 rounded border border-info/30 bg-info-soft px-1 text-[0.625rem] font-semibold leading-4 text-info-soft-foreground"
+						>
+							<Layers class="size-2.5" aria-hidden="true" />
+							{{ __("Variants") }}
+						</span>
+					</span>
+					<span
+						v-if="showItemCode"
+						class="block truncate font-mono text-[0.6875rem] leading-4 text-muted-foreground"
+						:title="item.item_code"
+					>
+						{{ item.item_code }}
+					</span>
+				</span>
+
+				<span class="hidden truncate text-xs text-muted-foreground xl:block" :title="item.item_group">
+					{{ item.item_group ? __(item.item_group) : "" }}
+				</span>
+
+				<span class="justify-self-end">
+					<span
+						v-if="hasStockFigure"
+						class="inline-flex rounded border px-1.5 py-0.5 text-[0.6875rem] font-semibold leading-none tabular-nums"
+						:class="STOCK_TONE_CLASS[stockTone]"
+					>
+						{{ stockLabel }}
+					</span>
+				</span>
+
+				<span class="text-end">
+					<span
+						v-if="priceMissing"
+						class="text-xs font-semibold text-warning-soft-foreground"
+						data-testid="price-missing"
+					>
+						{{ __("No price") }}
+					</span>
+					<span v-else class="text-sm font-bold text-foreground tabular-nums">{{
+						money(item.rate)
+					}}</span>
+				</span>
+			</span>
+			<span
+				class="inline-flex size-7 shrink-0 items-center justify-center rounded-full"
+				:class="isUnavailable ? 'invisible' : 'bg-primary text-primary-foreground'"
+				aria-hidden="true"
+			>
+				<ChevronRight v-if="isTemplate" class="size-4 rtl:rotate-180" stroke-width="2.5" />
+				<Plus v-else class="size-4" stroke-width="2.5" />
+			</span>
 		</button>
 
-		<div
-			v-if="!isOutOfStock || allowNegativeStock"
-			class="shrink-0 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+		<button
+			type="button"
+			class="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-fast hover:bg-surface-hover hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+			:aria-label="__('Details for {0}', [item.item_name])"
+			data-testid="item-details"
+			@click="$emit('showDetail', item)"
 		>
-			<Plus class="w-4 h-4" />
-		</div>
-		<div
-			v-else
-			class="shrink-0 w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center"
-		>
-			<Ban class="w-4 h-4" />
-		</div>
+			<Info class="size-4" />
+		</button>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import { usePosStore } from "@/stores/posStore";
+import { toRef } from "vue";
 import { useMoney } from "@/composables/useMoney";
-import { formatQty } from "@/utils/numberFormat";
-import { Badge } from "@/components/ui/badge";
-import { TooltipWrapper } from "@/components/ui/tooltip";
-import { Package, Plus, AlertCircle, Ban, Info } from "lucide-vue-next";
+import { itemRowGrid, STOCK_TONE_CLASS, useItemTileState } from "@/composables/useItemTileState";
+import { ChevronRight, Info, Layers, Package, Plus } from "lucide-vue-next";
+import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 
 const props = defineProps({
-	item: { type: Object, required: true },
+	item: { type: Object as () => POSItem, required: true },
 	currencySymbol: { type: String, default: "$" },
 	highlighted: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(["click", "showDetail"]);
 
-const posStore = usePosStore();
 const { money } = useMoney();
-
-const showStock = computed(() => true);
-const showItemCode = computed(() => posStore.displayItemCode);
-const allowNegativeStock = computed(() => posStore.stockSettings?.allow_negative_stock);
-const hideImages = computed(() => posStore.hideImages);
-
-const isNonStockItem = computed(() => Number(props.item.is_stock_item) === 0);
-
-const isOutOfStock = computed(() => {
-	if (isNonStockItem.value) return false;
-	const qty = props.item.actual_qty;
-	return qty !== undefined && qty <= 0;
-});
-
-const stockVariant = computed(() => {
-	const qty = props.item.actual_qty || 0;
-	if (qty <= 0) return "destructive" as const;
-	if (qty <= 5) return "warning" as const;
-	return "success" as const;
-});
-
-const stockLabel = computed(() => {
-	const stock = props.item.actual_qty || 0;
-	if (stock <= 0) return "Out";
-	return stock > 999 ? "999+" : formatQty(stock);
-});
+const {
+	showItemCode,
+	hasStockFigure,
+	isUnavailable,
+	isTemplate,
+	priceMissing,
+	stockTone,
+	stockLabel,
+	imageFailed,
+	showImage,
+	showThumbColumn,
+	actionLabel,
+} = useItemTileState(toRef(props, "item"));
 
 function handleClick() {
-	if (isOutOfStock.value && !allowNegativeStock.value) {
-		return;
-	}
+	if (isUnavailable.value) return;
 	emit("click", props.item);
 }
 </script>

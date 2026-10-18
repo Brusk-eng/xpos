@@ -179,7 +179,6 @@ import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialo
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";
-import { useBranding } from "@/composables/useBranding";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { AlertTriangle, Trash2 } from "lucide-vue-next";
 import { useOfflineStore } from "@/stores/offlineStore";
@@ -371,7 +370,6 @@ provide("isDark", isDark);
 provide("theme", theme);
 provide("toggleDarkMode", toggleDarkMode);
 
-const { initBranding, enableSplash } = useBranding();
 const showSplash = ref(false);
 
 let mediaQuery: MediaQueryList | null = null;
@@ -396,13 +394,10 @@ onMounted(() => {
 
 	applyThemeToDocument(isDark.value);
 
-	const brandingReady = initBranding();
-	showSplash.value = enableSplash.value;
-	brandingReady.finally(() => {
-		window.setTimeout(() => {
-			showSplash.value = false;
-		}, 700);
-	});
+	showSplash.value = true;
+	window.setTimeout(() => {
+		showSplash.value = false;
+	}, 700);
 
 	mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 	mediaQuery.addEventListener("change", handleSystemThemeChange);

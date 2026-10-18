@@ -26,6 +26,8 @@ export default {
 				destructive: {
 					DEFAULT: "hsl(var(--destructive))",
 					foreground: "hsl(var(--destructive-foreground))",
+					soft: "hsl(var(--destructive-soft))",
+					"soft-foreground": "hsl(var(--destructive-soft-foreground))",
 				},
 				muted: {
 					DEFAULT: "hsl(var(--muted))",
@@ -43,6 +45,37 @@ export default {
 					DEFAULT: "hsl(var(--card))",
 					foreground: "hsl(var(--card-foreground))",
 				},
+				"border-strong": "hsl(var(--border-strong))",
+				focus: "hsl(var(--focus))",
+				surface: {
+					raised: "hsl(var(--surface-raised))",
+					sunken: "hsl(var(--surface-sunken))",
+					hover: "hsl(var(--surface-hover))",
+					pressed: "hsl(var(--surface-pressed))",
+					selected: "hsl(var(--surface-selected))",
+					"selected-foreground": "hsl(var(--surface-selected-foreground))",
+					inverse: "hsl(var(--surface-inverse))",
+					"inverse-foreground": "hsl(var(--surface-inverse-foreground))",
+				},
+				success: {
+					DEFAULT: "hsl(var(--success))",
+					foreground: "hsl(var(--success-foreground))",
+					soft: "hsl(var(--success-soft))",
+					"soft-foreground": "hsl(var(--success-soft-foreground))",
+				},
+				warning: {
+					DEFAULT: "hsl(var(--warning))",
+					foreground: "hsl(var(--warning-foreground))",
+					soft: "hsl(var(--warning-soft))",
+					"soft-foreground": "hsl(var(--warning-soft-foreground))",
+				},
+				info: {
+					DEFAULT: "hsl(var(--info))",
+					foreground: "hsl(var(--info-foreground))",
+					soft: "hsl(var(--info-soft))",
+					"soft-foreground": "hsl(var(--info-soft-foreground))",
+				},
+				scrim: "hsl(var(--scrim))",
 			},
 			fontFamily: {
 				sans: [
@@ -64,6 +97,34 @@ export default {
 			},
 			boxShadow: {
 				soft: "0 2px 15px -3px rgba(0,0,0,0.07), 0 10px 20px -2px rgba(0,0,0,0.04)",
+				raised: "var(--shadow-raised)",
+				"raised-hover": "var(--shadow-raised-hover)",
+				pressed: "var(--shadow-pressed)",
+				inset: "var(--shadow-inset)",
+				primary: "var(--shadow-primary)",
+				overlay: "var(--shadow-overlay)",
+			},
+			height: {
+				control: "var(--control-h)",
+				"control-compact": "var(--control-h-compact)",
+				"control-touch": "var(--control-h-touch)",
+			},
+			minHeight: {
+				control: "var(--control-h)",
+				"control-compact": "var(--control-h-compact)",
+				"control-touch": "var(--control-h-touch)",
+			},
+			width: {
+				control: "var(--control-h)",
+				"control-compact": "var(--control-h-compact)",
+				"control-touch": "var(--control-h-touch)",
+			},
+			transitionDuration: {
+				fast: "var(--duration-fast)",
+				base: "var(--duration-base)",
+			},
+			transitionTimingFunction: {
+				standard: "var(--ease-standard)",
 			},
 			keyframes: {
 				"accordion-down": {

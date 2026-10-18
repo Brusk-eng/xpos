@@ -10,3 +10,4 @@ export {
 
 export { default as Popover } from "./Popover.vue";
 export { default as PopoverContentStyled } from "./PopoverContentStyled.vue";
+export { default as PopoverMenuItem } from "./PopoverMenuItem.vue";

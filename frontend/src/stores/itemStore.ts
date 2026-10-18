@@ -33,6 +33,8 @@ interface ItemGroupsResult {
 export const useItemStore = defineStore("items", () => {
 	const items = ref<POSItem[]>([]);
 	const isLoading = ref(false);
+	/** Set when the last catalogue fetch failed and no offline cache stood in for it. */
+	const loadError = ref<string | null>(null);
 	const searchTerm = ref("");
 	const selectedGroup = ref("All Item Groups");
 	const currentPage = ref(0);
@@ -134,9 +136,16 @@ export const useItemStore = defineStore("items", () => {
 		}
 	}
 
+	/** A new search/category arrived mid-fetch: run it once the current fetch lands instead of dropping it. */
+	let refetchQueued = false;
+
 	async function fetchItems(posProfile: string, append = false): Promise<void> {
-		if (isLoading.value) return;
+		if (isLoading.value) {
+			if (!append) refetchQueued = true;
+			return;
+		}
 		isLoading.value = true;
+		loadError.value = null;
 
 		try {
 			if (isElectron()) {
@@ -237,8 +246,13 @@ export const useItemStore = defineStore("items", () => {
 				}
 			}
 			console.error("Error fetching items:", error);
+			loadError.value = error instanceof Error ? error.message : String(error);
 		} finally {
 			isLoading.value = false;
+			if (refetchQueued) {
+				refetchQueued = false;
+				void fetchItems(posProfile);
+			}
 		}
 	}
 
@@ -511,6 +525,7 @@ export const useItemStore = defineStore("items", () => {
 	return {
 		items,
 		isLoading,
+		loadError,
 		searchTerm,
 		selectedGroup,
 		currentPage,

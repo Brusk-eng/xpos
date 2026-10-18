@@ -4,11 +4,7 @@
 			class="flex flex-none items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-8 sm:py-5"
 		>
 			<div class="flex min-w-0 items-center gap-3.5">
-				<img
-					class="h-[clamp(38px,5vh,48px)] w-[clamp(38px,5vh,48px)] shrink-0 rounded-lg"
-					:src="isDark ? logoDark : logoLight"
-					alt="X POS"
-				/>
+				<XposLogo :size="44" class="shrink-0" />
 				<div class="flex min-w-0 flex-col leading-tight">
 					<span class="text-[clamp(18px,2.6vh,22px)] font-extrabold tracking-tight">{{
 						appName
@@ -186,9 +182,7 @@ import { formatFor } from "@/composables/useCurrency";
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from "vue";
 import __ from "@/lib/translate";
 import { ScanBarcode } from "lucide-vue-next";
-import { useBranding } from "@/composables/useBranding";
-
-const { logoLight, logoDark } = useBranding();
+import { XposLogo } from "@/components/ui/brand";
 
 const props = defineProps({
 	appName: { type: String, default: "X POS" },
