@@ -50,14 +50,26 @@ import MenuBar from "@/components/MenuBar.vue";
 import { isElectron } from "@/services/electronBridge";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
-import { LayoutGrid, FileText, BarChart3, AlignJustify } from "lucide-vue-next";
+import { LayoutGrid, FileText, BarChart3, AlignJustify, ScrollText } from "lucide-vue-next";
+import { usePosStore } from "@/stores/posStore";
 import __ from "@/lib/translate";
 
 const route = useRoute();
+const posStore = usePosStore();
 
 const links = computed(() => [
 	{ to: "/pos", label: __("POS"), icon: LayoutGrid, active: route.path === "/pos" },
 	{ to: "/orders", label: __("Orders"), icon: FileText, active: route.path === "/orders" },
+	...(posStore.allowSalesOrder
+		? [
+				{
+					to: "/sales-orders",
+					label: __("Sales Orders"),
+					icon: ScrollText,
+					active: route.path === "/sales-orders",
+				},
+			]
+		: []),
 	{ to: "/reports", label: __("Reports"), icon: BarChart3, active: route.path.startsWith("/reports") },
 ]);
 

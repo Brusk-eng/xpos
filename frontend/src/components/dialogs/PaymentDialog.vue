@@ -173,6 +173,10 @@
 								<dt>{{ __("Loyalty") }}</dt>
 								<dd class="tabular-nums">-{{ money(cartStore.loyaltyAmount) }}</dd>
 							</div>
+							<div v-if="cartStore.depositApplied > 0" class="flex justify-between">
+								<dt>{{ __("Deposit on {0}", [cartStore.sourceOrder?.name || ""]) }}</dt>
+								<dd class="tabular-nums">-{{ money(cartStore.depositApplied) }}</dd>
+							</div>
 							<div
 								v-if="Math.abs(cartStore.roundingAdjustment) >= 0.005"
 								class="flex justify-between"

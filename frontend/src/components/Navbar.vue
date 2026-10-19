@@ -213,6 +213,7 @@ import {
 	LayoutDashboard,
 	ShoppingCart,
 	ChevronDown,
+	ScrollText,
 } from "lucide-vue-next";
 import ConnectionStatus from "@/components/ConnectionStatus.vue";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
@@ -249,6 +250,16 @@ const themeTooltip = computed(() => {
 const navLinks = computed(() => [
 	{ to: "/pos", label: __("POS"), icon: ShoppingCart, active: route.name === "pos" },
 	{ to: "/orders", label: __("Orders"), icon: FileText, active: route.name === "orders" },
+	...(posStore.allowSalesOrder
+		? [
+				{
+					to: "/sales-orders",
+					label: __("Sales Orders"),
+					icon: ScrollText,
+					active: route.name === "sales-orders",
+				},
+			]
+		: []),
 	{ to: "/reports", label: __("Reports"), icon: BarChart3, active: route.path.startsWith("/reports") },
 ]);
 

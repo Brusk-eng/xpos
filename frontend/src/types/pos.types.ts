@@ -232,6 +232,39 @@ export interface CartItem extends POSItem {
 	gift_card_issue?: boolean;
 	/** On a return: the card sold on the original line. */
 	gift_card?: string;
+	/** Loaded from a Sales Order: the line it bills. */
+	sales_order?: string;
+	so_detail?: string;
+	/** Loaded from a Quotation: the line it takes up. */
+	quotation?: string;
+	quotation_item?: string;
+}
+
+/** A Sales Order or Quotation line as the server hands it to the cart. */
+export interface OrderCartLine {
+	item_code: string;
+	item_name: string;
+	qty: number;
+	uom: string;
+	stock_uom: string;
+	conversion_factor: number;
+	price_list_rate: number;
+	rate: number;
+	discount_percentage: number;
+	sales_order?: string;
+	so_detail?: string;
+	quotation?: string;
+	quotation_item?: string;
+}
+
+export interface OrderForCart {
+	name: string;
+	customer: string;
+	customer_name: string;
+	currency: string;
+	/** Deposit already paid against a Sales Order; deducted from what is due. */
+	advance?: number;
+	items: OrderCartLine[];
 }
 
 export interface ItemGroup {
@@ -412,6 +445,10 @@ export interface InvoiceItem {
 	pricing_rules?: string;
 	gift_card_issue?: number;
 	gift_card?: string;
+	sales_order?: string;
+	so_detail?: string;
+	quotation?: string;
+	quotation_item?: string;
 }
 
 export interface InvoicePayment {

@@ -4,7 +4,6 @@
 
 import frappe
 from frappe import _
-from frappe.model.mapper import get_mapped_doc
 from frappe.utils import add_days, flt
 
 from xpos.api.profile_rules import validate_delivery_charge
@@ -39,8 +38,13 @@ def before_submit(doc, method):
 	apply_gift_cards_on_submit(doc)
 	fiscalize_invoice(doc)
 	add_loyalty_point(doc)
-	create_sales_order(doc)
 	update_coupon_usage(doc, "used")
+
+
+def settle_order_deposits(doc, method=None):
+	"""Deduct Sales Order deposits from an xPOS sale: ERPNext skips advances on POS invoices."""
+	if doc.is_pos and not doc.is_return and doc.get("pos_opening_shift") and doc.get("advances"):
+		doc.update_against_document_in_jv()
 
 
 def before_cancel(doc, method):
@@ -110,81 +114,6 @@ def add_loyalty_point(invoice_doc):
 					}
 				)
 				doc.insert(ignore_permissions=True)
-
-
-def create_sales_order(doc):
-	if (
-		getattr(doc, "pos_opening_shift", None)
-		and doc.pos_profile
-		and doc.is_pos
-		and doc.doctype == "Sales Invoice"
-		and not doc.is_return
-		and getattr(doc, "pos_delivery_date", None)
-		and not doc.update_stock
-		and frappe.get_value("POS Profile", doc.pos_profile, "allow_sales_order")
-	):
-		sales_order_doc = make_sales_order(doc.name)
-		if sales_order_doc:
-			sales_order_doc.pos_additional_notes = getattr(doc, "pos_notes", None)
-			sales_order_doc.flags.ignore_permissions = True
-			sales_order_doc.flags.ignore_account_permission = True
-			sales_order_doc.save()
-			sales_order_doc.submit()
-			url = frappe.utils.get_url_to_form(sales_order_doc.doctype, sales_order_doc.name)
-			frappe.msgprint(
-				_("Sales Order Created at <a href='{0}'>{1}</a>").format(url, sales_order_doc.name),
-				title=_("Sales Order Created"),
-				indicator="green",
-				alert=True,
-			)
-			for inv_item, so_item in zip(doc.items, sales_order_doc.items, strict=True):
-				inv_item.sales_order = sales_order_doc.name
-				inv_item.so_detail = so_item.name
-
-
-def make_sales_order(source_name, target_doc=None, ignore_permissions=True):
-	def set_missing_values(source, target):
-		target.ignore_pricing_rule = 1
-		target.flags.ignore_permissions = ignore_permissions
-		target.run_method("set_missing_values")
-		target.run_method("calculate_taxes_and_totals")
-
-	def update_item(obj, target, source_parent):
-		target.stock_qty = flt(obj.qty) * flt(obj.conversion_factor)
-		target.delivery_date = getattr(obj, "delivery_date", None) or getattr(
-			source_parent, "pos_delivery_date", None
-		)
-
-	doclist = get_mapped_doc(
-		"Sales Invoice",
-		source_name,
-		{
-			"Sales Invoice": {
-				"doctype": "Sales Order",
-			},
-			"Sales Invoice Item": {
-				"doctype": "Sales Order Item",
-				"field_map": {
-					"cost_center": "cost_center",
-					"Warehouse": "warehouse",
-					"delivery_date": "delivery_date",
-					"additional_notes": "pos_additional_notes",
-				},
-				"postprocess": update_item,
-			},
-			"Sales Taxes and Charges": {
-				"doctype": "Sales Taxes and Charges",
-				"add_if_empty": True,
-			},
-			"Sales Team": {"doctype": "Sales Team", "add_if_empty": True},
-			"Payment Schedule": {"doctype": "Payment Schedule", "add_if_empty": True},
-		},
-		target_doc,
-		set_missing_values,
-		ignore_permissions=ignore_permissions,
-	)
-
-	return doclist
 
 
 def set_patient(doc):

@@ -7,6 +7,7 @@ const ReportViewerView = () => import("@/views/ReportViewerView.vue");
 const SettingsView = () => import("@/views/SettingsView.vue");
 const PurchaseOrderView = () => import("@/views/PurchaseOrderView.vue");
 const PurchaseOrderListView = () => import("@/views/PurchaseOrderListView.vue");
+const SalesOrdersView = () => import("@/views/SalesOrdersView.vue");
 const PurchaseInvoiceView = () => import("@/views/PurchaseInvoiceView.vue");
 const PurchaseInvoiceListView = () => import("@/views/PurchaseInvoiceListView.vue");
 const StockReceivingView = () => import("@/views/StockReceivingView.vue");
@@ -53,6 +54,12 @@ const routes: RouteRecordRaw[] = [
 		name: "orders",
 		component: OrdersView,
 		meta: { title: "Orders", requiresAuth: true },
+	},
+	{
+		path: "/sales-orders",
+		name: "sales-orders",
+		component: SalesOrdersView,
+		meta: { title: "Sales Orders", requiresAuth: true },
 	},
 	{
 		path: "/cashier",

@@ -106,6 +106,7 @@ import {
 	BarChart3,
 	Banknote,
 	ScanBarcode,
+	ScrollText,
 } from "lucide-vue-next";
 
 import { isElectron } from "@/services/electronBridge";
@@ -226,6 +227,12 @@ onUnmounted(() => {
 const mainNavItems = computed(() => [
 	{ route: "/pos", label: __("POS"), icon: LayoutGrid, show: true },
 	{ route: "/orders", label: __("Orders"), icon: FileText, show: true },
+	{
+		route: "/sales-orders",
+		label: __("Sales Orders"),
+		icon: ScrollText,
+		show: posStore.allowSalesOrder,
+	},
 	{
 		route: "/cashier",
 		label: __("Cashier"),

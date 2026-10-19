@@ -4,6 +4,7 @@ import { ref, computed, watch } from "vue";
 import { call } from "@/services/api";
 import { usePosStore } from "./posStore";
 import { useSettingsStore } from "./settingsStore";
+import { roundFor } from "@/composables/useCurrency";
 import { getCachedItemByCode, getCachedStockForItem } from "@/services/dbBridge";
 import type {
 	CartItem,
@@ -22,6 +23,7 @@ import type {
 	IssuedGiftCard,
 	RepriceResponse,
 	BatchInfo,
+	OrderForCart,
 } from "@/types/pos.types";
 import __ from "@/lib/translate";
 import {
@@ -96,6 +98,11 @@ export const useCartStore = defineStore("cart", () => {
 	const issuedGiftCards = ref<IssuedGiftCard[]>([]);
 	const orderNotes = ref("");
 	const deliveryDate = ref("");
+	/** The Sales Order this cart bills, with the deposit already paid against it. */
+	const sourceOrder = ref<{ name: string; deposit: number } | null>(null);
+	/** The Quotation the cart was loaded from; saving it as an order marks the quotation Ordered. */
+	const sourceQuotation = ref("");
+	const orderDeposit = computed(() => (isReturnMode.value ? 0 : sourceOrder.value?.deposit || 0));
 	const postingDate = ref(nowDate());
 	const writeOffAmount = ref(0);
 	const salesPerson = ref("");
@@ -141,6 +148,18 @@ export const useCartStore = defineStore("cart", () => {
 
 	const offerEvaluation = computed<OfferEvaluationResult>(() => {
 		return evaluateOffers(appliedOffers.value, items.value);
+	});
+
+	const firedOffers = computed(() => {
+		const ev = offerEvaluation.value;
+		const fired = new Set(
+			[...ev.itemDiscounts, ...ev.freeItems, ...ev.grandTotalDiscounts, ...ev.loyaltyAwards].map(
+				(row) => row.offer_name,
+			),
+		);
+		return appliedOffers.value.filter(
+			(o) => fired.has(o.name) || (o as Record<string, unknown>).promo_source === "Promotional Scheme",
+		);
 	});
 
 	const offerItemDiscountTotal = computed(() => {
@@ -293,7 +312,7 @@ export const useCartStore = defineStore("cart", () => {
 		return calculatedTaxes.value.reduce((sum, t) => sum + t.amount, 0);
 	});
 
-	const unroundedTotal = computed(() => {
+	const totalBeforeDeposit = computed(() => {
 		let total = subtotal.value + taxAmount.value;
 
 		// Apply offer item-level discounts
@@ -324,6 +343,12 @@ export const useCartStore = defineStore("cart", () => {
 		return isReturnMode.value ? total : Math.max(0, total);
 	});
 
+	const depositApplied = computed(() =>
+		orderDeposit.value > 0 ? Math.min(orderDeposit.value, Math.max(0, totalBeforeDeposit.value)) : 0,
+	);
+
+	const unroundedTotal = computed(() => totalBeforeDeposit.value - depositApplied.value);
+
 	const grandTotal = computed(() => {
 		const posStore = usePosStore();
 		let total = unroundedTotal.value;
@@ -331,7 +356,7 @@ export const useCartStore = defineStore("cart", () => {
 		if (!posStore.disableRoundedTotal && total !== 0 && !isGiftCardSale.value && !giftCardTender.value) {
 			total = Math.round(total);
 		}
-		return total;
+		return roundFor(posStore.invoiceCurrency || posStore.currency, total);
 	});
 
 	/** What rounding added to (or took off) the total, for display only. */
@@ -946,7 +971,10 @@ export const useCartStore = defineStore("cart", () => {
 		}
 
 		return items.value
-			.filter((item) => !item.pos_is_free_item && !item.pos_is_offer && item.qty !== 0)
+			.filter(
+				(item) =>
+					!item.pos_is_free_item && !item.pos_is_offer && !isOrderLine(item) && item.qty !== 0,
+			)
 			.map((item) => ({
 				row_id: item.uid as string,
 				item_code: item.item_code,
@@ -1126,8 +1154,13 @@ export const useCartStore = defineStore("cart", () => {
 		return item.pos_price_key ?? `|${item.uom || item.stock_uom}`;
 	}
 
+	function isOrderLine(item: CartItem): boolean {
+		return !!(item.so_detail || item.quotation_item);
+	}
+
 	function isPriceListLine(item: CartItem): boolean {
 		return (
+			!isOrderLine(item) &&
 			!item.pos_is_free_item &&
 			!item.pos_is_offer &&
 			!item.pos_rate_overridden &&
@@ -1541,6 +1574,8 @@ export const useCartStore = defineStore("cart", () => {
 		writeOffAmount.value = 0;
 		orderNotes.value = "";
 		deliveryDate.value = "";
+		sourceOrder.value = null;
+		sourceQuotation.value = "";
 		postingDate.value = nowDate();
 		salesPerson.value = "";
 		payments.value = [];
@@ -1766,6 +1801,43 @@ export const useCartStore = defineStore("cart", () => {
 		}
 	}
 
+	function loadOrderLines(source: OrderForCart): void {
+		clearCart();
+		customer.value = { name: source.customer, customer_name: source.customer_name };
+		for (const line of source.items) {
+			items.value.push({
+				uid: nextRowId(),
+				item_code: line.item_code,
+				item_name: line.item_name,
+				rate: normalizeItemRate(line.price_list_rate || line.rate || 0),
+				qty: line.qty,
+				uom: line.uom || line.stock_uom,
+				stock_uom: line.stock_uom || line.uom,
+				image: "",
+				discount_percentage: line.discount_percentage || 0,
+				discount_amount: 0,
+				actual_qty: 0,
+				has_serial_no: false,
+				has_batch_no: false,
+				conversion_factor: line.conversion_factor || 1,
+				sales_order: line.sales_order,
+				so_detail: line.so_detail,
+				quotation: line.quotation,
+				quotation_item: line.quotation_item,
+			} as CartItem);
+		}
+	}
+
+	function loadSalesOrder(order: OrderForCart): void {
+		loadOrderLines(order);
+		sourceOrder.value = { name: order.name, deposit: order.advance || 0 };
+	}
+
+	function loadQuotation(quotation: OrderForCart): void {
+		loadOrderLines(quotation);
+		sourceQuotation.value = quotation.name;
+	}
+
 	let invoiceLocalId = "";
 	function getInvoiceData(posProfile: string, posOpeningShift: string): InvoiceData {
 		const data: InvoiceData = {
@@ -1797,6 +1869,10 @@ export const useCartStore = defineStore("cart", () => {
 					gift_card_issue:
 						item.gift_card_issue || item.item_code === posStore.giftCards?.item ? 1 : undefined,
 					gift_card: item.gift_card,
+					sales_order: item.sales_order,
+					so_detail: item.so_detail,
+					quotation: item.quotation,
+					quotation_item: item.quotation_item,
 				}),
 			),
 			pos_opening_shift: posOpeningShift,
@@ -1892,9 +1968,9 @@ export const useCartStore = defineStore("cart", () => {
 			];
 		}
 
-		if (appliedOffers.value.length > 0) {
-			data.offers = JSON.stringify(appliedOffers.value.map((o) => o.name));
-			data.offers_detail = appliedOffers.value.map((o) => ({
+		if (firedOffers.value.length > 0) {
+			data.offers = JSON.stringify(firedOffers.value.map((o) => o.name));
+			data.offers_detail = firedOffers.value.map((o) => ({
 				offer_name: o.name,
 				offer:
 					(o as Record<string, unknown>).offer || (o as Record<string, unknown>).offer_type || "",
@@ -2006,6 +2082,12 @@ export const useCartStore = defineStore("cart", () => {
 		returnItemCodes,
 		orderNotes,
 		deliveryDate,
+		sourceOrder,
+		sourceQuotation,
+		orderDeposit,
+		depositApplied,
+		loadSalesOrder,
+		loadQuotation,
 		postingDate,
 		writeOffAmount,
 		salesPerson,

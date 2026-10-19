@@ -77,6 +77,18 @@
 			</ul>
 		</div>
 
+		<p
+			v-if="cartStore.sourceOrder || cartStore.sourceQuotation"
+			class="flex items-center gap-1.5 rounded-lg bg-info-soft px-2 py-1 text-xs font-semibold text-info-soft-foreground"
+			data-testid="cart-source-doc"
+		>
+			<ScrollText class="size-3.5" aria-hidden="true" />
+			{{
+				cartStore.sourceOrder
+					? __("Billing Sales Order {0}", [cartStore.sourceOrder.name])
+					: __("From Quotation {0}", [cartStore.sourceQuotation])
+			}}
+		</p>
 		<dl class="space-y-1 px-1 text-sm" data-testid="cart-totals">
 			<div class="flex items-center justify-between">
 				<dt class="text-foreground">
@@ -187,6 +199,18 @@
 				</dt>
 				<dd class="font-medium text-foreground tabular-nums">
 					+{{ money(cartStore.selectedDeliveryCharge.rate) }}
+				</dd>
+			</div>
+			<div
+				v-if="cartStore.depositApplied > 0"
+				class="flex items-center justify-between"
+				data-testid="cart-deposit"
+			>
+				<dt class="text-muted-foreground">
+					{{ __("Deposit on {0}", [cartStore.sourceOrder?.name || ""]) }}
+				</dt>
+				<dd class="font-medium text-success-soft-foreground tabular-nums">
+					-{{ money(cartStore.depositApplied) }}
 				</dd>
 			</div>
 			<div v-if="hasRounding" class="flex items-center justify-between" data-testid="cart-rounding">
@@ -361,6 +385,24 @@
 									: __("Delivery charge")
 							}}
 						</PopoverMenuItem>
+						<template v-if="canSaveAsOrder">
+							<PopoverMenuItem
+								data-testid="save-as-order"
+								:disabled="!orderable"
+								@click="runMore(() => (orderMode = 'order'))"
+							>
+								<template #icon><ClipboardList /></template>
+								{{ __("Save as sales order") }}
+							</PopoverMenuItem>
+							<PopoverMenuItem
+								data-testid="save-as-quotation"
+								:disabled="!orderable"
+								@click="runMore(() => (orderMode = 'quotation'))"
+							>
+								<template #icon><FileText /></template>
+								{{ __("Save as quotation") }}
+							</PopoverMenuItem>
+						</template>
 						<PopoverMenuItem :disabled="!hasAnyDiscount" @click="runMore(clearAllDiscounts)">
 							<template #icon><X /></template>
 							{{ __("Clear all discounts") }}
@@ -460,6 +502,8 @@
 				>F4</kbd
 			>
 		</Button>
+
+		<SalesOrderDialog :mode="orderMode" @close="orderMode = null" @saved="orderMode = null" />
 	</div>
 </template>
 
@@ -493,6 +537,8 @@ import {
 	Loader2,
 	Percent,
 	FileText,
+	ClipboardList,
+	ScrollText,
 	Truck,
 	WifiOff,
 	X,
@@ -502,6 +548,7 @@ import {
 import type { DeliveryCharge } from "@/types/pos.types";
 import { useMoney } from "@/composables/useMoney";
 import { formatTaxAmount } from "@/utils/numberFormat";
+import SalesOrderDialog from "@/components/dialogs/SalesOrderDialog.vue";
 
 const posStore = usePosStore();
 const { money, moneyPrecision, percent } = useMoney();
@@ -512,6 +559,16 @@ const offlineStore = useOfflineStore();
 const { printInvoice, printInvoiceLocal } = usePrintInvoice();
 
 const showDiscount = ref(false);
+const orderMode = ref<"order" | "quotation" | null>(null);
+const canSaveAsOrder = computed(() => posStore.allowSalesOrder && !cartStore.isReturnMode);
+const orderable = computed(
+	() =>
+		offlineStore.isOnline &&
+		!cartStore.isEmpty &&
+		!!cartStore.customer?.name &&
+		!cartStore.sourceOrder &&
+		!cartStore.isGiftCardSale,
+);
 const showCoupon = ref(false);
 const moreOpen = ref(false);
 const moreView = ref<"menu" | "gift" | "delivery">("menu");
@@ -912,6 +969,10 @@ function extractErrorMessage(error: unknown): string {
 
 async function holdOrder() {
 	if (cartStore.isEmpty) return;
+	if (cartStore.sourceOrder) {
+		showError(__("A sale billing a Sales Order cannot be held. Take payment or clear the cart."));
+		return;
+	}
 
 	const profileName = posStore.profileName;
 	const shiftName = posStore.posOpeningShift?.name || "";

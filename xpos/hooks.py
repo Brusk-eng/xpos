@@ -170,6 +170,7 @@ doc_events = {
 		"validate": "xpos.x_pos.api.invoice.validate",
 		"before_print": "xpos.api.print_formats.enforce_reprint_right",
 		"before_submit": "xpos.x_pos.api.invoice.before_submit",
+		"on_submit": "xpos.x_pos.api.invoice.settle_order_deposits",
 		"before_cancel": "xpos.x_pos.api.invoice.before_cancel",
 		"on_cancel": "xpos.x_pos.api.invoice.on_cancel",
 	},
