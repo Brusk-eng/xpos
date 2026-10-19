@@ -64,7 +64,7 @@ class TestFBRIntegration(unittest.TestCase):
 			return fiscal_ledger.Known("pending")
 		return fiscal_ledger.Known("none", attempt="ATTEMPT-1")
 
-	def _make_invoice(self, **overrides):
+	def make_invoice(self, **overrides):
 		item = DummyDoc(
 			item_code="ITEM-001",
 			item_name="Test Item",
@@ -97,7 +97,7 @@ class TestFBRIntegration(unittest.TestCase):
 		defaults.update(overrides)
 		return DummyDoc(**defaults)
 
-	def _mock_profile(self, enabled=True):
+	def mock_profile(self, enabled=True):
 		profile = MagicMock()
 		profile.enable_fbr_integration = 1 if enabled else 0
 		profile.fbr_environment = "Sandbox"
@@ -108,7 +108,7 @@ class TestFBRIntegration(unittest.TestCase):
 		profile.get_password.return_value = "secret-token"
 		return profile
 
-	def _db_get_value_side_effect(self, doctype, name, fieldname=None, *args, **kwargs):
+	def db_get_value_side_effect(self, doctype, name, fieldname=None, *args, **kwargs):
 		if doctype == "Item":
 			return {"customs_tariff_number": "11001010", "fbr_third_schedule": 0}
 		if doctype == "Mode of Payment":
@@ -118,9 +118,9 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_fiscalize_invoice_stores_fbr_response(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 
 		response = MagicMock()
 		response.status_code = 200
@@ -146,8 +146,8 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_fiscalize_invoice_skips_when_disabled(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=False)
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=False)
 
 		fbr.fiscalize_invoice(invoice)
 
@@ -157,8 +157,8 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_fiscalize_invoice_requires_pct_code(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
 
 		def missing_pct_side_effect(doctype, name, fieldname=None, *args, **kwargs):
 			if doctype == "Item":
@@ -177,9 +177,9 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_prepare_fiscalization_cloud_success(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 
 		response = MagicMock()
 		response.status_code = 200
@@ -197,9 +197,9 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_prepare_fiscalization_local_required_when_offline(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 		mock_post.side_effect = connection_refused()
 
 		outcome = fbr.prepare_fiscalization(invoice)
@@ -213,9 +213,9 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_fiscalize_invoice_raises_connection_error_when_offline(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 		mock_post.side_effect = connection_refused()
 
 		# The submit-time hook has no client to drive the local fallback → hard-fail.
@@ -225,9 +225,9 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_no_answer_after_sending_is_uncertain_not_local(self, mock_frappe, mock_post):
-		invoice = self._make_invoice()
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+		invoice = self.make_invoice()
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 		for error in (
 			fbr.requests.ReadTimeout("no answer"),
 			fbr.requests.ConnectionError("connection reset"),
@@ -247,25 +247,25 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_prepare_fiscalization_uses_local_id_as_usin(self, mock_frappe, mock_post):
-		invoice = self._make_invoice(xpos_local_id="inv_local_123")
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+		invoice = self.make_invoice(xpos_local_id="inv_local_123")
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 		mock_post.side_effect = connection_refused()
 
 		outcome = fbr.prepare_fiscalization(invoice)
 
 		self.assertEqual(outcome.payload["USIN"], "inv_local_123")
 
-	def _setup_enabled(self, mock_frappe):
-		mock_frappe.get_doc.return_value = self._mock_profile(enabled=True)
-		mock_frappe.db.get_value.side_effect = self._db_get_value_side_effect
+	def setup_enabled(self, mock_frappe):
+		mock_frappe.get_doc.return_value = self.mock_profile(enabled=True)
+		mock_frappe.db.get_value.side_effect = self.db_get_value_side_effect
 
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_a_number_fbr_already_issued_is_reused_without_sending(self, mock_frappe, mock_post):
-		self._setup_enabled(mock_frappe)
-		invoice = self._make_invoice(xpos_local_id="inv_1")
-		payload = fbr._build_payload(invoice, fbr._get_fbr_settings("POS-TEST"))
+		self.setup_enabled(mock_frappe)
+		invoice = self.make_invoice(xpos_local_id="inv_1")
+		payload = fbr.build_payload(invoice, fbr.get_fbr_settings("POS-TEST"))
 		self.known = fiscal_ledger.Known(
 			"recorded", "FBR-OLD-1", "2026-04-06 10:00:00", fiscal_ledger.content_hash(payload), "ATTEMPT-0"
 		)
@@ -275,7 +275,7 @@ class TestFBRIntegration(unittest.TestCase):
 
 		# A different sale under the same id is refused, still without sending.
 		with self.assertRaises(fbr.FBRIntegrationError):
-			fbr.prepare_fiscalization(self._make_invoice(xpos_local_id="inv_1", base_rounded_total=999))
+			fbr.prepare_fiscalization(self.make_invoice(xpos_local_id="inv_1", base_rounded_total=999))
 		mock_post.assert_not_called()
 
 	def test_content_hash_ignores_only_the_time_sent(self):
@@ -292,31 +292,31 @@ class TestFBRIntegration(unittest.TestCase):
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_gateway_errors_and_answers_without_a_number_are_uncertain(self, mock_frappe, mock_post):
-		self._setup_enabled(mock_frappe)
+		self.setup_enabled(mock_frappe)
 		for status, body in ((502, {}), (504, {"Response": "timeout"}), (200, {}), (200, {"Code": "100"})):
 			mock_post.return_value = MagicMock(status_code=status, json=MagicMock(return_value=body), text="")
-			self.assertEqual(fbr.prepare_fiscalization(self._make_invoice()).status, "uncertain")
+			self.assertEqual(fbr.prepare_fiscalization(self.make_invoice()).status, "uncertain")
 			self.assertEqual(self.finish.call_args.args[:2], ("ATTEMPT-1", "Uncertain"))
 
 	@patch("xpos.x_pos.integrations.fbr.requests.post")
 	@patch("xpos.x_pos.integrations.fbr.frappe")
 	def test_attempt_outcomes_are_recorded(self, mock_frappe, mock_post):
-		self._setup_enabled(mock_frappe)
+		self.setup_enabled(mock_frappe)
 		mock_post.return_value = MagicMock(
 			status_code=200, json=MagicMock(return_value={"Code": "100", "InvoiceNumber": "FBR-1"})
 		)
-		fbr.prepare_fiscalization(self._make_invoice())
+		fbr.prepare_fiscalization(self.make_invoice())
 		self.assertEqual(self.finish.call_args.args[:3], ("ATTEMPT-1", "Accepted", "FBR-1"))
 
 		mock_post.return_value = MagicMock(
 			status_code=200, json=MagicMock(return_value={"Code": "401", "Response": "bad"})
 		)
 		with self.assertRaises(fbr.FBRIntegrationError):
-			fbr.prepare_fiscalization(self._make_invoice())
+			fbr.prepare_fiscalization(self.make_invoice())
 		self.assertEqual(self.finish.call_args.args[:2], ("ATTEMPT-1", "Rejected"))
 
 		mock_post.side_effect = connection_refused()
-		self.assertEqual(fbr.prepare_fiscalization(self._make_invoice()).status, "local_required")
+		self.assertEqual(fbr.prepare_fiscalization(self.make_invoice()).status, "local_required")
 		self.assertEqual(self.finish.call_args.args[:2], ("ATTEMPT-1", "Not Sent"))
 
 

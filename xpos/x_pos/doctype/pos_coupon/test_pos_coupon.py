@@ -14,7 +14,6 @@ from erpnext.tests.utils import ERPNextTestSuite
 from frappe.utils import add_days, nowdate
 
 from xpos.api import offers as active_api
-from xpos.x_pos.api import offers as legacy_api
 from xpos.x_pos.doctype.pos_coupon.pos_coupon import check_coupon_code, validate_coupon_code
 
 COMPANY = "_Test Company"
@@ -80,20 +79,18 @@ def used(coupon):
 
 
 class TestCouponPreview(ERPNextTestSuite):
-	"""Both whitelisted endpoints must apply the one shared set of rules."""
+	"""The coupon preview endpoint must apply the same rules as the sale."""
 
 	def assert_rejected(self, coupon, customer=CUSTOMER, company=COMPANY):
-		for endpoint in (active_api.get_pos_coupon, legacy_api.get_pos_coupon):
-			result = endpoint(coupon.coupon_code, customer, company)
-			self.assertIsNone(result["coupon"], endpoint.__module__)
-			self.assertNotEqual(result["msg"], "Apply")
+		result = active_api.get_pos_coupon(coupon.coupon_code, customer, company)
+		self.assertIsNone(result["coupon"])
+		self.assertNotEqual(result["msg"], "Apply")
 		self.assertRaises(frappe.ValidationError, validate_coupon_code, coupon.coupon_code, customer, company)
 
 	def assert_accepted(self, coupon, customer=CUSTOMER, company=COMPANY):
-		for endpoint in (active_api.get_pos_coupon, legacy_api.get_pos_coupon):
-			result = endpoint(coupon.coupon_code, customer, company)
-			self.assertEqual(result["msg"], "Apply", endpoint.__module__)
-			self.assertEqual(result["coupon"].name, coupon.name)
+		result = active_api.get_pos_coupon(coupon.coupon_code, customer, company)
+		self.assertEqual(result["msg"], "Apply")
+		self.assertEqual(result["coupon"].name, coupon.name)
 
 	def test_active_endpoint_returns_the_linked_offer(self):
 		coupon = make_coupon("_Test Shape")
@@ -104,8 +101,7 @@ class TestCouponPreview(ERPNextTestSuite):
 		self.assertEqual(result["offer"]["discount_percentage"], 10)
 
 	def test_unknown_code_is_rejected(self):
-		for endpoint in (active_api.get_pos_coupon, legacy_api.get_pos_coupon):
-			self.assertIsNone(endpoint("_NO_SUCH_CODE", CUSTOMER, COMPANY)["coupon"])
+		self.assertIsNone(active_api.get_pos_coupon("_NO_SUCH_CODE", CUSTOMER, COMPANY)["coupon"])
 
 	def test_one_use_rejects_the_same_customer_after_a_submitted_sale(self):
 		coupon = make_coupon("_Test One Use", one_use=1)

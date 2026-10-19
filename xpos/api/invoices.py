@@ -23,7 +23,7 @@ from xpos.api.profile_rules import (
 	verified_offer_free_line,
 	verified_pricing_rule_free_line,
 )
-from xpos.api.profiles import resolve_pos_profile
+from xpos.api.profiles import resolve_pos_profile, user_may_use_profile
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
 from xpos.x_pos.doctype.pos_coupon.pos_coupon import validate_invoice_coupons
@@ -56,7 +56,7 @@ def enforce_stock_availability(invoice_doc):
 	validate_stock_on_invoice(invoice_doc)
 
 
-def _get_item_rate_precision():
+def get_item_rate_precision():
 	"""Return item rate precision from System Settings float_precision, default 3."""
 	val = frappe.db.get_default("float_precision")
 	try:
@@ -66,7 +66,7 @@ def _get_item_rate_precision():
 		return 3
 
 
-def _resolve_invoice_posting_date(pos, requested_posting_date=None, current_posting_date=None):
+def resolve_invoice_posting_date(pos, requested_posting_date=None, current_posting_date=None):
 	"""Respect the POS Profile posting-date setting while validating client input."""
 	if not cint(pos.get("allow_change_posting_date")):
 		return nowdate()
@@ -81,7 +81,7 @@ def _resolve_invoice_posting_date(pos, requested_posting_date=None, current_post
 		frappe.throw(_("Posting Date must be a valid date"))
 
 
-def _detect_invoice_doctype(invoice_name: str):
+def detect_invoice_doctype(invoice_name: str):
 	"""Detect whether an invoice name belongs to Sales Invoice or POS Invoice."""
 	if frappe.db.exists("Sales Invoice", invoice_name):
 		return "Sales Invoice"
@@ -90,16 +90,34 @@ def _detect_invoice_doctype(invoice_name: str):
 	frappe.throw(_("Invoice {0} not found").format(invoice_name))
 
 
-def _mark_xpos_delivery_charges_managed(invoice_doc):
+INVOICE_DOCTYPES = ("Sales Invoice", "POS Invoice")
+
+
+def ensure_invoice_doctype(doctype: str) -> None:
+	if doctype not in INVOICE_DOCTYPES:
+		frappe.throw(_("{0} is not an invoice type.").format(doctype), frappe.PermissionError)
+
+
+def get_pos_invoice(doctype: str, name: str, ptype: str = "read"):
+	"""Load an invoice the caller may act on: a user of its POS Profile, or one Frappe grants `ptype`."""
+	ensure_invoice_doctype(doctype)
+	doc = frappe.get_doc(doctype, name)
+	profile = doc.get("pos_profile")
+	if not (profile and user_may_use_profile(profile)) and not doc.has_permission(ptype):
+		frappe.throw(_("You are not permitted to access invoice {0}.").format(name), frappe.PermissionError)
+	return doc
+
+
+def mark_xpos_delivery_charges_managed(invoice_doc):
 	"""Keep delivery-charge selection under xpos API control for this request."""
 	if getattr(invoice_doc, "flags", None) is None:
 		invoice_doc.flags = frappe._dict()
 	invoice_doc.flags.xpos_skip_auto_delivery_charges = True
 
 
-def _apply_invoice_delivery_charge_fields(invoice_doc, data: dict):
+def apply_invoice_delivery_charge_fields(invoice_doc, data: dict):
 	"""Apply the delivery-charge selection supplied by the xpos client."""
-	_mark_xpos_delivery_charges_managed(invoice_doc)
+	mark_xpos_delivery_charges_managed(invoice_doc)
 	selected_charge = data.get("pos_delivery_charges") or None
 	invoice_doc.pos_delivery_charges = selected_charge
 	invoice_doc.pos_delivery_charges_rate = (
@@ -107,7 +125,7 @@ def _apply_invoice_delivery_charge_fields(invoice_doc, data: dict):
 	)
 
 
-def _apply_invoice_loyalty_fields(invoice_doc, data: dict):
+def apply_invoice_loyalty_fields(invoice_doc, data: dict):
 	"""Apply loyalty redemption fields without trusting the client amount."""
 	redeem_points = cint(data.get("loyalty_points", 0))
 	redeem_loyalty = cint(data.get("redeem_loyalty_points", 0)) and redeem_points > 0
@@ -259,7 +277,7 @@ def resolve_return_sales_person(return_against: str | None) -> str | None:
 	if not return_against:
 		return None
 
-	doctype = _detect_invoice_doctype(return_against)
+	doctype = detect_invoice_doctype(return_against)
 	return frappe.db.get_value(
 		"Sales Team",
 		{"parent": return_against, "parenttype": doctype},
@@ -291,7 +309,7 @@ def apply_sales_person(doc, sales_person: str | None, pos_profile: str | None = 
 	doc.append("sales_team", {"sales_person": sales_person, "allocated_percentage": 100})
 
 
-def _prepare_invoice_totals_for_loyalty_validation(invoice_doc):
+def prepare_invoice_totals_for_loyalty_validation(invoice_doc):
 	"""Pre-calculate invoice totals before ERPNext validates loyalty redemption."""
 	from xpos.x_pos.api.invoice import apply_tax_inclusive, calc_delivery_charges
 
@@ -300,7 +318,7 @@ def _prepare_invoice_totals_for_loyalty_validation(invoice_doc):
 	invoice_doc.calculate_taxes_and_totals()
 
 
-def _resolve_loyalty_paid_amount(invoice_doc) -> float:
+def resolve_loyalty_paid_amount(invoice_doc) -> float:
 	"""Let ERPNext derive the redeemable loyalty amount from the selected points."""
 	if not (getattr(invoice_doc, "redeem_loyalty_points", 0) and getattr(invoice_doc, "loyalty_points", 0)):
 		invoice_doc.loyalty_amount = 0
@@ -315,7 +333,7 @@ def _resolve_loyalty_paid_amount(invoice_doc) -> float:
 	return round(flt(invoice_doc.loyalty_amount or 0), 2)
 
 
-def _coerce_amount(value) -> float:
+def coerce_amount(value) -> float:
 	"""Coerce invoice amounts without depending on request-local Frappe state."""
 	try:
 		return round(float(value or 0), 2)
@@ -323,24 +341,24 @@ def _coerce_amount(value) -> float:
 		return 0.0
 
 
-def _get_unpaid_balance(invoice_doc) -> float:
+def get_unpaid_balance(invoice_doc) -> float:
 	"""Return the unpaid balance remaining on an invoice after applied settlements."""
-	outstanding_amount = _coerce_amount(getattr(invoice_doc, "outstanding_amount", 0))
+	outstanding_amount = coerce_amount(getattr(invoice_doc, "outstanding_amount", 0))
 	if outstanding_amount > 0:
 		return outstanding_amount
 
 	grand_total = abs(
-		_coerce_amount(getattr(invoice_doc, "rounded_total", 0) or getattr(invoice_doc, "grand_total", 0))
+		coerce_amount(getattr(invoice_doc, "rounded_total", 0) or getattr(invoice_doc, "grand_total", 0))
 	)
 	settled_amount = (
-		abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
-		+ abs(_coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
-		+ abs(_coerce_amount(getattr(invoice_doc, "total_advance", 0)))
+		abs(coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
+		+ abs(coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
+		+ abs(coerce_amount(getattr(invoice_doc, "total_advance", 0)))
 	)
 	return max(0.0, round(grand_total - settled_amount, 2))
 
 
-def _guard_stale_draft(doctype: str, invoice_name: str, client_modified) -> None:
+def guard_stale_draft(doctype: str, invoice_name: str, client_modified) -> None:
 	"""Reject a write that was built on a stale copy of a shared open tab.
 
 	Once a tab can be recalled from another shift, two terminals can hold the same
@@ -362,9 +380,7 @@ def _guard_stale_draft(doctype: str, invoice_name: str, client_modified) -> None
 		)
 
 
-def _validate_unpaid_balance_permissions(
-	invoice_doc, pos_profile_doc, data: dict, customer_credit: float = 0
-):
+def validate_unpaid_balance_permissions(invoice_doc, pos_profile_doc, data: dict, customer_credit: float = 0):
 	"""Enforce POS Profile permissions before submitting an invoice with a balance due.
 
 	``customer_credit`` is existing customer credit allocated right after submit,
@@ -373,7 +389,7 @@ def _validate_unpaid_balance_permissions(
 	if cint(getattr(invoice_doc, "is_return", 0)):
 		return
 
-	outstanding_amount = _get_unpaid_balance(invoice_doc)
+	outstanding_amount = get_unpaid_balance(invoice_doc)
 	if customer_credit - outstanding_amount > 0.009:
 		frappe.throw(
 			_("Customer credit of {0} is more than the {1} still due.").format(
@@ -388,9 +404,9 @@ def _validate_unpaid_balance_permissions(
 	allow_partial_payment = cint(pos_profile_doc.get("allow_partial_payment"))
 	requested_credit_sale = cint(data.get("is_credit_sale"))
 	settled_amount = (
-		abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
-		+ abs(_coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
-		+ abs(_coerce_amount(getattr(invoice_doc, "total_advance", 0)))
+		abs(coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
+		+ abs(coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
+		+ abs(coerce_amount(getattr(invoice_doc, "total_advance", 0)))
 		+ customer_credit
 	)
 
@@ -403,7 +419,7 @@ def _validate_unpaid_balance_permissions(
 		frappe.throw(_("Partial payment is not allowed for POS Profile {0}.").format(pos_profile_doc.name))
 
 
-def _get_default_pos_payment_mode(pos_profile_doc) -> str:
+def get_default_pos_payment_mode(pos_profile_doc) -> str:
 	"""Return the default mode of payment configured on the POS Profile."""
 	payments = getattr(pos_profile_doc, "payments", None) or []
 	if payments:
@@ -413,7 +429,7 @@ def _get_default_pos_payment_mode(pos_profile_doc) -> str:
 	return "Cash"
 
 
-def _ensure_pos_invoice_payment_row(invoice_doc, pos_profile_doc, require_payment_row: bool):
+def ensure_pos_invoice_payment_row(invoice_doc, pos_profile_doc, require_payment_row: bool):
 	"""Seed a zero-amount payment row so ERPNext accepts POS sale submissions."""
 	if not require_payment_row:
 		return
@@ -434,7 +450,7 @@ def _ensure_pos_invoice_payment_row(invoice_doc, pos_profile_doc, require_paymen
 	invoice_doc.append(
 		"payments",
 		{
-			"mode_of_payment": _get_default_pos_payment_mode(pos_profile_doc),
+			"mode_of_payment": get_default_pos_payment_mode(pos_profile_doc),
 			"amount": 0,
 		},
 	)
@@ -619,7 +635,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		if invoice_doc.docstatus != 0:
 			frappe.throw(_("Only draft invoices can be updated and submitted"))
 
-		_guard_stale_draft(doctype, invoice_name, data.get("modified"))
+		guard_stale_draft(doctype, invoice_name, data.get("modified"))
 
 		if invoice_doc.get("pos_awaiting_settlement") and not is_pos_cashier(
 			frappe.session.user, pos_profile
@@ -647,7 +663,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	invoice_doc.debit_to = debit_to
 	if pos.allow_change_posting_date:
 		invoice_doc.set_posting_time = 1
-		invoice_doc.posting_date = _resolve_invoice_posting_date(
+		invoice_doc.posting_date = resolve_invoice_posting_date(
 			pos,
 			data.get("posting_date"),
 			getattr(invoice_doc, "posting_date", None) if is_existing_draft else None,
@@ -686,7 +702,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		invoice_doc.is_return = 1
 		if return_against:
 			invoice_doc.return_against = return_against
-			items = _validate_return_invoice(return_against, customer, items)
+			items = validate_return_invoice(return_against, customer, items)
 		else:
 			frappe.throw(_("Return Against invoice is required for returns"))
 	else:
@@ -707,7 +723,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	else:
 		apply_sales_person(invoice_doc, resolve_return_sales_person(invoice_doc.return_against))
 
-	_apply_invoice_loyalty_fields(invoice_doc, data)
+	apply_invoice_loyalty_fields(invoice_doc, data)
 
 	if data.get("write_off_amount"):
 		invoice_doc.write_off_amount = flt(data["write_off_amount"])
@@ -716,7 +732,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			"write_off_cost_center"
 		)
 
-	rate_precision = _get_item_rate_precision()
+	rate_precision = get_item_rate_precision()
 
 	gift_setting = get_company_setting(pos.company)
 	gift_issue_lines = [
@@ -896,32 +912,32 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 				invoice_doc,
 			)
 
-	_apply_invoice_delivery_charge_fields(invoice_doc, data)
+	apply_invoice_delivery_charge_fields(invoice_doc, data)
 
 	loyalty_paid = 0
 	if invoice_doc.redeem_loyalty_points and invoice_doc.loyalty_points:
-		_prepare_invoice_totals_for_loyalty_validation(invoice_doc)
-		loyalty_paid = _resolve_loyalty_paid_amount(invoice_doc)
+		prepare_invoice_totals_for_loyalty_validation(invoice_doc)
+		loyalty_paid = resolve_loyalty_paid_amount(invoice_doc)
 
 	rate_cache: dict = {}
 	tender_rows, total_payment = build_tender_legs(payments, invoice_doc, rate_cache)
 	for row in tender_rows:
 		invoice_doc.append("payments", row)
 
-	_ensure_pos_invoice_payment_row(invoice_doc, pos, bool(invoice_doc.is_pos and not invoice_doc.is_return))
+	ensure_pos_invoice_payment_row(invoice_doc, pos, bool(invoice_doc.is_pos and not invoice_doc.is_return))
 
 	if loyalty_paid and hasattr(invoice_doc, "set_paid_amount"):
-		_original_set_paid_amount = invoice_doc.set_paid_amount
+		original_set_paid_amount = invoice_doc.set_paid_amount
 
-		def _set_paid_amount_with_loyalty():
-			_original_set_paid_amount()
+		def set_paid_amount_with_loyalty():
+			original_set_paid_amount()
 			invoice_doc.paid_amount = flt(invoice_doc.paid_amount + loyalty_paid, 2)
 			invoice_doc.base_paid_amount = flt(
 				invoice_doc.base_paid_amount + (loyalty_paid * flt(invoice_doc.conversion_rate or 1)),
 				2,
 			)
 
-		invoice_doc.set_paid_amount = _set_paid_amount_with_loyalty
+		invoice_doc.set_paid_amount = set_paid_amount_with_loyalty
 
 	if is_return and doctype == "POS Invoice":
 		invoice_doc.validate_change_amount = lambda: None
@@ -1032,7 +1048,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	enforce_stock_availability(invoice_doc)
 	validate_invoice_coupons(invoice_doc)
 
-	_validate_unpaid_balance_permissions(invoice_doc, pos, data, credit_total(customer_credit))
+	validate_unpaid_balance_permissions(invoice_doc, pos, data, credit_total(customer_credit))
 
 	from xpos.x_pos.integrations import fbr
 
@@ -1064,7 +1080,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 
 	if submit_in_background:
 		enqueue(
-			_submit_invoice_job,
+			submit_invoice_job,
 			queue="short",
 			timeout=300,
 			invoice_name=invoice_doc.name,
@@ -1083,7 +1099,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	if customer_credit:
 		invoice_doc.reload()
 
-	return _build_invoice_response(invoice_doc)
+	return build_invoice_response(invoice_doc)
 
 
 def cap_change_at_overpayment(invoice_doc):
@@ -1105,7 +1121,7 @@ def existing_sale_response(doctype: str, name: str) -> dict:
 	"""Answer a retry of a sale that already exists, without creating or fiscalizing it again."""
 	doc = frappe.get_doc(doctype, name)
 	if doc.docstatus == 1:
-		return {**_build_invoice_response(doc), "duplicate": True}
+		return {**build_invoice_response(doc), "duplicate": True}
 	if doc.get("fbr_invoice_number"):
 		# Fiscalized, but the submit failed earlier: finish it without asking FBR again.
 		return {**submit_fiscalized_draft(doc), "duplicate": True}
@@ -1225,7 +1241,7 @@ def retry_fiscalization(name: str, doctype: str | None = None) -> dict:
 	"""Finish a draft held for an FBR check, once ``resolve_fiscal_check`` has recorded the outcome."""
 	doc = fiscal_draft(name, doctype, _("fiscalize"))
 	if doc.docstatus == 1:
-		return _build_invoice_response(doc)
+		return build_invoice_response(doc)
 	if doc.get("xpos_fiscal_state") != "Uncertain":
 		frappe.throw(_("Invoice {0} is not waiting for an FBR check.").format(doc.name))
 	return resume_fiscal_draft(doc)
@@ -1314,10 +1330,10 @@ def submit_fiscalized_draft(doc) -> dict:
 	doc.save(ignore_permissions=True)
 	enforce_stock_availability(doc)
 	doc.submit()
-	return _build_invoice_response(doc)
+	return build_invoice_response(doc)
 
 
-def _submit_invoice_job(invoice_name: str, doctype: str = "Sales Invoice"):
+def submit_invoice_job(invoice_name: str, doctype: str = "Sales Invoice"):
 	"""Background job to submit an invoice."""
 	user = frappe.session.user
 	try:
@@ -1357,7 +1373,7 @@ def finalize_fiscal_invoice(name: str, fbr_invoice_number: str, doctype: str | N
 
 	invoice_doc = fiscal_draft(name, doctype, _("finalize"))
 	if invoice_doc.docstatus != 0:
-		return _build_invoice_response(invoice_doc)
+		return build_invoice_response(invoice_doc)
 	if invoice_doc.get("xpos_fiscal_state") == "Uncertain":
 		# Only a recorded FBR check may supply the number of a sale FBR may already hold.
 		known = fbr.ledger_outcome(invoice_doc)
@@ -1381,10 +1397,11 @@ def discard_draft_invoice(name: str, doctype: str | None = None) -> dict:
 	could not be finalized and the draft should not linger.
 	"""
 	doctype = doctype or get_invoice_type()
+	ensure_invoice_doctype(doctype)
 	if not frappe.db.exists(doctype, name):
 		return {"deleted": False}
 
-	invoice_doc = frappe.get_doc(doctype, name)
+	invoice_doc = get_pos_invoice(doctype, name, "delete")
 	if invoice_doc.docstatus != 0:
 		frappe.throw(_("Only a draft invoice can be discarded."))
 	if invoice_doc.get("xpos_fiscal_state") == "Uncertain":
@@ -1429,7 +1446,7 @@ def save_draft_invoice(data: str | dict):
 		invoice_doc = frappe.get_doc(doctype, invoice_name)
 		if invoice_doc.docstatus != 0:
 			frappe.throw(_("Invoice {0} is not a draft and cannot be updated").format(invoice_name))
-		_guard_stale_draft(doctype, invoice_name, data.get("modified"))
+		guard_stale_draft(doctype, invoice_name, data.get("modified"))
 		is_update = True
 		invoice_doc.set("items", [])
 		invoice_doc.set("taxes", [])
@@ -1443,7 +1460,7 @@ def save_draft_invoice(data: str | dict):
 	invoice_doc.debit_to = debit_to
 	if pos.allow_change_posting_date:
 		invoice_doc.set_posting_time = 1
-		invoice_doc.posting_date = _resolve_invoice_posting_date(
+		invoice_doc.posting_date = resolve_invoice_posting_date(
 			pos,
 			data.get("posting_date"),
 			getattr(invoice_doc, "posting_date", None) if is_update else None,
@@ -1476,7 +1493,7 @@ def save_draft_invoice(data: str | dict):
 
 	apply_sales_person(invoice_doc, data.get("sales_person") or None, pos_profile)
 
-	rate_precision = _get_item_rate_precision()
+	rate_precision = get_item_rate_precision()
 
 	for item_data in items:
 		item_rate = flt(item_data.get("rate", 0), rate_precision)
@@ -1522,7 +1539,7 @@ def save_draft_invoice(data: str | dict):
 		for row in tender_rows:
 			invoice_doc.append("payments", row)
 
-	_ensure_pos_invoice_payment_row(invoice_doc, pos, doctype == "POS Invoice")
+	ensure_pos_invoice_payment_row(invoice_doc, pos, doctype == "POS Invoice")
 
 	if pos_opening_shift:
 		try:
@@ -1533,7 +1550,7 @@ def save_draft_invoice(data: str | dict):
 	if data.get("pos_awaiting_settlement") and frappe.db.has_column(doctype, "pos_awaiting_settlement"):
 		invoice_doc.pos_awaiting_settlement = 1
 
-	_apply_invoice_delivery_charge_fields(invoice_doc, data)
+	apply_invoice_delivery_charge_fields(invoice_doc, data)
 
 	if is_update:
 		invoice_doc.save(ignore_permissions=True)
@@ -1639,255 +1656,11 @@ def get_unsettled_invoices(pos_profile: str | None = None):
 
 
 @frappe.whitelist()
-def get_past_orders(
-	pos_profile: str = "",
-	from_date: str = "",
-	to_date: str = "",
-	search_term: str = "",
-	page: int = 0,
-	limit: int = 20,
-	filters: str | None = None,
-	order_by: str = "posting_date desc, posting_time desc",
-):
-	"""Get past submitted invoices with advanced filtering and pagination.
-
-	Args:
-	        pos_profile: POS Profile name
-	        from_date: Start date for filter
-	        to_date: End date for filter
-	        search_term: Search in invoice name, customer name, customer
-	        page: Page number (0-indexed)
-	        limit: Number of records per page
-	        filters: JSON array of filter conditions like Frappe's query builder
-	                Format: [["fieldname", "operator", "value"], ...]
-	                Operators: =, !=, >, <, >=, <=, like, not like, in, not in, between, is, is not
-	        order_by: Order by clause (default: posting_date desc, posting_time desc)
-
-	Returns:
-	        dict with 'data' (list of orders) and 'total' (total count)
-	"""
-	conditions = "si.docstatus = 1 AND si.is_pos = 1"
-	values = {"offset": cint(page) * cint(limit), "limit": cint(limit)}
-
-	if pos_profile:
-		conditions += " AND si.pos_profile = %(pos_profile)s"
-		values["pos_profile"] = pos_profile
-
-	if from_date:
-		conditions += " AND si.posting_date >= %(from_date)s"
-		values["from_date"] = getdate(from_date)
-
-	if to_date:
-		conditions += " AND si.posting_date <= %(to_date)s"
-		values["to_date"] = getdate(to_date)
-
-	if search_term:
-		search_term = search_term.strip()
-		conditions += """ AND (
-			si.name LIKE %(search)s
-			OR si.customer_name LIKE %(search)s
-			OR si.customer LIKE %(search)s
-		)"""
-		values["search"] = f"%{search_term}%"
-
-	if filters:
-		if isinstance(filters, str):
-			filters = json.loads(filters)
-
-		valid_fields = {
-			"status",
-			"customer",
-			"customer_name",
-			"is_return",
-			"return_against",
-			"grand_total",
-			"net_total",
-			"paid_amount",
-			"outstanding_amount",
-			"posting_date",
-			"posting_time",
-			"currency",
-			"owner",
-			"modified_by",
-		}
-
-		for idx, f in enumerate(filters):
-			if len(f) < 3:
-				continue
-
-			fieldname, operator, value = f[0], f[1].lower(), f[2]
-
-			if fieldname not in valid_fields:
-				continue
-
-			param_name = f"filter_{idx}"
-			operator = operator.strip()
-
-			if operator == "=":
-				conditions += f" AND si.{fieldname} = %({param_name})s"
-				values[param_name] = value
-			elif operator == "!=":
-				conditions += f" AND si.{fieldname} != %({param_name})s"
-				values[param_name] = value
-			elif operator == ">":
-				conditions += f" AND si.{fieldname} > %({param_name})s"
-				values[param_name] = value
-			elif operator == "<":
-				conditions += f" AND si.{fieldname} < %({param_name})s"
-				values[param_name] = value
-			elif operator == ">=":
-				conditions += f" AND si.{fieldname} >= %({param_name})s"
-				values[param_name] = value
-			elif operator == "<=":
-				conditions += f" AND si.{fieldname} <= %({param_name})s"
-				values[param_name] = value
-			elif operator == "like":
-				conditions += f" AND si.{fieldname} LIKE %({param_name})s"
-				values[param_name] = f"%{value}%"
-			elif operator == "not like":
-				conditions += f" AND si.{fieldname} NOT LIKE %({param_name})s"
-				values[param_name] = f"%{value}%"
-			elif operator == "in":
-				if isinstance(value, list) and value:
-					placeholders = ", ".join([f"%({param_name}_{i})s" for i in range(len(value))])
-					conditions += f" AND si.{fieldname} IN ({placeholders})"
-					for i, v in enumerate(value):
-						values[f"{param_name}_{i}"] = v
-			elif operator == "not in":
-				if isinstance(value, list) and value:
-					placeholders = ", ".join([f"%({param_name}_{i})s" for i in range(len(value))])
-					conditions += f" AND si.{fieldname} NOT IN ({placeholders})"
-					for i, v in enumerate(value):
-						values[f"{param_name}_{i}"] = v
-			elif operator == "between":
-				if isinstance(value, list) and len(value) == 2:
-					conditions += f" AND si.{fieldname} BETWEEN %({param_name}_0)s AND %({param_name}_1)s"
-					values[f"{param_name}_0"] = value[0]
-					values[f"{param_name}_1"] = value[1]
-			elif operator in ("is", "is not"):
-				if value is None or str(value).lower() in (
-					"null",
-					"none",
-					"set",
-					"not set",
-				):
-					null_check = (
-						"IS NULL"
-						if operator == "is" or str(value).lower() in ("null", "none", "not set")
-						else "IS NOT NULL"
-					)
-					if str(value).lower() == "set":
-						null_check = "IS NOT NULL"
-					elif str(value).lower() == "not set":
-						null_check = "IS NULL"
-					conditions += f" AND si.{fieldname} {null_check}"
-
-	allowed_order_fields = {
-		"posting_date",
-		"posting_time",
-		"grand_total",
-		"name",
-		"customer_name",
-		"status",
-		"modified",
-	}
-	order_parts = []
-	for part in order_by.split(","):
-		part = part.strip()
-		if not part:
-			continue
-		tokens = part.split()
-		field = tokens[0].lower()
-		direction = tokens[1].upper() if len(tokens) > 1 else "DESC"
-		if field in allowed_order_fields and direction in ("ASC", "DESC"):
-			order_parts.append(f"si.{field} {direction}")
-
-	order_clause = ", ".join(order_parts) if order_parts else "si.posting_date DESC, si.posting_time DESC"
-
-	doctype = get_invoice_type()
-	table = f"`tab{doctype}`"
-
-	total = frappe.db.sql(
-		f"""SELECT COUNT(*) FROM {table} si WHERE """ + conditions,
-		values,
-		as_list=True,
-	)[0][0]
-
-	orders = frappe.db.sql(
-		f"""SELECT
-			si.name,
-			si.customer,
-			si.customer_name,
-			si.posting_date,
-			si.posting_time,
-			si.grand_total,
-			si.net_total,
-			si.total_taxes_and_charges,
-			si.paid_amount,
-			si.currency,
-			si.status,
-			si.is_return,
-			si.return_against,
-			si.owner,
-			si.modified
-		FROM {table} si
-		WHERE """
-		+ conditions
-		+ """
-		ORDER BY """
-		+ order_clause
-		+ """
-		LIMIT %(offset)s, %(limit)s
-		""",
-		values,
-		as_dict=True,
-	)
-
-	return {"data": orders, "total": total}
-
-
-@frappe.whitelist()
-def get_invoices(
-	pos_opening_shift: str | None = None,
-	is_return: int | None = None,
-	limit: int = 50,
-	pos_profile: str = "",
-):
-	"""Return POS invoices filtered by opening shift and optional return flag."""
-	doctype = get_invoice_type()
-	filters = {"docstatus": 1, "is_pos": 1}
-	if pos_opening_shift:
-		filters["pos_opening_shift"] = pos_opening_shift
-	if is_return is not None:
-		filters["is_return"] = cint(is_return)
-
-	return frappe.get_all(
-		doctype,
-		filters=filters,
-		fields=[
-			"name",
-			"customer",
-			"customer_name",
-			"posting_date",
-			"posting_time",
-			"grand_total",
-			"net_total",
-			"paid_amount",
-			"status",
-			"is_return",
-			"return_against",
-		],
-		order_by="posting_date desc, posting_time desc, modified desc",
-		limit_page_length=cint(limit) if limit else 50,
-	)
-
-
-@frappe.whitelist()
 def get_invoice_details(invoice_name: str, doctype: str = ""):
 	"""Get full invoice details including items and payments."""
 	if not doctype:
-		doctype = _detect_invoice_doctype(invoice_name)
-	doc = frappe.get_doc(doctype, invoice_name)
+		doctype = detect_invoice_doctype(invoice_name)
+	doc = get_pos_invoice(doctype, invoice_name)
 
 	return {
 		"name": doc.name,
@@ -1972,8 +1745,8 @@ def get_invoice_details(invoice_name: str, doctype: str = ""):
 def delete_draft_invoice(name: str, doctype: str = "", pos_opening_shift: str = ""):
 	"""Delete a draft invoice."""
 	if not doctype:
-		doctype = _detect_invoice_doctype(name)
-	doc = frappe.get_doc(doctype, name)
+		doctype = detect_invoice_doctype(name)
+	doc = get_pos_invoice(doctype, name, "delete")
 	if doc.docstatus != 0:
 		frappe.throw(_("Only draft invoices can be deleted"))
 
@@ -2119,7 +1892,7 @@ def get_invoice_for_return(invoice_name: str, pos_profile: str = "", doctype: st
 
 	Accounts for past returns to show only what can still be returned.
 	"""
-	doc = frappe.get_doc(doctype, invoice_name)
+	doc = get_pos_invoice(doctype, invoice_name)
 
 	return_invoices = frappe.get_all(
 		doctype,
@@ -2190,63 +1963,7 @@ def get_invoice_for_return(invoice_name: str, pos_profile: str = "", doctype: st
 	}
 
 
-@frappe.whitelist()
-def fetch_exchange_rate(from_currency: str, to_currency: str):
-	"""Returns exchange rate between two currencies."""
-	from erpnext.setup.utils import get_exchange_rate
-
-	rate = get_exchange_rate(from_currency, to_currency, nowdate())
-	return {
-		"exchange_rate": flt(rate),
-		"date": nowdate(),
-	}
-
-
-@frappe.whitelist()
-def get_last_invoice_rates(customer: str, item_codes: str | list, company: str):
-	"""Get the most recent invoice rates for items by customer."""
-	if isinstance(item_codes, str):
-		item_codes = json.loads(item_codes)
-
-	if not item_codes:
-		return []
-
-	item_params = {}
-	for idx, code in enumerate(item_codes):
-		item_params[f"item_{idx}"] = code
-	item_placeholders = ", ".join([f"%(item_{i})s" for i in range(len(item_codes))])
-	results = frappe.db.sql(  # nosemgrep: frappe-sql-format-injection - item_placeholders is built from %(name)s named params, all values parameterized
-		f"""
-		SELECT
-			sii.item_code,
-			sii.rate,
-			si.currency,
-			sii.uom,
-			si.posting_date
-		FROM `tabSales Invoice Item` sii
-		INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
-		WHERE si.customer = %(customer)s
-			AND si.company = %(company)s
-			AND si.docstatus = 1
-			AND si.is_return = 0
-			AND sii.item_code IN ({item_placeholders})
-		ORDER BY si.posting_date DESC, si.creation DESC
-		""",
-		{"customer": customer, "company": company, **item_params},
-		as_dict=True,
-	)
-
-	seen = set()
-	latest = []
-	for r in results:
-		if r.item_code not in seen:
-			seen.add(r.item_code)
-			latest.append(r)
-
-	return latest
-
-
-def _build_invoice_response(invoice_doc: dict) -> dict:
+def build_invoice_response(invoice_doc: dict) -> dict:
 	"""Build a standard invoice response dict."""
 	issued = invoice_doc.flags.xpos_issued_gift_cards
 	if issued is None and invoice_doc.docstatus == 1:
@@ -2279,7 +1996,7 @@ def _build_invoice_response(invoice_doc: dict) -> dict:
 	}
 
 
-def _validate_return_invoice(return_against: str, customer: str, items: str | list) -> list:
+def validate_return_invoice(return_against: str, customer: str, items: str | list) -> list:
 	"""Validate return invoice data against the original invoice and attach source row references."""
 	doctype = "Sales Invoice"
 	if not frappe.db.exists(doctype, return_against):
@@ -2449,6 +2166,7 @@ def get_invoice_for_repeat(invoice_name: str, pos_profile: str = "", doctype: st
 	Returns item details with current stock prices so the repeated
 	invoice uses up-to-date pricing.
 	"""
+	ensure_invoice_doctype(doctype)
 	if not frappe.db.exists(doctype, invoice_name):
 		alt = "POS Invoice" if doctype == "Sales Invoice" else "Sales Invoice"
 		if frappe.db.exists(alt, invoice_name):
@@ -2456,7 +2174,7 @@ def get_invoice_for_repeat(invoice_name: str, pos_profile: str = "", doctype: st
 		else:
 			frappe.throw(_("Invoice {0} not found").format(invoice_name))
 
-	doc = frappe.get_doc(doctype, invoice_name)
+	doc = get_pos_invoice(doctype, invoice_name)
 
 	price_list = None
 	if pos_profile:

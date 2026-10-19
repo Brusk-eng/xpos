@@ -11,7 +11,7 @@ PRECISION = {"LBP": 0, "USD": 2}
 USD_RATE = 90000.0
 RATE_DATE = "2026-08-17"
 
-_rounding_patch = None
+rounding_patch = None
 
 
 def setUpModule():
@@ -23,13 +23,13 @@ def setUpModule():
 	Returning None reproduces an unconfigured site: `rounded` falls back to legacy banker's
 	rounding, the same behaviour production gets by default.
 	"""
-	global _rounding_patch
-	_rounding_patch = patch("frappe.get_system_settings", return_value=None)
-	_rounding_patch.start()
+	global rounding_patch
+	rounding_patch = patch("frappe.get_system_settings", return_value=None)
+	rounding_patch.start()
 
 
 def tearDownModule():
-	_rounding_patch.stop()
+	rounding_patch.stop()
 
 
 class Doc(dict):

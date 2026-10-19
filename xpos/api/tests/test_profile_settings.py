@@ -48,7 +48,7 @@ class TestShouldBlock(unittest.TestCase):
 		with patch.object(stock_module, "frappe") as mock_frappe:
 			mock_frappe.db.get_single_value.return_value = global_negative
 			mock_frappe.db.get_value.return_value = stored
-			return stock_module._should_block(pos_profile)
+			return stock_module.should_block(pos_profile)
 
 	def test_matrix(self):
 		self.assertTrue(self.check(0, 1))
@@ -59,7 +59,7 @@ class TestShouldBlock(unittest.TestCase):
 			self.assertFalse(self.check(1, stored), "global negative stock always wins")
 
 	def test_returns_and_non_stock_invoices_are_never_checked(self):
-		with patch.object(stock_module, "_collect_stock_errors") as collect:
+		with patch.object(stock_module, "collect_stock_errors") as collect:
 			stock_module.validate_stock_on_invoice(
 				SimpleNamespace(doctype="Sales Invoice", update_stock=0, items=[], pos_profile="POS-1")
 			)
@@ -226,7 +226,7 @@ class TestCreateInvoicePricing(unittest.TestCase):
 			"invoice_currency_of": {"return_value": "USD"},
 			"get_currency_precision": {"return_value": 2},
 			"get_invoice_type": {"return_value": "Sales Invoice"},
-			"_validate_return_invoice": {"side_effect": lambda against, customer, items: items},
+			"validate_return_invoice": {"side_effect": lambda against, customer, items: items},
 		}.items():
 			patcher = patch(f"xpos.api.invoices.{name}", **kwargs)
 			patcher.start()
@@ -476,7 +476,7 @@ class TestBlindClosing(unittest.TestCase):
 			),
 			patch.object(shifts, "get_shift_payment_totals", return_value={"Cash": {"amount": 500}}),
 			patch.object(shifts, "resolve_cash_mode_of_payment", return_value="Cash"),
-			patch.object(shifts, "_get_shift_tax_summary", return_value=[]),
+			patch.object(shifts, "get_shift_tax_summary", return_value=[]),
 			patch.object(shifts, "is_blind_closing", return_value=blind),
 		):
 			return shifts.get_shift_summary("OPEN-1")
@@ -800,9 +800,9 @@ class TestCustomerCredit(unittest.TestCase):
 	def test_credit_counts_as_settled_and_cannot_exceed_due(self):
 		invoice = SimpleNamespace(is_return=0, outstanding_amount=50, paid_amount=50, write_off_amount=0)
 		pos = profile(allow_partial_payment=0, allow_credit_sale=0)
-		invoices._validate_unpaid_balance_permissions(invoice, pos, {}, customer_credit=50)
+		invoices.validate_unpaid_balance_permissions(invoice, pos, {}, customer_credit=50)
 		with self.assertRaises(frappe.ValidationError):
-			invoices._validate_unpaid_balance_permissions(invoice, pos, {}, customer_credit=80)
+			invoices.validate_unpaid_balance_permissions(invoice, pos, {}, customer_credit=80)
 
 	def test_helpers_are_not_endpoints(self):
 		from xpos.api import customer_credit

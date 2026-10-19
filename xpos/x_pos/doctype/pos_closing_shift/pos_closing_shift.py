@@ -7,10 +7,10 @@ from frappe.model.document import Document
 from frappe.utils import flt
 
 from xpos.x_pos.doctype.pos_closing_shift.closing_processing.invoices import (
-	_clear_closing_entry_invoices,
-	_set_closing_entry_invoices,
+	clear_closing_entry_invoices,
 	consolidate_closing_shift_invoices,
 	delete_draft_invoices,
+	set_closing_entry_invoices,
 )
 from xpos.x_pos.doctype.pos_closing_shift.closing_processing.overview import (
 	get_payment_reconciliation_details,
@@ -92,7 +92,7 @@ class POSClosingShift(Document):
 		delete_draft_invoices(self.pos_opening_shift, self.pos_profile)
 		opening_entry.flags.ignore_permissions = True
 		opening_entry.save()
-		_set_closing_entry_invoices(self)
+		set_closing_entry_invoices(self)
 		consolidate_closing_shift_invoices(self)
 		create_reclass_journal_entry(self)
 
@@ -105,7 +105,7 @@ class POSClosingShift(Document):
 				opening_entry.set_status()
 				opening_entry.save()
 
-		_clear_closing_entry_invoices(self)
+		clear_closing_entry_invoices(self)
 
 	def delete_draft_invoices(self):
 		delete_draft_invoices(self.pos_opening_shift, self.pos_profile)

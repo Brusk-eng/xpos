@@ -21,18 +21,18 @@ from xpos.api.utilities import get_invoice_type
 def execute(filters=None):
 	filters = frappe.parse_json(filters) if filters else {}
 	doctype = get_invoice_type()
-	invoices = _get_invoices(filters, doctype)
+	invoices = get_invoices(filters, doctype)
 	ensure_not_blind({inv["pos_profile"] for inv in invoices})
 	return (
 		get_columns(),
-		_get_items_sold(invoices, doctype),
+		get_items_sold(invoices, doctype),
 		None,
 		None,
-		_get_report_summary(invoices, doctype, filters),
+		get_report_summary(invoices, doctype, filters),
 	)
 
 
-def _get_invoices(filters, doctype):
+def get_invoices(filters, doctype):
 	conditions = {"docstatus": 1, "is_pos": 1}
 	if doctype == "POS Invoice":
 		conditions["consolidated_invoice"] = ["in", ["", None]]
@@ -62,7 +62,7 @@ def ensure_not_blind(pos_profiles):
 		frappe.throw(_("Shift totals are hidden for blind-closing POS Profiles."), frappe.PermissionError)
 
 
-def _get_items_sold(invoices, doctype):
+def get_items_sold(invoices, doctype):
 	names = [inv["name"] for inv in invoices]
 	if not names:
 		return []
@@ -87,7 +87,7 @@ def _get_items_sold(invoices, doctype):
 	)
 
 
-def _resolve_report_cash_mode(filters):
+def resolve_report_cash_mode(filters):
 	"""The cash mode the shift's change came out of, for the leg-less legacy fallback."""
 	pos_profile = filters.get("pos_profile")
 	if not pos_profile and filters.get("pos_opening_shift"):
@@ -95,8 +95,8 @@ def _resolve_report_cash_mode(filters):
 	return resolve_cash_mode_of_payment(pos_profile)
 
 
-def _get_report_summary(invoices, doctype, filters):
-	payment_summary = get_shift_payment_totals(doctype, invoices, _resolve_report_cash_mode(filters))
+def get_report_summary(invoices, doctype, filters):
+	payment_summary = get_shift_payment_totals(doctype, invoices, resolve_report_cash_mode(filters))
 
 	grand_total = sum(flt(inv.get("grand_total")) for inv in invoices)
 	returns_count = sum(1 for inv in invoices if inv.get("is_return"))

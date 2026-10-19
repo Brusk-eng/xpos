@@ -14,8 +14,6 @@ from xpos.x_pos.doctype.referral_code.referral_code import (
 	create_referral_code,
 )
 
-from . import customers
-
 
 def after_insert(doc: Any, method: str):
 	create_customer_referral_code(doc)
@@ -57,14 +55,3 @@ def validate_referral_code(doc: Any):
 			exist = frappe.db.exists("Referral Code", {"referral_code": referral_code})
 		if not exist:
 			frappe.throw(_("This Referral Code {0} not exists").format(referral_code))
-
-
-@frappe.whitelist()
-def get_customer_balance(customer: str):
-	return customers.get_customer_balance(customer)
-
-
-@frappe.whitelist()
-def create_customer(*args, **kwargs):
-	"""Backward compatible wrapper for ``api.customers.create_customer``."""
-	return customers.create_customer(*args, **kwargs)

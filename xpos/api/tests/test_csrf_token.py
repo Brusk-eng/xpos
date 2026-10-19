@@ -14,7 +14,7 @@ from xpos.www import xpos as xpos_page
 class TestXposPageCsrfToken(unittest.TestCase):
 	"""The /xpos page must embed the token the session keeps, not a throwaway one."""
 
-	def _context(self):
+	def page_context(self):
 		return SimpleNamespace()
 
 	@patch("xpos.www.xpos.get", return_value={})
@@ -23,7 +23,7 @@ class TestXposPageCsrfToken(unittest.TestCase):
 	def test_logged_in_page_uses_the_saved_session_token(self, mock_frappe, mock_get_token, _get):
 		mock_frappe.session.user = "cashier@example.com"
 		mock_frappe.local.lang = "en"
-		context = self._context()
+		context = self.page_context()
 
 		xpos_page.get_context(context)
 
@@ -37,7 +37,7 @@ class TestXposPageCsrfToken(unittest.TestCase):
 	def test_guest_page_gets_no_token(self, mock_frappe, mock_get_token, _get):
 		mock_frappe.session.user = "Guest"
 		mock_frappe.local.lang = "en"
-		context = self._context()
+		context = self.page_context()
 
 		xpos_page.get_context(context)
 

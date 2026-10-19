@@ -107,7 +107,7 @@ def get_pos_items(
 		)
 
 		if use_pos_deduction and in_stock_items:
-			pending_map = _get_pending_pos_qty_map(wh_list, item_codes=in_stock_items)
+			pending_map = get_pending_pos_qty_map(wh_list, item_codes=in_stock_items)
 			if pending_map:
 				from frappe.query_builder import DocType as DT
 				from frappe.query_builder.functions import Sum as SumFn
@@ -329,7 +329,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 	if not price_list:
 		price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
 
-	def _get_item_rate(item_code):
+	def get_item_rate(item_code):
 		rate = (
 			frappe.db.get_value(
 				"Item Price",
@@ -357,7 +357,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 			"barcode": barcode_data.barcode,
 			"uom": barcode_data.uom or item.stock_uom,
 			"stock_uom": item.stock_uom,
-			"rate": _get_item_rate(item.name),
+			"rate": get_item_rate(item.name),
 			"has_batch_no": item.has_batch_no,
 			"has_serial_no": item.has_serial_no,
 			"is_stock_item": item.is_stock_item,
@@ -374,7 +374,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 			"barcode": barcode,
 			"uom": item.stock_uom,
 			"stock_uom": item.stock_uom,
-			"rate": _get_item_rate(item.name),
+			"rate": get_item_rate(item.name),
 			"has_batch_no": item.has_batch_no,
 			"has_serial_no": item.has_serial_no,
 			"is_stock_item": item.is_stock_item,
@@ -400,7 +400,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 				"serial_no": scan.get("serial_no"),
 				"uom": item.stock_uom,
 				"stock_uom": item.stock_uom,
-				"rate": _get_item_rate(item.name),
+				"rate": get_item_rate(item.name),
 				"has_batch_no": item.has_batch_no,
 				"has_serial_no": item.has_serial_no,
 				"is_stock_item": item.is_stock_item,
@@ -413,7 +413,7 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 	result = resolve_scale_barcode(barcode)
 	if result:
 		scale_price = result.pop("scale_price", None)
-		rate = _get_item_rate(result["item_code"])
+		rate = get_item_rate(result["item_code"])
 		if scale_price is not None and flt(result.get("qty")):
 			rate = flt(scale_price) / flt(result["qty"])
 		result["rate"] = rate
@@ -476,7 +476,7 @@ def get_item_detail(
 	batches = []
 	if item.has_batch_no and warehouse:
 		pending_batches = get_pending_batch_qty(warehouse, pos_profile)
-		for b in _get_batch_data(item_code, warehouse, today):
+		for b in get_batch_data(item_code, warehouse, today):
 			batch_no = b["batch_no"]
 			batches.append(
 				{
@@ -646,7 +646,7 @@ def get_stock_availability(items: str | list, warehouse: str | None = None, pos_
 				all_item_codes.append(d)
 			elif d.get("item_code"):
 				all_item_codes.append(d.get("item_code"))
-		pending_map = _get_pending_pos_qty_map(wh_list, item_codes=all_item_codes)
+		pending_map = get_pending_pos_qty_map(wh_list, item_codes=all_item_codes)
 
 	results = []
 	for d in items:
@@ -730,7 +730,7 @@ def get_stock_qty_map(item_codes: list[str], warehouse: str, pos_profile: str | 
 	)
 	stock = {row.item_code: flt(row.actual_qty) for row in rows}
 	if pos_profile and get_invoice_type() == "POS Invoice":
-		pending = _get_pending_pos_qty_map(warehouses, item_codes=item_codes)
+		pending = get_pending_pos_qty_map(warehouses, item_codes=item_codes)
 		for code in item_codes:
 			stock[code] = stock.get(code, 0) - pending.get(code, 0)
 	return stock
@@ -759,7 +759,7 @@ def get_stock_qty(item_code: str, warehouse: str, pos_profile: str | None = None
 	bin_qty = flt(rows[0].actual_qty) if rows else 0
 
 	if pos_profile and get_invoice_type() == "POS Invoice":
-		pending_map = _get_pending_pos_qty_map(warehouses, item_codes=[item_code])
+		pending_map = get_pending_pos_qty_map(warehouses, item_codes=[item_code])
 		bin_qty -= pending_map.get(item_code, 0.0)
 
 	return bin_qty
@@ -782,7 +782,7 @@ def get_pending_batch_qty(warehouse: str, pos_profile: str | None) -> dict[str, 
 	return pending
 
 
-def _get_pending_pos_qty_map(
+def get_pending_pos_qty_map(
 	warehouses: list[str],
 	item_codes: list[str] | None = None,
 ) -> dict[str, float]:
@@ -857,7 +857,7 @@ def get_pending_pos_batch_qty_map(
 	return {(r.batch_no, r.warehouse): flt(r.total_qty) for r in rows}
 
 
-def _get_batch_data(item_code: str, warehouse: str, today: str | None = None):
+def get_batch_data(item_code: str, warehouse: str, today: str | None = None):
 	"""Fetch available (non-expired) batches for an item in warehouse."""
 	today = today or nowdate()
 	batches = frappe.db.sql(

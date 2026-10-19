@@ -207,7 +207,7 @@ def get_shift_expected_amounts(opening, doctype: str, invoices: list) -> dict[st
 	return expected
 
 
-def _get_open_shift_rows(user: str):
+def get_open_shift_rows(user: str):
 	return frappe.db.get_all(
 		"POS Opening Shift",
 		filters={
@@ -305,7 +305,7 @@ def open_shift(pos_profile: str, company: str, balance_details: str | list[dict]
 	data = {
 		"pos_opening_shift": new_shift.as_dict(),
 	}
-	_enrich_shift_data(data, pos_profile)
+	enrich_shift_data(data, pos_profile)
 
 	return data
 
@@ -316,7 +316,7 @@ def check_open_shift(user: str | None = None):
 
 	user = user or frappe.session.user
 
-	open_shifts = _get_open_shift_rows(user)
+	open_shifts = get_open_shift_rows(user)
 
 	if not open_shifts:
 		return None
@@ -327,7 +327,7 @@ def check_open_shift(user: str | None = None):
 	data = {
 		"pos_opening_shift": frappe.get_doc("POS Opening Shift", shift_name).as_dict(),
 	}
-	_enrich_shift_data(data, pos_profile)
+	enrich_shift_data(data, pos_profile)
 
 	return data
 
@@ -485,7 +485,7 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 				},
 			)
 
-	tax_summary = _get_shift_tax_summary(invoices, doctype)
+	tax_summary = get_shift_tax_summary(invoices, doctype)
 	for tax in tax_summary:
 		try:
 			closing_shift.append(
@@ -565,7 +565,7 @@ def get_shift_summary(opening_shift: str):
 			"currency": row_value(detail, "currency") or "",
 		}
 
-	tax_summary = _get_shift_tax_summary(invoices, doctype)
+	tax_summary = get_shift_tax_summary(invoices, doctype)
 
 	return {
 		"total_invoices": len(invoices),
@@ -629,7 +629,7 @@ def attach_tender_currencies(data: dict, profile_doc):
 	data["company_currency_meta"] = get_currency_meta(company_currency)
 
 
-def _enrich_shift_data(data: dict, pos_profile: str):
+def enrich_shift_data(data: dict, pos_profile: str):
 	"""Add profile, company, settings, and tax template data to shift response."""
 	try:
 		profile = frappe.get_cached_doc("POS Profile", pos_profile)
@@ -686,7 +686,7 @@ def _enrich_shift_data(data: dict, pos_profile: str):
 	}
 
 
-def _get_shift_tax_summary(invoices: list, doctype: str = "Sales Invoice") -> list:
+def get_shift_tax_summary(invoices: list, doctype: str = "Sales Invoice") -> list:
 	"""Aggregate tax info across all shift invoices."""
 	if not invoices:
 		return []

@@ -123,39 +123,3 @@ def get_number_format_settings():
 		"use_number_format_from_currency": cint(system_settings.get("use_number_format_from_currency")),
 		"hide_currency_symbol": frappe.db.get_default("hide_currency_symbol") or "",
 	}
-
-
-@frappe.whitelist()
-def get_currencies():
-	"""Return enabled currency codes for dropdowns and cached settings."""
-
-	return frappe.get_all(
-		"Currency",
-		filters={"enabled": 1},
-		fields=["name", "currency_name", "symbol"],
-		order_by="name asc",
-		limit_page_length=0,
-	)
-
-
-@frappe.whitelist()
-def get_languages():
-	"""Return enabled language names for dropdowns and cached settings."""
-
-	try:
-		rows = frappe.get_all(
-			"Language",
-			filters={"enabled": 1},
-			fields=["name", "language_name"],
-			order_by="language_name asc",
-			limit_page_length=0,
-		)
-	except Exception:
-		rows = frappe.get_all(
-			"Language",
-			fields=["name"],
-			order_by="name asc",
-			limit_page_length=0,
-		)
-
-	return [row.get("name") for row in rows if row.get("name")]

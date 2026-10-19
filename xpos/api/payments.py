@@ -21,16 +21,6 @@ from xpos.api.utilities import can_settle_outstanding
 
 
 @frappe.whitelist()
-def get_available_credit(
-	customer: str, company: str | None = None, pos_profile: str | None = None
-) -> list[dict]:
-	"""Spendable credit rows for a customer; same rules as xpos.api.customer_credit."""
-	from xpos.api.customer_credit import get_customer_credit
-
-	return get_customer_credit(customer, pos_profile=pos_profile)["sources"]
-
-
-@frappe.whitelist()
 def get_outstanding_invoices(
 	customer: str | None = None,
 	company: str | None = None,

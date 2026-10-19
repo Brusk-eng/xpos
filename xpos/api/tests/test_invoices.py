@@ -74,7 +74,7 @@ class TestCreateInvoice(unittest.TestCase):
 		mock_frappe.throw.assert_called()
 
 	@patch("xpos.api.invoices.get_invoice_type", return_value="Sales Invoice")
-	@patch("xpos.api.invoices._validate_return_invoice")
+	@patch("xpos.api.invoices.validate_return_invoice")
 	@patch("xpos.api.invoices.frappe")
 	def test_create_invoice_creates_sales_invoice(self, mock_frappe, mock_validate_return, mock_invoice_type):
 		"""Test that create_invoice creates a Sales Invoice document."""
@@ -104,7 +104,7 @@ class TestCreateInvoice(unittest.TestCase):
 		mock_frappe.new_doc.assert_called_once_with("Sales Invoice")
 		mock_invoice.insert.assert_called_once()
 
-	@patch("xpos.api.invoices._validate_return_invoice")
+	@patch("xpos.api.invoices.validate_return_invoice")
 	@patch("xpos.api.invoices.frappe")
 	def test_create_invoice_handles_return(self, mock_frappe, mock_validate_return):
 		"""Test that create_invoice properly handles return invoices."""
@@ -215,7 +215,7 @@ class TestInvoiceOutstandingPermissions(unittest.TestCase):
 		}.get(key)
 
 		with patch("xpos.api.invoices._", lambda message: message):
-			invoices._validate_unpaid_balance_permissions(invoice_doc, pos_profile, {"is_credit_sale": 1})
+			invoices.validate_unpaid_balance_permissions(invoice_doc, pos_profile, {"is_credit_sale": 1})
 
 		mock_throw.assert_called_once_with("Credit sale is not allowed for POS Profile POS-PROFILE-1.")
 
@@ -235,7 +235,7 @@ class TestInvoiceOutstandingPermissions(unittest.TestCase):
 			"allow_partial_payment": 0,
 		}.get(key)
 
-		invoices._validate_unpaid_balance_permissions(invoice_doc, pos_profile, {"is_credit_sale": 1})
+		invoices.validate_unpaid_balance_permissions(invoice_doc, pos_profile, {"is_credit_sale": 1})
 
 		mock_throw.assert_not_called()
 
@@ -255,7 +255,7 @@ class TestInvoiceOutstandingPermissions(unittest.TestCase):
 			"allow_partial_payment": 1,
 		}.get(key)
 
-		invoices._validate_unpaid_balance_permissions(invoice_doc, pos_profile, {"is_credit_sale": 0})
+		invoices.validate_unpaid_balance_permissions(invoice_doc, pos_profile, {"is_credit_sale": 0})
 
 		mock_throw.assert_not_called()
 
@@ -269,7 +269,7 @@ class TestInvoicePaymentRowDefaults(unittest.TestCase):
 		invoice_doc.get.return_value = []
 		pos_profile = SimpleNamespace(payments=[SimpleNamespace(mode_of_payment="Cash")])
 
-		invoices._ensure_pos_invoice_payment_row(invoice_doc, pos_profile, True)
+		invoices.ensure_pos_invoice_payment_row(invoice_doc, pos_profile, True)
 
 		invoice_doc.append.assert_called_once_with(
 			"payments",
@@ -282,7 +282,7 @@ class TestInvoicePaymentRowDefaults(unittest.TestCase):
 		invoice_doc.get.return_value = [SimpleNamespace(mode_of_payment="Card", amount=50)]
 		pos_profile = SimpleNamespace(payments=[SimpleNamespace(mode_of_payment="Cash")])
 
-		invoices._ensure_pos_invoice_payment_row(invoice_doc, pos_profile, True)
+		invoices.ensure_pos_invoice_payment_row(invoice_doc, pos_profile, True)
 
 		invoice_doc.append.assert_not_called()
 
@@ -298,7 +298,7 @@ class TestInvoiceDeliveryChargeFields(unittest.TestCase):
 			pos_delivery_charges_rate=25,
 		)
 
-		invoices._apply_invoice_delivery_charge_fields(invoice_doc, {})
+		invoices.apply_invoice_delivery_charge_fields(invoice_doc, {})
 
 		self.assertIsNone(invoice_doc.pos_delivery_charges)
 		self.assertEqual(invoice_doc.pos_delivery_charges_rate, 0)
@@ -308,7 +308,7 @@ class TestInvoiceDeliveryChargeFields(unittest.TestCase):
 		"""The xpos payload should remain the only source of delivery-charge selection."""
 		invoice_doc = SimpleNamespace(flags=SimpleNamespace())
 
-		invoices._apply_invoice_delivery_charge_fields(
+		invoices.apply_invoice_delivery_charge_fields(
 			invoice_doc,
 			{
 				"pos_delivery_charges": "Express Delivery",
@@ -332,7 +332,7 @@ class TestInvoiceLoyaltyFields(unittest.TestCase):
 			loyalty_amount=500,
 		)
 
-		invoices._apply_invoice_loyalty_fields(invoice_doc, {})
+		invoices.apply_invoice_loyalty_fields(invoice_doc, {})
 
 		self.assertEqual(invoice_doc.redeem_loyalty_points, 0)
 		self.assertEqual(invoice_doc.loyalty_points, 0)
@@ -346,7 +346,7 @@ class TestInvoiceLoyaltyFields(unittest.TestCase):
 			loyalty_amount=0,
 		)
 
-		invoices._apply_invoice_loyalty_fields(
+		invoices.apply_invoice_loyalty_fields(
 			invoice_doc,
 			{
 				"redeem_loyalty_points": 1,
@@ -368,43 +368,16 @@ class TestInvoiceLoyaltyFields(unittest.TestCase):
 			loyalty_amount=999,
 		)
 
-		def _set_loyalty_amount(doc, points):
+		def set_loyalty_amount(doc, points):
 			doc.loyalty_amount = 25
 
-		mock_validate_loyalty_points.side_effect = _set_loyalty_amount
+		mock_validate_loyalty_points.side_effect = set_loyalty_amount
 
-		loyalty_paid = invoices._resolve_loyalty_paid_amount(invoice_doc)
+		loyalty_paid = invoices.resolve_loyalty_paid_amount(invoice_doc)
 
 		self.assertEqual(loyalty_paid, 25)
 		self.assertEqual(invoice_doc.loyalty_amount, 25)
 		mock_validate_loyalty_points.assert_called_once_with(invoice_doc, 50)
-
-
-class TestGetInvoices(unittest.TestCase):
-	"""Tests for get_invoices function."""
-
-	@patch("xpos.api.invoices.frappe")
-	def test_get_invoices_filters_by_shift(self, mock_frappe):
-		"""Test that get_invoices filters by POS opening shift."""
-		mock_frappe.get_all.return_value = [
-			{"name": "INV-001", "grand_total": 100, "customer": "C1"},
-			{"name": "INV-002", "grand_total": 200, "customer": "C2"},
-		]
-
-		result = invoices.get_invoices(pos_opening_shift="POS-OPEN-001")
-
-		mock_frappe.get_all.assert_called()
-		self.assertEqual(len(result), 2)
-
-	@patch("xpos.api.invoices.frappe")
-	def test_get_invoices_filters_returns(self, mock_frappe):
-		"""Test that get_invoices can filter return invoices."""
-		mock_frappe.get_all.return_value = [{"name": "INV-RET-001", "grand_total": -50, "is_return": 1}]
-
-		result = invoices.get_invoices(pos_opening_shift="POS-OPEN-001", is_return=1)
-
-		self.assertEqual(len(result), 1)
-		self.assertEqual(result[0]["is_return"], 1)
 
 
 class TestGetInvoiceDetails(unittest.TestCase):

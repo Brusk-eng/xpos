@@ -16,7 +16,7 @@ from frappe.utils import flt
 from xpos.api.items import get_stock_qty
 
 
-def _resolve_profile(pos_profile: str | None):
+def resolve_profile(pos_profile: str | None):
 	"""Return (pos_profile_doc | None, currency, symbol, warehouse, price_list)."""
 	pos = None
 	currency = None
@@ -41,7 +41,7 @@ def _resolve_profile(pos_profile: str | None):
 	return pos, currency, symbol or currency or "", warehouse, price_list
 
 
-def _get_rate(item_code: str, price_list: str | None, uom: str | None = None):
+def get_rate(item_code: str, price_list: str | None, uom: str | None = None):
 	"""Best selling rate for an item from the given price list."""
 	if not price_list:
 		return 0.0
@@ -56,7 +56,7 @@ def _get_rate(item_code: str, price_list: str | None, uom: str | None = None):
 	return flt(rate or 0)
 
 
-def _find_item_code(barcode: str) -> str | None:
+def find_item_code(barcode: str) -> str | None:
 	"""
 	Resolve a scanned barcode to a single Item code.
 	"""
@@ -83,16 +83,16 @@ def lookup(barcode: str, pos_profile: str | None = None):
 	if not barcode:
 		return None
 
-	pos, currency, symbol, warehouse, price_list = _resolve_profile(pos_profile)
+	pos, currency, symbol, warehouse, price_list = resolve_profile(pos_profile)
 
-	item_code = _find_item_code(barcode)
+	item_code = find_item_code(barcode)
 	if not item_code:
 		return None
 
 	item = frappe.get_cached_doc("Item", item_code)
 
 	uom = frappe.db.get_value("Item Barcode", {"barcode": barcode}, "uom") or item.stock_uom
-	rate = _get_rate(item.name, price_list, uom)
+	rate = get_rate(item.name, price_list, uom)
 
 	actual_qty = 0.0
 	if warehouse and item.is_stock_item:

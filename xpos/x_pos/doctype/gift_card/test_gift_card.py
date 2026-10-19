@@ -10,7 +10,7 @@ from erpnext.tests.utils import ERPNextTestSuite
 from frappe.utils import add_days, flt, nowdate
 
 from xpos.api import gift_cards as api
-from xpos.api.invoices import _submit_invoice_job, create_invoice, get_invoice_for_return
+from xpos.api.invoices import create_invoice, get_invoice_for_return, submit_invoice_job
 from xpos.api.shifts import get_shift_expected_amounts, get_shift_invoices, open_shift
 from xpos.x_pos.gift_cards import (
 	SETTINGS,
@@ -406,7 +406,7 @@ class TestGiftCardIdempotency(GiftCardTestCase):
 		self.assertEqual(card_of(code).balance, 50)
 		# the background submit job runs the same hooks in its own transaction
 		with patch("xpos.api.invoices.frappe.db.commit"):
-			_submit_invoice_job(invoice.name)
+			submit_invoice_job(invoice.name)
 		self.assertEqual(card_of(code).balance, 35)
 
 

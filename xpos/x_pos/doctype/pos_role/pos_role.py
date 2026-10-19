@@ -23,7 +23,7 @@ class POSRole(Document):
 	# end: auto-generated types
 
 	def validate(self):
-		self._sync_permissions_with_catalog()
+		self.sync_permissions_with_catalog()
 
 	def on_update(self):
 		clear_role_permission_cache(self.name)
@@ -31,7 +31,7 @@ class POSRole(Document):
 	def on_trash(self):
 		clear_role_permission_cache(self.name)
 
-	def _sync_permissions_with_catalog(self):
+	def sync_permissions_with_catalog(self):
 		"""Keep the child table aligned with the POS Permission catalog.
 
 		Adds a disabled row for every catalog permission missing from this role

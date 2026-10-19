@@ -48,7 +48,7 @@ BARCODE_TYPE_ALIASES = {
 }
 
 
-def _normalize_barcode_type(barcode_type: str | None, default: str = "code128") -> str:
+def normalize_barcode_type(barcode_type: str | None, default: str = "code128") -> str:
 	"""
 	Resolve any barcode type label to a supported python-barcode class name.
 
@@ -75,11 +75,11 @@ def _normalize_barcode_type(barcode_type: str | None, default: str = "code128") 
 	return default
 
 
-def _get_barcode_class(barcode_type: str):
+def get_barcode_class(barcode_type: str):
 	"""Return the python-barcode class for the given type identifier."""
 	import barcode as python_barcode
 
-	return python_barcode.get_barcode_class(BARCODE_TYPES[_normalize_barcode_type(barcode_type)])
+	return python_barcode.get_barcode_class(BARCODE_TYPES[normalize_barcode_type(barcode_type)])
 
 
 def generate_barcode(
@@ -111,7 +111,7 @@ def generate_barcode(
 		return ""
 
 	try:
-		barcode_cls = _get_barcode_class(barcode_type)
+		barcode_cls = get_barcode_class(barcode_type)
 
 		options = {
 			"module_width": width,
@@ -252,7 +252,7 @@ def generate_item_barcode_label(
 		else:
 			barcode_value = item_code
 
-	barcode_type = _normalize_barcode_type(barcode_type)
+	barcode_type = normalize_barcode_type(barcode_type)
 
 	price = 0
 	currency = frappe.defaults.get_global_default("currency") or "USD"
@@ -296,44 +296,6 @@ def generate_item_barcode_label(
 		"currency": currency,
 		"uom": item.stock_uom or "Nos",
 	}
-
-
-@frappe.whitelist()
-def get_barcode_image(
-	value: str,
-	barcode_type: str = "code128",
-	width: float = 0.4,
-	height: float = 15.0,
-	font_size: int = 10,
-	fmt: str = "png",
-) -> str:
-	"""API: Generate a barcode and return as base64 data URI."""
-	return generate_barcode(
-		value,
-		barcode_type=barcode_type,
-		width=float(width),
-		height=float(height),
-		font_size=int(font_size),
-		fmt=fmt,
-	)
-
-
-@frappe.whitelist()
-def get_qrcode_image(
-	value: str,
-	size: int = 4,
-	border: int = 2,
-	error_correction: str = "M",
-	fmt: str = "png",
-) -> str:
-	"""API: Generate a QR code and return as base64 data URI."""
-	return generate_qrcode(
-		value,
-		size=int(size),
-		border=int(border),
-		error_correction=error_correction,
-		fmt=fmt,
-	)
 
 
 @frappe.whitelist()
@@ -394,12 +356,6 @@ def get_item_barcode_labels(
 				labels.append(label)
 
 	return labels
-
-
-@frappe.whitelist()
-def get_barcode_types() -> list[dict]:
-	"""API: Return list of supported barcode types."""
-	return [{"value": k, "label": k.upper().replace("_", " ")} for k in BARCODE_TYPES]
 
 
 @frappe.whitelist()

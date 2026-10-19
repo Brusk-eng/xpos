@@ -25,7 +25,7 @@ from io import BufferedReader
 #   __("message", [args], "context")
 #   __("message", null, "context")
 # ---------------------------------------------------------------------------
-_CALL_PATTERN = re.compile(
+CALL_PATTERN = re.compile(
 	r"""__\(\s*"""
 	# ── message ──────────────────────────────────────────────────────────
 	r"""(?P<q1>["'])"""  # opening quote (single or double)
@@ -58,9 +58,9 @@ def extract(
 	"""
 	code = fileobj.read().decode("utf-8")
 
-	for m in _CALL_PATTERN.finditer(code):
+	for m in CALL_PATTERN.finditer(code):
 		message = m.group("message")
-		if not message or not _is_translatable(message):
+		if not message or not is_translatable(message):
 			continue
 
 		context = m.group("context")
@@ -75,13 +75,13 @@ def extract(
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
-_NON_TRANSLATABLE = re.compile(r"^(fa fa-|eval:)|px$")
+NON_TRANSLATABLE = re.compile(r"^(fa fa-|eval:)|px$")
 
 
-def _is_translatable(text: str) -> bool:
+def is_translatable(text: str) -> bool:
 	"""Return *True* if *text* looks like a real translatable string."""
 	if not re.search(r"[a-zA-Z]", text):
 		return False
-	if _NON_TRANSLATABLE.search(text):
+	if NON_TRANSLATABLE.search(text):
 		return False
 	return True

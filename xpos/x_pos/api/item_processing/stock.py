@@ -2,7 +2,7 @@ import frappe
 from erpnext.stock.doctype.batch.batch import get_batch_qty
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Sum
-from frappe.utils import cstr, flt, json
+from frappe.utils import cstr, flt
 
 
 def get_stock_availability(item_code: str, warehouse: str) -> float:
@@ -147,44 +147,3 @@ def get_bulk_stock_availability(items: list[dict]) -> dict[tuple[str, str, str],
 			results[(code, warehouse, "")] = qty_map.get(code, 0.0)
 
 	return results
-
-
-@frappe.whitelist()
-def get_available_qty(items: str | list[dict]) -> list[dict]:
-	"""Return available stock quantity for given items.
-
-	Args:
-	    items (str | list[dict]): JSON string or list of dicts with
-	        item_code, warehouse and optional batch_no.
-
-	Returns:
-	    list: List of dicts with item_code, warehouse and available_qty
-	        in stock UOM.
-	"""
-
-	if isinstance(items, str):
-		items = json.loads(items)
-
-	result = []
-	for it in items or []:
-		item_code = it.get("item_code")
-		warehouse = it.get("warehouse")
-		batch_no = it.get("batch_no")
-
-		if not item_code or not warehouse:
-			continue
-
-		if batch_no:
-			available_qty = get_batch_qty(batch_no, warehouse) or 0
-		else:
-			available_qty = get_stock_availability(item_code, warehouse)
-
-		result.append(
-			{
-				"item_code": item_code,
-				"warehouse": warehouse,
-				"available_qty": flt(available_qty),
-			}
-		)
-
-	return result

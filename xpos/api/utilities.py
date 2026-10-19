@@ -107,60 +107,6 @@ def get_version_info():
 
 
 @frappe.whitelist()
-def get_selling_price_lists():
-	"""Lists all selling price lists."""
-
-	return frappe.get_all(
-		"Price List",
-		filters={"selling": 1, "enabled": 1},
-		fields=["name"],
-		order_by="name asc",
-	)
-
-
-@frappe.whitelist()
-def get_pos_profile_tax_inclusive(pos_profile: str):
-	"""Returns tax inclusive flag for a POS Profile."""
-
-	try:
-		return cint(frappe.db.get_value("POS Profile", pos_profile, "tax_inclusive"))
-	except Exception:
-		return 0
-
-
-@frappe.whitelist()
-def get_active_pos_profile(user: str | None = None):
-	"""Returns the active POS Profile for a user."""
-
-	user = user or frappe.session.user
-
-	profiles = frappe.db.sql(
-		"""
-		SELECT DISTINCT p.name, p.company, p.currency, p.warehouse
-		FROM `tabPOS Profile` p
-		INNER JOIN `tabPOS Profile User` u ON u.parent = p.name
-		WHERE p.disabled = 0 AND u.user = %(user)s
-		ORDER BY u.default DESC, p.name ASC
-		LIMIT 1
-		""",
-		{"user": user},
-		as_dict=True,
-	)
-
-	if profiles:
-		return frappe.get_cached_doc("POS Profile", profiles[0].name).as_dict()
-	return None
-
-
-def get_profile_setting(profile: str, setting: str, default=None):
-	"""Helper to get a setting from POS Profile."""
-	try:
-		return frappe.get_cached_value("POS Profile", profile, setting) or default
-	except Exception:
-		return default
-
-
-@frappe.whitelist()
 def get_default_warehouse(company: str | None = None):
 	"""Return the default warehouse, preferring Stock Settings over the Company default."""
 
