@@ -2,7 +2,7 @@
 	<div class="relative">
 		<div
 			v-if="canDock && !isOpen"
-			class="fixed start-0 top-14 bottom-0 z-40 w-1.5"
+			class="fixed inset-s-0 top-14 bottom-0 z-40 w-1.5"
 			aria-hidden="true"
 			data-testid="sidebar-hot-zone"
 			@mouseenter="schedulePeek"
@@ -22,8 +22,8 @@
 					cn(
 						'fixed z-50 flex w-64 flex-col border border-border bg-card text-card-foreground shadow-overlay',
 						canDock
-							? 'start-2 top-18 bottom-2 rounded-xl'
-							: 'start-0 top-0 h-full border-y-0 border-s-0',
+							? 'inset-s-2 top-18 bottom-2 rounded-xl'
+							: 'inset-s-0 top-0 h-full border-y-0 border-s-0',
 					)
 				"
 				@mouseenter="cancelHide"
@@ -58,7 +58,7 @@
 									cn(
 										'relative flex min-h-control items-center gap-3 rounded-lg px-3 text-sm no-underline transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
 										isActive(item.route)
-											? 'bg-surface-selected font-semibold text-surface-selected-foreground before:absolute before:inset-y-2 before:start-0 before:w-1 before:rounded-full before:bg-primary'
+											? 'bg-surface-selected font-semibold text-surface-selected-foreground before:absolute before:inset-y-2 before:inset-s-0 before:w-1 before:rounded-full before:bg-primary'
 											: 'font-medium text-muted-foreground hover:bg-surface-hover hover:text-foreground',
 									)
 								"

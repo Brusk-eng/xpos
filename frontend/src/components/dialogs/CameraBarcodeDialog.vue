@@ -40,25 +40,25 @@
 						:class="lastDetected ? 'scanner-success' : ''"
 					>
 						<span
-							class="absolute top-0 start-0 w-7 h-7 border-t-4 border-s-4 rounded-tl-sm transition-colors duration-300"
+							class="absolute top-0 inset-s-0 w-7 h-7 border-t-4 border-s-4 rounded-tl-sm transition-colors duration-300"
 							:class="lastDetected ? 'border-emerald-400' : 'border-primary'"
 						/>
 						<span
-							class="absolute top-0 end-0 w-7 h-7 border-t-4 border-e-4 rounded-tr-sm transition-colors duration-300"
+							class="absolute top-0 inset-e-0 w-7 h-7 border-t-4 border-e-4 rounded-tr-sm transition-colors duration-300"
 							:class="lastDetected ? 'border-emerald-400' : 'border-primary'"
 						/>
 						<span
-							class="absolute bottom-0 start-0 w-7 h-7 border-b-4 border-s-4 rounded-bl-sm transition-colors duration-300"
+							class="absolute bottom-0 inset-s-0 w-7 h-7 border-b-4 border-s-4 rounded-bl-sm transition-colors duration-300"
 							:class="lastDetected ? 'border-emerald-400' : 'border-primary'"
 						/>
 						<span
-							class="absolute bottom-0 end-0 w-7 h-7 border-b-4 border-e-4 rounded-br-sm transition-colors duration-300"
+							class="absolute bottom-0 inset-e-0 w-7 h-7 border-b-4 border-e-4 rounded-br-sm transition-colors duration-300"
 							:class="lastDetected ? 'border-emerald-400' : 'border-primary'"
 						/>
 
 						<div
 							v-if="!lastDetected && scanning"
-							class="absolute start-2 end-2 h-0.5 bg-primary/80 scan-line"
+							class="absolute inset-s-2 inset-e-2 h-0.5 bg-primary/80 scan-line"
 						/>
 
 						<div

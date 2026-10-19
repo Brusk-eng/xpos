@@ -119,7 +119,7 @@ function clearSearch() {
 						<div class="flex flex-wrap items-center gap-2">
 							<div class="relative w-full sm:w-80">
 								<Search
-									class="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
+									class="pointer-events-none absolute inset-s-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground"
 								/>
 								<Input
 									v-model="searchTerm"

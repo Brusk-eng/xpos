@@ -422,7 +422,7 @@ onMounted(() => {
 						<span class="text-sm font-medium">Search field</span>
 						<span class="relative block">
 							<Search
-								class="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+								class="pointer-events-none absolute inset-s-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
 								aria-hidden="true"
 							/>
 							<Input

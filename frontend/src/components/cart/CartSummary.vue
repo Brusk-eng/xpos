@@ -497,7 +497,7 @@
 			<CreditCard class="size-6!" />
 			{{ payButtonLabel }}
 			<kbd
-				class="absolute end-4 hidden h-8 min-w-10 items-center justify-center rounded-lg border border-white/30 bg-white/15 px-2 font-mono text-sm font-semibold sm:inline-flex"
+				class="absolute inset-e-4 hidden h-8 min-w-10 items-center justify-center rounded-lg border border-white/30 bg-white/15 px-2 font-mono text-sm font-semibold sm:inline-flex"
 				aria-hidden="true"
 				>F4</kbd
 			>

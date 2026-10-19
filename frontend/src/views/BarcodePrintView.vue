@@ -26,7 +26,7 @@
 				<div class="p-4 pb-2 space-y-3">
 					<div class="relative">
 						<Search
-							class="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+							class="absolute inset-s-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
 						/>
 						<input
 							ref="searchInput"

@@ -9,7 +9,7 @@
 		"
 		:value="value"
 	>
-		<span class="absolute end-2 flex h-4 w-4 items-center justify-center">
+		<span class="absolute inset-e-2 flex h-4 w-4 items-center justify-center">
 			<SelectItemIndicator>
 				<Check class="h-4 w-4" />
 			</SelectItemIndicator>

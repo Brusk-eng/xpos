@@ -28,7 +28,7 @@
 						</label>
 						<div class="relative">
 							<User
-								class="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+								class="absolute inset-s-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
 							/>
 							<Input
 								id="username"
@@ -47,7 +47,7 @@
 						<label for="password" class="text-sm font-medium text-foreground"> Password </label>
 						<div class="relative">
 							<Lock
-								class="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
+								class="absolute inset-s-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"
 							/>
 							<Input
 								id="password"
@@ -61,7 +61,7 @@
 							/>
 							<button
 								type="button"
-								class="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+								class="absolute inset-e-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
 								@click="showPassword = !showPassword"
 							>
 								<EyeOff v-if="showPassword" class="w-4 h-4" />
