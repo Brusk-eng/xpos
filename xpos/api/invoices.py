@@ -132,6 +132,128 @@ def apply_invoice_delivery_dates(invoice_doc, data: dict, items: list):
 	invoice_doc.pos_delivery_date = data.get("pos_delivery_date") or (min(dates) if dates else None)
 
 
+OPEN_ORDER_STATUSES = ("To Deliver and Bill", "To Bill", "To Deliver")
+
+
+def agreed_line(item_data: dict, customer: str, pos):
+	"""The Sales Order or Quotation line a cart line comes from, or None for an ordinary line."""
+	if not (item_data.get("so_detail") or item_data.get("quotation_item")):
+		return None
+	if not cint(pos.get("allow_sales_order")):
+		frappe.throw(_("{0} is disabled for POS Profile {1}.").format(_("Sales Orders"), pos.name))
+	if item_data.get("so_detail"):
+		return sales_order_line(item_data, customer, pos)
+	return quotation_line(item_data, customer, pos)
+
+
+def quotation_line(item_data: dict, customer: str, pos):
+	"""The Quotation line a cart line was loaded from, checked against the quotation."""
+	row = frappe.db.get_value(
+		"Quotation Item",
+		item_data.get("quotation_item"),
+		["name", "parent", "item_code", "rate", "price_list_rate", "discount_percentage"],
+		as_dict=True,
+	)
+	quote = row and frappe.db.get_value(
+		"Quotation",
+		row.parent,
+		["party_name", "quotation_to", "company", "docstatus", "status", "valid_till"],
+		as_dict=True,
+	)
+	if (
+		not quote
+		or row.parent != item_data.get("quotation")
+		or row.item_code != item_data.get("item_code")
+		or quote.quotation_to != "Customer"
+		or quote.party_name != customer
+		or quote.company != pos.company
+		or quote.docstatus != 1
+		or quote.status not in ("Open", "Replied", "Partially Ordered")
+		or (
+			quote.valid_till
+			and getdate(quote.valid_till) < getdate(nowdate())
+			and not cint(
+				frappe.db.get_single_value(
+					"Selling Settings", "allow_sales_order_creation_for_expired_quotation"
+				)
+			)
+		)
+	):
+		frappe.throw(
+			_("Row for {0} does not match a valid line of Quotation {1}.").format(
+				item_data.get("item_code"), item_data.get("quotation")
+			)
+		)
+	row.doctype = "Quotation Item"
+	return row
+
+
+def sales_order_line(item_data: dict, customer: str, pos):
+	"""The Sales Order line a cart line bills, checked against the order it claims to come from."""
+	row = frappe.db.get_value(
+		"Sales Order Item",
+		item_data.get("so_detail"),
+		[
+			"name",
+			"parent",
+			"item_code",
+			"qty",
+			"rate",
+			"amount",
+			"billed_amt",
+			"price_list_rate",
+			"discount_percentage",
+		],
+		as_dict=True,
+	)
+	order = row and frappe.db.get_value(
+		"Sales Order", row.parent, ["customer", "company", "docstatus", "status"], as_dict=True
+	)
+	if (
+		not order
+		or row.parent != item_data.get("sales_order")
+		or row.item_code != item_data.get("item_code")
+		or order.customer != customer
+		or order.company != pos.company
+		or order.docstatus != 1
+		or order.status not in OPEN_ORDER_STATUSES
+	):
+		frappe.throw(
+			_("Row for {0} does not match an open line of Sales Order {1}.").format(
+				item_data.get("item_code"), item_data.get("sales_order")
+			)
+		)
+	left = (flt(row.amount) - flt(row.billed_amt)) / flt(row.rate) if flt(row.rate) else flt(row.qty)
+	if flt(item_data.get("qty")) - left > 0.0001:
+		frappe.throw(
+			_("Only {0} of {1} is left to bill on Sales Order {2}.").format(
+				flt(left, 3), row.item_code, row.parent
+			)
+		)
+	row.doctype = "Sales Order Item"
+	return row
+
+
+def deduct_order_deposits(invoice_doc, doctype: str) -> None:
+	"""Allocate the deposits paid against the billed orders, so the customer pays only the rest."""
+	orders = {row.sales_order for row in invoice_doc.items if row.get("sales_order")}
+	with_deposit = [so for so in orders if flt(frappe.db.get_value("Sales Order", so, "advance_paid"))]
+	if not with_deposit:
+		return
+	if doctype != "Sales Invoice":
+		frappe.throw(
+			_("Sales Order {0} has a deposit, which POS Invoices cannot deduct. Bill it in Desk.").format(
+				with_deposit[0]
+			)
+		)
+	# only what was paid against these orders, not the customer's other unallocated payments
+	invoice_doc.only_include_allocated_payments = 1
+	# for_validate keeps the tendered payment rows instead of reloading the profile's
+	invoice_doc.set_missing_values(for_validate=True)
+	invoice_doc.calculate_taxes_and_totals()
+	invoice_doc.set_advances()
+
+
 def resolve_return_sales_person(return_against: str | None) -> str | None:
 	"""Sales person credited on the invoice being returned, if any."""
 	if not return_against:
@@ -210,8 +332,10 @@ def _get_unpaid_balance(invoice_doc) -> float:
 	grand_total = abs(
 		_coerce_amount(getattr(invoice_doc, "rounded_total", 0) or getattr(invoice_doc, "grand_total", 0))
 	)
-	settled_amount = abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0))) + abs(
-		_coerce_amount(getattr(invoice_doc, "write_off_amount", 0))
+	settled_amount = (
+		abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
+		+ abs(_coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
+		+ abs(_coerce_amount(getattr(invoice_doc, "total_advance", 0)))
 	)
 	return max(0.0, round(grand_total - settled_amount, 2))
 
@@ -266,6 +390,7 @@ def _validate_unpaid_balance_permissions(
 	settled_amount = (
 		abs(_coerce_amount(getattr(invoice_doc, "paid_amount", 0)))
 		+ abs(_coerce_amount(getattr(invoice_doc, "write_off_amount", 0)))
+		+ abs(_coerce_amount(getattr(invoice_doc, "total_advance", 0)))
 		+ customer_credit
 	)
 
@@ -617,6 +742,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	# (row, line as the till sent it, index): compared with ERPNext's result before anything is submitted.
 	quoted = []
 	sale_rows = []
+	order_rows = []
 	for index, item_data in enumerate(items):
 		if item_data in gift_issue_lines:
 			item_data["item_code"] = gift_setting.issue_item
@@ -631,6 +757,19 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			and verified_offer_free_line(pos, item_data, paid_lines, coupon_offers, invoice_doc.posting_date)
 		)
 		is_sale_line = not is_return and not verified_free and item_data not in gift_issue_lines
+		order_row = None if is_return else agreed_line(item_data, customer, pos)
+		if order_row:
+			# billed at the price agreed on the order or quotation, which was checked when it was made
+			is_sale_line = False
+			item_rate = flt(order_row.price_list_rate or order_row.rate, rate_precision)
+			item_data.update(
+				{
+					"rate": item_rate,
+					"discount_percentage": order_row.discount_percentage,
+					"discount_amount": 0,
+				}
+			)
+			order_rows.append(order_row)
 
 		if is_sale_line and not allow_rate_change:
 			listed_rate = get_line_rate(
@@ -677,12 +816,15 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 						setattr(item, fieldname, item_data.get(fieldname))
 					except Exception:
 						pass
+		elif order_row and order_row.doctype == "Sales Order Item":
+			item.sales_order = order_row.parent
+			item.so_detail = order_row.name
 
 		disc_pct = flt(item_data.get("discount_percentage", 0), 2)
 		disc_amt = flt(item_data.get("discount_amount", 0), 2)
 
 		max_discount = flt(pos.get("max_discount_percentage_allowed", 0))
-		if max_discount > 0 and disc_pct > max_discount and not verified_free:
+		if max_discount > 0 and disc_pct > max_discount and not verified_free and not order_row:
 			frappe.throw(
 				_("Item {0}: Discount {1}% exceeds maximum allowed {2}%").format(
 					item_data.get("item_code"), disc_pct, max_discount
@@ -799,6 +941,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	change_amount = change_total if change_legs else flt(data.get("change_amount", 0))
 	if change_amount > 0:
 		invoice_doc.change_amount = change_amount
+		if not change_legs and not is_return and doctype == "POS Invoice":
+			cap_change_at_overpayment(invoice_doc)
 
 	if pos_opening_shift:
 		try:
@@ -850,6 +994,9 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 				invoice_doc.return_valid_upto = getdate(nowdate()) + timedelta(days=return_days)
 	except Exception:
 		pass
+
+	if order_rows:
+		deduct_order_deposits(invoice_doc, doctype)
 
 	frappe.db.savepoint(REPRICE_SAVEPOINT)
 	try:
@@ -937,6 +1084,21 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		invoice_doc.reload()
 
 	return _build_invoice_response(invoice_doc)
+
+
+def cap_change_at_overpayment(invoice_doc):
+	"""The client's change can be off by rounding: never record more than paid minus the total."""
+	validate_change_amount = invoice_doc.validate_change_amount
+
+	def capped():
+		total = flt(invoice_doc.rounded_total) or flt(invoice_doc.grand_total)
+		overpaid = flt(invoice_doc.paid_amount) - total + flt(invoice_doc.write_off_amount)
+		invoice_doc.change_amount = flt(
+			max(0, min(flt(invoice_doc.change_amount), overpaid)), invoice_doc.precision("change_amount")
+		)
+		validate_change_amount()
+
+	invoice_doc.validate_change_amount = capped
 
 
 def existing_sale_response(doctype: str, name: str) -> dict:

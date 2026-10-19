@@ -36,6 +36,7 @@
 | 27 | [Open Tabs](27-open-tabs.md) | Recall a customer's tab across shifts, and settle past credit sales |
 | 28 | [Mixed-Currency Tender Setup](28-mixed-currency-setup.md) | Configure a store that prices in one currency and takes cash in another |
 | 29 | [Gift Cards](29-gift-cards.md) | Stored-value cards: sell, spend in parts, refund, liability report |
+| 30 | [Sales Orders & Quotations](30-sales-orders-quotations.md) | Save the cart as an order or quotation, take a deposit, bill orders in parts |
 
 ---
 
