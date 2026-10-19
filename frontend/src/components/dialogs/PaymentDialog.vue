@@ -956,7 +956,6 @@ import { __ } from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { submitDurableInvoice } from "@/services/invoiceSubmission";
 import { useOfflineSale } from "@/composables/useOfflineSale";
-import { isElectron } from "@/services/electronBridge";
 import {
 	completeLocalFiscalization,
 	FiscalUncertainError,
@@ -1041,7 +1040,7 @@ import {
 
 const posStore = usePosStore();
 const { moneyPrecision, percent } = useMoney();
-const { printInvoice, printInvoiceLocal } = usePrintInvoice();
+const { printInvoice } = usePrintInvoice();
 const { completeOfflineSale } = useOfflineSale();
 const cartStore = useCartStore();
 const customerStore = useCustomerStore();
@@ -1070,7 +1069,6 @@ const showCustomerCredit = computed(
 		!cartStore.isReturnMode &&
 		!!cartStore.customer &&
 		offlineStore.isOnline &&
-		!isElectron() &&
 		creditSources.value.length > 0,
 );
 
@@ -1736,7 +1734,7 @@ function validateForSubmission(): { valid: boolean; message?: string } {
 		}
 	}
 
-	if (isGiftCardSale.value && (!isOnline() || isElectron())) {
+	if (isGiftCardSale.value && !isOnline()) {
 		return {
 			valid: false,
 			message: __("Gift cards need a live connection. This sale cannot be saved offline."),
@@ -1857,40 +1855,6 @@ async function submitPayment(withPrint: boolean = true) {
 			return;
 		}
 
-		if (isElectron() && window.electronAPI?.db) {
-			const result = await window.electronAPI.db.addPendingInvoice({
-				data: {
-					...invoiceData,
-					pos_opening_shift_local_id: shiftName,
-					is_draft: false,
-					is_return: cartStore.isReturnMode,
-					receipt: cartStore.getReceiptSnapshot("", authStore.userFullName),
-				},
-				customer_name: cartStore.customerName,
-				grand_total: cartStore.grandTotal,
-			});
-
-			const localId = result.id;
-			posStore.lastInvoiceName = `LOCAL-${localId}`;
-
-			if (cartStore.isReturnMode) {
-				showSuccess(
-					__("Return saved locally (#{0}). It will sync to server automatically.", [localId]),
-				);
-			} else {
-				showSuccess(
-					__("Invoice saved locally (#{0}). It will sync to server automatically.", [localId]),
-				);
-			}
-
-			if (withPrint && localId && window.electronAPI?.print) {
-				await printInvoiceLocal(localId);
-			}
-
-			cartStore.clearAll();
-			return;
-		}
-
 		if (!isOnline()) {
 			const saved = await completeOfflineSale(invoiceData, {
 				withPrint,
@@ -1958,7 +1922,7 @@ async function submitPayment(withPrint: boolean = true) {
  * recognises and never charges twice.
  */
 async function submitGiftCardSale(invoiceData: InvoiceData, withPrint: boolean) {
-	if (isElectron() || !isOnline()) {
+	if (!isOnline()) {
 		failSubmit(
 			invoiceData.customer_credit?.length
 				? __("Customer credit needs a live connection. This sale cannot be saved offline.")

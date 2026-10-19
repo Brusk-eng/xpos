@@ -14,7 +14,6 @@ vi.stubGlobal(
 	"matchMedia",
 	vi.fn(() => ({ matches: media.matches, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
 );
-vi.mock("@/services/electronBridge", () => ({ isElectron: () => false }));
 vi.mock("@/services/userRights", () => ({ hasPermission: () => true }));
 vi.mock("@/stores/posStore", () => ({
 	usePosStore: () => ({ companyName: "Kodlyft", warehouse: "Stores - KL", allowPosExpense: true }),

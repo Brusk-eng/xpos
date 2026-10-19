@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-muted p-4"
+		class="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-background to-muted p-4"
 	>
 		<div class="mb-8 text-center">
 			<div class="w-16 h-16 mx-auto mb-4 rounded-2xl bg-primary flex items-center justify-center">

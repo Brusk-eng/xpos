@@ -291,7 +291,7 @@ describe("Cart Store", () => {
 		/**
 		 * `setPayments` and friends previously had no callers at all, so `payments` was always empty
 		 * at checkout. `getInvoiceData` never emitted a payment list and `getReceiptSnapshot` always
-		 * reported an empty one with zero change, which is why Electron and cashier backup receipts
+		 * reported an empty one with zero change, which is why cashier backup receipts
 		 * printed no payment or change lines. The payment dialog now routes through these setters.
 		 */
 		it("carries payments set through the store into the invoice payload", () => {

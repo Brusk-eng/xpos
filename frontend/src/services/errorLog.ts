@@ -1,12 +1,11 @@
 /**
  * Central error log, a single shared, reactive buffer that every layer of the
- * app feeds (API/backend failures, sync errors, dead-letters, uncaught renderer
- * errors, and Electron main-process crashes).
+ * app feeds (API/backend failures, sync errors, dead-letters, and uncaught
+ * renderer errors).
  *
  * This is a module-level singleton on purpose: `captureError` must be callable
  * from non-component code (e.g. services/api.ts, main.ts) and the buffer must be
- * shared across the whole app. (Composables like useSyncStatus create fresh refs
- * per call, so they are NOT shared. Hence a plain module singleton here.)
+ * shared across the whole app, hence a plain module singleton.
  *
  * Entries are persisted to localStorage so they survive a window reload. This is
  * client-side capture only; nothing is sent to the server.
@@ -14,7 +13,7 @@
 
 import { ref } from "vue";
 
-export type ErrorSource = "api" | "sync" | "dead-letter" | "renderer" | "promise" | "main";
+export type ErrorSource = "api" | "sync" | "dead-letter" | "renderer" | "promise";
 
 export interface ErrorEntry {
 	id: string;

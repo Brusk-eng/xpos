@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { call, isNetworkError } from "@/services/api";
-import { isElectron } from "@/services/electronBridge";
 import { usePosStore } from "@/stores/posStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
@@ -63,7 +62,6 @@ export const useItemStore = defineStore("items", () => {
 	const isLoadingVariants = ref(false);
 
 	async function cacheAllItems(posProfile: string): Promise<void> {
-		if (isElectron()) return;
 		if (!usePosStore().useOfflineMode) return;
 		try {
 			const batchSize = 200;
@@ -96,7 +94,6 @@ export const useItemStore = defineStore("items", () => {
 	}
 
 	async function cacheAllStock(posProfile: string, warehouse: string, allItems?: POSItem[]): Promise<void> {
-		if (isElectron()) return;
 		if (!isOnline()) {
 			console.warn("[XPOS Offline] Cannot cache stock - system is offline");
 			return;
@@ -149,29 +146,6 @@ export const useItemStore = defineStore("items", () => {
 		loadError.value = null;
 
 		try {
-			if (isElectron()) {
-				const posStoreRef = usePosStore();
-				const { fields, limit } = offlineSearchConfig();
-				const results = (await window.electronAPI!.db.getItems({
-					search: searchTerm.value || undefined,
-					searchFields: fields,
-					group: selectedGroup.value === "All Item Groups" ? undefined : selectedGroup.value,
-					limit,
-					offset: append ? items.value.length : undefined,
-					priceList: posStoreRef.sellingPriceList || undefined,
-					warehouse: posStoreRef.warehouse || undefined,
-				})) as POSItem[];
-
-				if (append) {
-					items.value = [...items.value, ...results];
-				} else {
-					items.value = results;
-					currentPage.value = 0;
-				}
-				hasMore.value = results.length === limit;
-				return;
-			}
-
 			if (!isOnline() && usePosStore().useOfflineMode) {
 				const filtered = await idbSearchCachedItems(
 					searchTerm.value,
@@ -259,13 +233,6 @@ export const useItemStore = defineStore("items", () => {
 
 	async function fetchItemGroups(): Promise<void> {
 		try {
-			if (isElectron()) {
-				const all = (await window.electronAPI!.db.getItemGroups()) as unknown as ItemGroup[];
-				itemGroups.value = all;
-				parentGroups.value = all.filter((g) => !!g.is_group);
-				return;
-			}
-
 			if (!isOnline() && usePosStore().useOfflineMode) {
 				const cached = await idbGetCachedGroups();
 				itemGroups.value = cached.groups;
@@ -303,23 +270,6 @@ export const useItemStore = defineStore("items", () => {
 
 	async function searchByBarcode(barcode: string, _posProfile?: string): Promise<POSItem | null> {
 		try {
-			if (isElectron()) {
-				const lower = barcode.toLowerCase();
-				const posStoreRef = usePosStore();
-				const all = (await window.electronAPI!.db.getItems({
-					search: barcode,
-					priceList: posStoreRef.sellingPriceList || undefined,
-					warehouse: posStoreRef.warehouse || undefined,
-				})) as POSItem[];
-				return (
-					all.find(
-						(i) =>
-							(i.barcode && String(i.barcode).toLowerCase() === lower) ||
-							i.item_code.toLowerCase() === lower,
-					) || null
-				);
-			}
-
 			if (!isOnline()) {
 				const cached = await idbGetCachedItems();
 				const lower = barcode.toLowerCase();

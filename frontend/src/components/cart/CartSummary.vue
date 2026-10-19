@@ -512,11 +512,9 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { hasPermission } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
-import { useAuthStore } from "@/stores/authStore";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showSuccess, showError, showInfo } from "@/services/api";
 import { __ } from "@/lib/translate";
-import { isElectron } from "@/services/electronBridge";
 import { isTabConflictError } from "@/utils";
 import { useOfflineStore } from "@/stores/offlineStore";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
@@ -553,10 +551,9 @@ import SalesOrderDialog from "@/components/dialogs/SalesOrderDialog.vue";
 const posStore = usePosStore();
 const { money, moneyPrecision, percent } = useMoney();
 const cartStore = useCartStore();
-const authStore = useAuthStore();
 const offerStore = useOfferStore();
 const offlineStore = useOfflineStore();
-const { printInvoice, printInvoiceLocal } = usePrintInvoice();
+const { printInvoice } = usePrintInvoice();
 
 const showDiscount = ref(false);
 const orderMode = ref<"order" | "quotation" | null>(null);
@@ -1006,34 +1003,21 @@ async function holdOrder() {
 			return;
 		}
 
-		if (isElectron() && window.electronAPI?.db) {
-			await window.electronAPI.db.addPendingInvoice({
-				data: { ...data, is_draft: true, pos_opening_shift_local_id: shiftName },
-				customer_name: cartStore.customerName || data.customer,
-				grand_total: cartStore.grandTotal || 0,
+		const serverData = { ...data };
+		if (offlineStore.isOnline) {
+			await call("xpos.api.invoices.save_draft_invoice", {
+				data: JSON.stringify(serverData),
 			});
 			cartStore.clearAll();
-			showSuccess(__("Order saved as draft locally"));
+			showSuccess(__("Order saved as draft"));
 		} else {
-			const serverData = { ...data };
-			if (serverData.pos_opening_shift && /^\d+$/.test(String(serverData.pos_opening_shift))) {
-				delete serverData.pos_opening_shift;
-			}
-			if (offlineStore.isOnline) {
-				await call("xpos.api.invoices.save_draft_invoice", {
-					data: JSON.stringify(serverData),
-				});
-				cartStore.clearAll();
-				showSuccess(__("Order saved as draft"));
-			} else {
-				await offlineStore.saveOffline(
-					{ ...serverData, is_draft: true } as Parameters<typeof offlineStore.saveOffline>[0],
-					cartStore.customerName || data.customer,
-					cartStore.grandTotal || 0,
-				);
-				cartStore.clearAll();
-				showSuccess(__("No connection – draft saved offline"));
-			}
+			await offlineStore.saveOffline(
+				{ ...serverData, is_draft: true } as Parameters<typeof offlineStore.saveOffline>[0],
+				cartStore.customerName || data.customer,
+				cartStore.grandTotal || 0,
+			);
+			cartStore.clearAll();
+			showSuccess(__("No connection – draft saved offline"));
 		}
 	} catch (error: unknown) {
 		if (handleTabConflict(error)) return;
@@ -1086,45 +1070,24 @@ async function sendToCashier() {
 			return;
 		}
 
-		if (isElectron() && window.electronAPI?.db) {
-			const result = await window.electronAPI.db.addPendingInvoice({
-				data: {
-					...data,
-					is_draft: true,
-					pos_opening_shift_local_id: shiftName,
-					receipt: cartStore.getReceiptSnapshot("", authStore.userFullName),
-				},
-				customer_name: cartStore.customerName || data.customer,
-				grand_total: cartStore.grandTotal || 0,
+		const serverData = { ...data };
+		if (offlineStore.isOnline) {
+			const result = await call<{ name: string }>("xpos.api.invoices.save_draft_invoice", {
+				data: JSON.stringify(serverData),
 			});
-			if (posStore.printBackupReceipt && result?.id) {
-				await printInvoiceLocal(result.id);
+			if (posStore.printBackupReceipt && result?.name) {
+				await printInvoice(result.name);
 			}
 			cartStore.clearAll();
 			showSuccess(__("Sent to cashier"));
 		} else {
-			const serverData = { ...data };
-			if (serverData.pos_opening_shift && /^\d+$/.test(String(serverData.pos_opening_shift))) {
-				delete serverData.pos_opening_shift;
-			}
-			if (offlineStore.isOnline) {
-				const result = await call<{ name: string }>("xpos.api.invoices.save_draft_invoice", {
-					data: JSON.stringify(serverData),
-				});
-				if (posStore.printBackupReceipt && result?.name) {
-					await printInvoice(result.name);
-				}
-				cartStore.clearAll();
-				showSuccess(__("Sent to cashier"));
-			} else {
-				await offlineStore.saveOffline(
-					{ ...serverData, is_draft: true } as Parameters<typeof offlineStore.saveOffline>[0],
-					cartStore.customerName || data.customer,
-					cartStore.grandTotal || 0,
-				);
-				cartStore.clearAll();
-				showSuccess(__("No connection – will sync to cashier when back online"));
-			}
+			await offlineStore.saveOffline(
+				{ ...serverData, is_draft: true } as Parameters<typeof offlineStore.saveOffline>[0],
+				cartStore.customerName || data.customer,
+				cartStore.grandTotal || 0,
+			);
+			cartStore.clearAll();
+			showSuccess(__("No connection – will sync to cashier when back online"));
 		}
 	} catch (error: unknown) {
 		if (handleTabConflict(error)) return;

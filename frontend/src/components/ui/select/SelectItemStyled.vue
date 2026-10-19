@@ -3,7 +3,7 @@
 		v-bind="$attrs"
 		:class="
 			cn(
-				'relative flex min-h-10 w-full cursor-default select-none items-center rounded-xl py-1.5 ps-3 pe-8 text-sm outline-none focus:bg-surface-hover data-[highlighted]:bg-surface-hover data-[state=checked]:bg-surface-selected data-[state=checked]:font-semibold data-[state=checked]:text-surface-selected-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-55',
+				'relative flex min-h-10 w-full cursor-default select-none items-center rounded-xl py-1.5 ps-3 pe-8 text-sm outline-none focus:bg-surface-hover data-highlighted:bg-surface-hover data-[state=checked]:bg-surface-selected data-[state=checked]:font-semibold data-[state=checked]:text-surface-selected-foreground data-disabled:pointer-events-none data-disabled:opacity-55',
 				$attrs.class as string,
 			)
 		"

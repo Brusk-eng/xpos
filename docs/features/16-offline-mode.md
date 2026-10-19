@@ -194,6 +194,13 @@ When connectivity returns:
 | External payment verification | Requires connectivity |
 | Order history | Only online orders visible in history |
 | Shift closing | Requires connectivity to close the shift |
+| Shift opening | Requires connectivity. A shift that is already open keeps working offline |
+| Signing in | Requires connectivity. Reloading the page while offline shows the sign-in screen until the connection returns; queued sales stay on the device |
+| Expenses and bank drops | Require connectivity |
+| Gift cards and customer credit | Require connectivity |
+| Storage | IndexedDB is the browser's best-effort storage. Clearing site data, or the browser under storage pressure, can remove queued sales, so sync before clearing anything |
+
+X POS v3 runs only in the browser. For what the retired desktop app did differently, see [X POS v3: browser and PWA only](../v3-browser-only.md#browser-capability-gaps).
 
 ---
 

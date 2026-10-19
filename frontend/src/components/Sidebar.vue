@@ -1,6 +1,5 @@
 <template>
 	<div class="relative">
-		<!-- Invisible dock trigger: desktop web pointers only -->
 		<div
 			v-if="canDock && !isOpen"
 			class="fixed start-0 top-14 bottom-0 z-40 w-1.5"
@@ -100,7 +99,6 @@ import {
 	Printer,
 	Building2,
 	Receipt,
-	Settings,
 	Wallet,
 	Landmark,
 	BarChart3,
@@ -109,15 +107,8 @@ import {
 	ScrollText,
 } from "lucide-vue-next";
 
-import { isElectron } from "@/services/electronBridge";
-
 const route = useRoute();
 const posStore = usePosStore();
-
-/**
- * "peek": revealed by hovering the inline-start edge (desktop web), no backdrop, hides on leave.
- * "pinned": opened via the hamburger / bottom-nav toggle event, modal-style with a backdrop.
- */
 const mode = ref<"closed" | "peek" | "pinned">("closed");
 const isOpen = computed(() => mode.value !== "closed");
 const asideRef = ref<HTMLElement | null>(null);
@@ -125,7 +116,7 @@ const asideRef = ref<HTMLElement | null>(null);
 const DOCK_QUERY = "(hover: hover) and (pointer: fine) and (min-width: 768px)";
 const dockMedia = typeof window !== "undefined" && window.matchMedia ? window.matchMedia(DOCK_QUERY) : null;
 const pointerCanDock = ref(!!dockMedia?.matches);
-const canDock = computed(() => pointerCanDock.value && !isElectron());
+const canDock = computed(() => pointerCanDock.value);
 
 let peekTimer: ReturnType<typeof setTimeout> | undefined;
 let hideTimer: ReturnType<typeof setTimeout> | undefined;
@@ -189,7 +180,7 @@ function handleDockMediaChange(event: MediaQueryListEvent) {
 let swipeStart: { x: number; y: number } | null = null;
 
 function handleTouchStart(event: TouchEvent) {
-	if (canDock.value || isOpen.value || isElectron()) return;
+	if (canDock.value || isOpen.value) return;
 	const touch = event.touches[0];
 	const rtl = document.documentElement.dir === "rtl";
 	const fromEdge = rtl ? window.innerWidth - touch.clientX : touch.clientX;
@@ -251,7 +242,6 @@ const purchaseNavItems = [
 const toolsNavItems = [
 	{ route: "/price-checker", label: __("Price Checker"), icon: ScanBarcode, show: true },
 	{ route: "/barcode-print", label: __("Barcode Printer"), icon: Printer, show: true },
-	{ route: "/settings", label: __("Settings"), icon: Settings, show: isElectron() },
 ];
 
 const financeNavItems = computed(() => [

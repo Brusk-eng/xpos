@@ -38,7 +38,6 @@
 								:shortcut="['Ctrl', '/']"
 								:description="__('Show Keyboard Shortcuts')"
 							/>
-							<ShortcutItem :shortcut="['Ctrl', ',']" :description="__('Open Settings')" />
 							<ShortcutItem :shortcut="['F11']" :description="__('Toggle Full Screen')" />
 							<ShortcutItem :shortcut="['Escape']" :description="__('Close Dialog / Cancel')" />
 						</div>
@@ -154,19 +153,6 @@
 							/>
 						</div>
 					</div>
-
-					<div v-if="isElectronEnv">
-						<h3 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-							<RefreshCw class="w-4 h-4" />
-							{{ __("Data Sync") }}
-						</h3>
-						<div class="space-y-1.5">
-							<ShortcutItem
-								:shortcut="['Ctrl', 'Shift', 'S']"
-								:description="__('Trigger Manual Sync')"
-							/>
-						</div>
-					</div>
 				</div>
 			</ScrollArea>
 
@@ -192,18 +178,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { isElectron } from "@/services/electronBridge";
 import { __ } from "@/lib/translate";
-import {
-	Keyboard,
-	Monitor,
-	Navigation,
-	ShoppingCart,
-	Package,
-	List,
-	Clock,
-	RefreshCw,
-} from "lucide-vue-next";
+import { Keyboard, Monitor, Navigation, ShoppingCart, Package, List, Clock } from "lucide-vue-next";
 
 defineProps<{
 	open: boolean;
@@ -212,8 +188,6 @@ defineProps<{
 defineEmits<{
 	close: [];
 }>();
-
-const isElectronEnv = isElectron();
 
 const ShortcutItem = (props: { shortcut: string[]; description: string }) => {
 	return h("div", { class: "flex items-center justify-between py-1.5 px-2 rounded hover:bg-muted/50" }, [

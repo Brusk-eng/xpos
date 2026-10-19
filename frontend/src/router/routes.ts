@@ -4,7 +4,6 @@ const OrdersView = () => import("@/views/OrdersView.vue");
 const CashierView = () => import("@/views/CashierView.vue");
 const ReportsIndexView = () => import("@/views/ReportsIndexView.vue");
 const ReportViewerView = () => import("@/views/ReportViewerView.vue");
-const SettingsView = () => import("@/views/SettingsView.vue");
 const PurchaseOrderView = () => import("@/views/PurchaseOrderView.vue");
 const PurchaseOrderListView = () => import("@/views/PurchaseOrderListView.vue");
 const SalesOrdersView = () => import("@/views/SalesOrdersView.vue");
@@ -16,17 +15,10 @@ const BankDropView = () => import("@/views/BankDropView.vue");
 const LoginView = () => import("@/views/LoginView.vue");
 const ResetPasswordView = () => import("@/views/ResetPasswordView.vue");
 const BarcodePrintView = () => import("@/views/BarcodePrintView.vue");
-const SetupWizardView = () => import("@/views/SetupWizardView.vue");
 const RolePermissionsView = () => import("@/views/RolePermissionsView.vue");
 import { RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
-	{
-		path: "/setup",
-		name: "setup",
-		component: SetupWizardView,
-		meta: { title: "Setup", requiresAuth: false, isSetupPage: true },
-	},
 	{
 		path: "/login",
 		name: "login",
@@ -114,12 +106,6 @@ const routes: RouteRecordRaw[] = [
 		name: "stock-receiving",
 		component: StockReceivingView,
 		meta: { title: "Stock Receiving", requiresAuth: true },
-	},
-	{
-		path: "/settings",
-		name: "settings",
-		component: SettingsView,
-		meta: { title: "Settings", requiresAuth: true },
 	},
 	{
 		path: "/expenses",

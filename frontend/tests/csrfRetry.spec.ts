@@ -12,11 +12,6 @@ vi.mock("@/utils", () => ({
 	isOnline: () => true,
 	isNetworkError: () => false,
 }));
-vi.mock("@/services/electronBridge", () => ({
-	isElectron: () => false,
-	getApiBaseUrlSync: () => "",
-	getApiCredentialsSync: () => ({}),
-}));
 vi.mock("@/services/errorLog", () => ({ captureError: vi.fn() }));
 vi.mock("@/services/idbService", () => ({ getMeta: vi.fn() }));
 vi.mock("@/composables/useCurrency", () => ({ formatWithSymbol: vi.fn() }));

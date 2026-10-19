@@ -81,7 +81,7 @@ function clearSearch() {
 	<div class="flex flex-col h-full overflow-hidden bg-background">
 		<div class="shrink-0 p-3 sm:p-4 pb-2 sm:pb-3">
 			<Card
-				class="relative overflow-hidden border-border/70 bg-gradient-to-br from-emerald-500/12 via-card to-background"
+				class="relative overflow-hidden border-border/70 bg-linear-to-br from-emerald-500/12 via-card to-background"
 			>
 				<div
 					class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.10),transparent_30%)]"
@@ -181,7 +181,7 @@ function clearSearch() {
 						>
 							<div
 								:class="[
-									'absolute inset-x-0 top-0 h-1 bg-gradient-to-r',
+									'absolute inset-x-0 top-0 h-1 bg-linear-to-r',
 									categoryAccent[report.category].accent,
 								]"
 							/>

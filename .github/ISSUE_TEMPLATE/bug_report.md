@@ -36,7 +36,7 @@ If applicable, add screenshots or paste error logs to help explain the problem.
 - **ERPNext Version**: [e.g. 15.x.x]
 - **Browser**: [e.g. Chrome 120, Firefox 121]
 - **OS**: [e.g. Ubuntu 22.04, Windows 11, macOS 14]
-- **Deployment**: [Web / PWA / Electron Desktop]
+- **Deployment**: [Web / Installed PWA]
 
 ## Additional Context
 

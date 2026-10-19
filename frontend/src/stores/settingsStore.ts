@@ -3,7 +3,6 @@ import { ref, computed } from "vue";
 import { call } from "@/services/api";
 import { cacheERPSettings, getCachedERPSettings } from "@/services/dbBridge";
 import { isOnline } from "@/utils";
-import { isElectron } from "@/services/electronBridge";
 import {
 	DEFAULT_NUMBER_FORMAT,
 	setNumberFormatSettings,
@@ -179,7 +178,7 @@ export const useSettingsStore = defineStore("settings", () => {
 	}
 
 	async function fetchSettings(): Promise<void> {
-		if (!isElectron() && window.xpos?.boot) {
+		if (window.xpos?.boot) {
 			const boot = window.xpos.boot;
 			if (
 				boot.selling_settings ||

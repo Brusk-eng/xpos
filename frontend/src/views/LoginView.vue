@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-background to-muted p-4"
+		class="min-h-screen flex flex-col items-center justify-center bg-linear-to-br from-background to-muted p-4"
 	>
 		<div class="mb-8 text-center">
 			<XposLogo :size="64" class="mx-auto mb-4" />

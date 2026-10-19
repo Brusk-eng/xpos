@@ -1,6 +1,5 @@
 import { ref } from "vue";
 import { useRouter, type Router } from "vue-router";
-import { isElectron } from "@/services/electronBridge";
 import { clearCachedData } from "@/services/dbBridge";
 import { isOnline } from "@/utils";
 import { showError, showSuccess } from "@/services/api";
@@ -104,16 +103,6 @@ export function useKeyboardShortcuts() {
 			global: true,
 			action: () => {
 				window.dispatchEvent(new CustomEvent("xpos:toggle-error-inspector"));
-			},
-		},
-		{
-			id: "settings",
-			keys: ["ctrl", ","],
-			description: "Open Settings",
-			category: "General",
-			global: true,
-			action: () => {
-				if (isElectron()) router.push("/settings");
 			},
 		},
 		{
@@ -370,17 +359,6 @@ export function useKeyboardShortcuts() {
 			category: "Shift",
 			action: () => {
 				window.dispatchEvent(new CustomEvent("xpos:cash-deposit"));
-			},
-		},
-		{
-			id: "manual-sync",
-			keys: ["ctrl", "shift", "s"],
-			description: "Trigger Manual Sync",
-			category: "Sync",
-			action: () => {
-				if (isElectron() && window.electronAPI?.triggerSync) {
-					window.electronAPI.triggerSync();
-				}
 			},
 		},
 		{

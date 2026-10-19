@@ -2,10 +2,6 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export default defineConfig({
 	base: "/xpos/",
@@ -139,7 +135,7 @@ export default defineConfig({
 	},
 	resolve: {
 		alias: {
-			"@": path.resolve(__dirname, "src"),
+			"@": path.resolve(import.meta.dirname, "src"),
 		},
 	},
 	server: {
@@ -189,11 +185,11 @@ export default defineConfig({
 		exclude: ["@vite/client", "@vite/env"],
 	},
 	build: {
-		outDir: path.resolve(__dirname, "../xpos/public/xpos"),
+		outDir: path.resolve(import.meta.dirname, "../xpos/public/xpos"),
 		emptyOutDir: true,
 		sourcemap: true,
 		rollupOptions: {
-			input: path.resolve(__dirname, "index.html"),
+			input: path.resolve(import.meta.dirname, "index.html"),
 			output: {
 				manualChunks(id) {
 					if (!id.includes("node_modules")) return;

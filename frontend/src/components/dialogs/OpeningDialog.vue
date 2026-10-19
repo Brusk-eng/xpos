@@ -20,24 +20,15 @@
 							<label class="text-sm font-semibold text-foreground">{{
 								__("POS Profile")
 							}}</label>
-							<TooltipWrapper
-								:content="
-									syncStatus.isSyncing.value ? __('Syncing...') : __('Refresh profiles')
-								"
-							>
+							<TooltipWrapper :content="__('Refresh profiles')">
 								<button
 									type="button"
 									class="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-									:class="{
-										'animate-spin pointer-events-none': syncStatus.isSyncing.value,
-									}"
 									:disabled="isLoadingData"
 									@click="loadProfiles"
 								>
 									<RefreshCw class="w-3.5 h-3.5" />
-									<span>{{
-										syncStatus.isSyncing.value ? __("Syncing...") : __("Refresh")
-									}}</span>
+									<span>{{ __("Refresh") }}</span>
 								</button>
 							</TooltipWrapper>
 						</div>
@@ -55,11 +46,7 @@
 								class="h-10 w-full px-10"
 							/>
 							<p v-if="profiles.length === 0" class="mt-1 text-xs text-muted-foreground">
-								{{
-									syncStatus.isSyncing.value
-										? __("Downloading profiles from server…")
-										: __("No profiles found. Check server connection or click Refresh.")
-								}}
+								{{ __("No profiles found. Check server connection or click Refresh.") }}
 							</p>
 						</div>
 
@@ -118,7 +105,7 @@
 				</CardContent>
 			</Card>
 
-			<div v-if="!isElectronMode" class="text-center mt-4">
+			<div class="text-center mt-4">
 				<a
 					href="/desk"
 					class="text-primary-foreground/60 hover:text-primary-foreground text-sm transition-colors no-underline"
@@ -131,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { showError } from "@/services/api";
@@ -140,13 +127,9 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { Loader2, Lock, RefreshCw } from "lucide-vue-next";
-import { useSyncStatus } from "@/composables/useSyncStatus";
-import { isElectron } from "@/services/electronBridge";
 import __ from "@/lib/translate";
 import { Select } from "../ui/select";
 import { XposLogo } from "@/components/ui/brand";
-
-const isElectronMode = isElectron();
 
 interface ProfileOption {
 	name: string;
@@ -163,7 +146,6 @@ interface PaymentMethodEntry {
 
 const posStore = usePosStore();
 const { moneyPrecision } = useMoney();
-const syncStatus = useSyncStatus();
 
 const isLoadingData = ref(true);
 const isOpening = ref(false);
@@ -190,12 +172,6 @@ async function loadProfiles() {
 }
 
 onMounted(loadProfiles);
-
-watch(syncStatus.syncCompleteCount, (count, prev) => {
-	if (count > prev) {
-		loadProfiles();
-	}
-});
 
 function onProfileChange() {
 	const profile = profiles.value.find((p) => p.name === selectedProfile.value);

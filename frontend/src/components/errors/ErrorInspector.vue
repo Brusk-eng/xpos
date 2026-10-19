@@ -1,6 +1,6 @@
 <template>
 	<Transition name="fade">
-		<div v-if="open" class="fixed inset-0 z-[100] flex justify-end">
+		<div v-if="open" class="fixed inset-0 z-100 flex justify-end">
 			<div class="absolute inset-0 bg-black/40" @click="open = false" />
 			<div
 				class="relative flex h-full w-full max-w-2xl flex-col border-s border-border bg-background shadow-2xl"
@@ -8,7 +8,7 @@
 				<div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
 					<div class="flex items-center gap-2">
 						<div
-							class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-red-500 to-red-600 shadow-sm"
+							class="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-red-500 to-red-600 shadow-sm"
 						>
 							<Bug class="h-4 w-4 text-white" />
 						</div>
@@ -176,26 +176,6 @@
 						</div>
 					</div>
 				</div>
-				<div v-else class="flex min-h-0 flex-1 flex-col">
-					<div class="flex items-center gap-2 border-b border-border px-4 py-2">
-						<select
-							v-model="selectedLog"
-							class="flex-1 rounded-md border border-border bg-background px-2 py-1 text-xs"
-							@change="loadLog"
-						>
-							<option v-for="f in logFiles" :key="f" :value="f">{{ f }}</option>
-						</select>
-						<Button variant="outline" size="sm" class="gap-1 text-xs" @click="refreshLogs">
-							<RefreshCw class="h-3.5 w-3.5" /> {{ __("Refresh") }}
-						</Button>
-					</div>
-					<div class="min-h-0 flex-1 overflow-auto p-3">
-						<pre v-if="logContent" class="text-[11px] leading-snug">{{ logContent }}</pre>
-						<p v-else class="py-16 text-center text-sm text-muted-foreground">
-							{{ logFiles.length ? __("Select a log file") : __("No log files found") }}
-						</p>
-					</div>
-				</div>
 			</div>
 		</div>
 	</Transition>
@@ -211,35 +191,18 @@ import {
 	type ErrorEntry,
 	type ErrorSource,
 } from "@/services/errorLog";
-import { isElectron } from "@/services/electronBridge";
 import { showSuccess, showError } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Bug, Copy, Download, Trash2, X, ChevronDown, ShieldCheck, RefreshCw } from "lucide-vue-next";
+import { Bug, Copy, Download, Trash2, X, ChevronDown, ShieldCheck } from "lucide-vue-next";
 import __ from "@/lib/translate";
 
 const open = defineModel<boolean>("open", { default: false });
 
-const isElectronEnv = isElectron();
-const tabs = computed(() =>
-	isElectronEnv
-		? [
-				{ id: "events" as const, label: __("Events") },
-				{ id: "logs" as const, label: __("Logs") },
-			]
-		: [{ id: "events" as const, label: __("Events") }],
-);
-const activeTab = ref<"events" | "logs">("events");
+const tabs = [{ id: "events" as const, label: __("Events") }];
+const activeTab = ref<"events">("events");
 
-const sourceFilters: (ErrorSource | "all")[] = [
-	"all",
-	"api",
-	"sync",
-	"dead-letter",
-	"renderer",
-	"promise",
-	"main",
-];
+const sourceFilters: (ErrorSource | "all")[] = ["all", "api", "sync", "dead-letter", "renderer", "promise"];
 const activeSource = ref<ErrorSource | "all">("all");
 
 const filteredEntries = computed(() =>
@@ -261,7 +224,6 @@ const SOURCE_CLASSES: Record<ErrorSource, string> = {
 	"dead-letter": "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
 	renderer: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
 	promise: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-	main: "bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300",
 };
 function sourceClass(source: ErrorSource): string {
 	return SOURCE_CLASSES[source] ?? "bg-muted text-muted-foreground";
@@ -343,34 +305,10 @@ function clearErrors() {
 	expanded.value = new Set();
 }
 
-const logFiles = ref<string[]>([]);
-const selectedLog = ref<string>("");
-const logContent = ref<string>("");
-
-async function refreshLogs() {
-	if (!isElectronEnv || !window.electronAPI?.logs) return;
-	logFiles.value = await window.electronAPI.logs.list();
-	if (!selectedLog.value && logFiles.value.length) {
-		selectedLog.value = logFiles.value[0];
-	}
-	await loadLog();
-}
-async function loadLog() {
-	if (!isElectronEnv || !window.electronAPI?.logs || !selectedLog.value) {
-		logContent.value = "";
-		return;
-	}
-	logContent.value = await window.electronAPI.logs.read(selectedLog.value);
-}
-
 watch(open, (isOpen) => {
 	if (isOpen) {
 		markAllSeen();
-		if (activeTab.value === "logs") void refreshLogs();
 	}
-});
-watch(activeTab, (tab) => {
-	if (tab === "logs" && open.value) void refreshLogs();
 });
 
 function onKeydown(e: KeyboardEvent) {

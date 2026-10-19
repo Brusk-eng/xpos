@@ -15,19 +15,19 @@ License: MIT · Frappe v16 · ERPNext v16
 
 ---
 
-X POS is a feature-rich, offline-first Point of Sale application built on Frappe and ERPNext. It delivers a fast, keyboard-driven, and fully offline-capable POS experience for retail, hospitality, and service businesses, deployable as a web app, PWA, or Electron desktop application.
+X POS is a feature-rich, offline-first Point of Sale application built on Frappe and ERPNext. It delivers a fast, keyboard-driven, and fully offline-capable POS experience for retail, hospitality, and service businesses, deployable as a web app or installable PWA.
+
+> **v3 is browser/PWA only.** The unfinished Electron desktop app is not part of v3. See [docs/v3-browser-only.md](docs/v3-browser-only.md) for what changed, the browser limits, and how to retire a desktop install without losing unsynced sales.
 
 ## Highlights
 
 | Feature | Description |
 |---|---|
-| **Offline-First** | Full POS operation without internet. Background sync when reconnected. |
-| **Electron Desktop** | Standalone app for Windows, macOS, and Linux with local database and hardware access. |
+| **Offline-First** | Keep selling without internet on an open shift. Queued sales sync when reconnected. |
 | **PWA Ready** | Install from browser on any device. Works offline with service-worker caching. |
 | **Keyboard-Driven** | 15+ shortcuts, command palette (Ctrl+K), and full keyboard navigation. |
 | **Dark Mode & RTL** | System theme detection, manual toggle, and full Right-to-Left layout support. |
 | **Multi-Payment** | Split payments across cash, card, mobile money, and custom modes in one transaction. |
-| **Hub & Spoke** | Multi-terminal architecture for networked stores with centralized sync. |
 | **Full Purchasing** | Purchase orders, purchase invoices, and stock receiving, all from the POS. |
 | **Customizing** | Customize the theme of the X POS as per your brand for look and feel |
 
@@ -47,7 +47,7 @@ X POS is a feature-rich, offline-first Point of Sale application built on Frappe
 
 ### Offline & Sync
 
-- **Continuous offline operation** – Complete POS functionality with no internet
+- **Continuous offline operation** – Keep selling on an open shift with no internet ([limits](docs/features/16-offline-mode.md#limitations-in-offline-mode))
 - **Auto background sync** – Pending invoices queue and retry on reconnection
 - **Master data caching** – Items, customers, pricing rules, and tax templates cached locally
 - **Sync status indicator** – Real-time display of pending transactions and connection state
@@ -115,8 +115,6 @@ X POS is a feature-rich, offline-first Point of Sale application built on Frappe
 |---|---|
 | **Web** | Standard browser-based deployment via Frappe site |
 | **PWA** | Installable progressive web app with offline service worker |
-| **Electron** | Standalone desktop app with local SQLite, hardware access, and auto-updates |
-| **Hub & Spoke** | Multi-terminal Electron setup with centralized hub and satellite tills |
 
 ### Security & Access Control
 
@@ -172,9 +170,9 @@ Then open your site and launch **X POS** from the app launcher.
 | Layer | Technology |
 |---|---|
 | Frontend | Vue 3, TypeScript, Pinia, Tailwind CSS, Radix Vue |
-| Build | Vite, vite-plugin-pwa, vite-plugin-electron |
+| Build | Vite, vite-plugin-pwa |
 | Backend | Frappe Framework (Python) |
-| Desktop | Electron with local MariaDB |
+| Offline storage | IndexedDB (Dexie) and a service worker |
 | Linting | Ruff, ESLint, Prettier |
 | Testing | Vitest |
 | CI/CD | GitHub Actions, Semantic Release |
@@ -238,11 +236,6 @@ docs: update installation instructions
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ---
-
-
-
-
-> **Note:** Desktop app is currently under development and not ready for production. Please use web version for better results
 
 ## License
 

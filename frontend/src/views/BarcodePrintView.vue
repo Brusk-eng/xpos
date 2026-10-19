@@ -22,7 +22,7 @@
 		</div>
 
 		<div class="flex-1 flex overflow-hidden">
-			<div class="w-[420px] flex flex-col border-e border-border shrink-0">
+			<div class="w-105 flex flex-col border-e border-border shrink-0">
 				<div class="p-4 pb-2 space-y-3">
 					<div class="relative">
 						<Search

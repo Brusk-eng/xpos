@@ -2,7 +2,6 @@ import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import { call } from "@/services/api";
 import { cachePOSData, getCachedPOSData, cacheReceiptContext } from "@/services/dbBridge";
-import { isElectron } from "@/services/electronBridge";
 import { hasPermission, loadPermissions } from "@/services/userRights";
 import {
 	type POSOpeningShift,
@@ -47,7 +46,7 @@ export const usePosStore = defineStore("pos", () => {
 	const currency = computed(() => posProfile.value?.currency);
 
 	watch(profileName, async (name, prev) => {
-		if (isElectron() || !name || name === prev) return;
+		if (!name || name === prev) return;
 		const { useAuthStore } = await import("@/stores/authStore");
 		await loadPermissions(useAuthStore().userName, name);
 	});
@@ -208,8 +207,7 @@ export const usePosStore = defineStore("pos", () => {
 
 	const cashModeOfPayment = computed(() => posProfile.value?.cash_mode_of_payment || "Cash");
 
-	/** Gift cards are online-only, so the desktop app (which queues every sale locally) never offers them. */
-	const giftCards = computed(() => (isElectron() ? null : giftCardConfig.value));
+	const giftCards = computed(() => giftCardConfig.value);
 	const giftCardMode = computed(() => giftCards.value?.mode_of_payment || "");
 
 	const purchaseTaxes = computed(() => posProfile.value?.purchase_taxes || []);
@@ -249,32 +247,6 @@ export const usePosStore = defineStore("pos", () => {
 		isLoading.value = true;
 		showOpeningDialog.value = false;
 		try {
-			if (isElectron()) {
-				const { useAuthStore } = await import("@/stores/authStore");
-				const authStore = useAuthStore();
-				const currentUser = authStore.userName;
-
-				const result = (await window.electronAPI!.db.checkOpenShift(
-					currentUser,
-				)) as ShiftCheckResult | null;
-
-				if (result) {
-					applyShiftState(result);
-					refreshReceiptContext(result.pos_profile?.name || "");
-
-					import("@/stores/settingsStore").then(({ useSettingsStore }) => {
-						const settingsStore = useSettingsStore();
-						settingsStore.fetchSettings().catch((error) => {
-							console.warn("[XPOS] Failed to fetch ERP settings:", error);
-						});
-					});
-				} else {
-					clearShiftState();
-					showOpeningDialog.value = true;
-				}
-				return;
-			}
-
 			if (!isOnline()) {
 				const cachedData = (await getCachedPOSData()) as ShiftCheckResult | null;
 
@@ -358,12 +330,6 @@ export const usePosStore = defineStore("pos", () => {
 
 	async function fetchOpeningData(): Promise<OpeningData | undefined> {
 		try {
-			if (isElectron()) {
-				const data = (await window.electronAPI!.db.getOpeningData()) as unknown as OpeningData;
-				openingData.value = data;
-				return data;
-			}
-
 			const data = await call<OpeningData>("xpos.api.shifts.get_opening_data");
 			openingData.value = data;
 			return data;
@@ -381,33 +347,6 @@ export const usePosStore = defineStore("pos", () => {
 		balanceDetails: Record<string, unknown>[],
 	): Promise<OpenShiftResult> {
 		try {
-			if (isElectron()) {
-				const { useAuthStore } = await import("@/stores/authStore");
-				const authStore = useAuthStore();
-				await window.electronAPI!.db.createPosOpeningShift({
-					pos_profile: profileName,
-					company: companyName,
-					user: authStore.userName,
-					opening_date: new Date().toISOString().slice(0, 10),
-					opening_amounts: balanceDetails,
-				});
-				const result = (await window.electronAPI!.db.checkOpenShift(
-					authStore.userName,
-				)) as unknown as OpenShiftResult;
-				posOpeningShift.value = result.pos_opening_shift;
-				posProfile.value = result.pos_profile;
-				company.value = result.company;
-				stockSettings.value = result.stock_settings || {};
-				taxes.value = result.taxes || [];
-				taxInclusiveMode.value = !!result.tax_inclusive;
-				disableRoundedTotal.value = !!result.disable_rounded_total;
-				giftCardConfig.value = result.gift_cards || null;
-				printSettings.value = result.print_settings || null;
-				showOpeningDialog.value = false;
-				isReady.value = true;
-				return result;
-			}
-
 			const result = await call<OpenShiftResult>("xpos.api.shifts.open_shift", {
 				pos_profile: profileName,
 				company: companyName,
@@ -524,7 +463,7 @@ export const usePosStore = defineStore("pos", () => {
 	/** Cache the receipt layout so a sale made offline can still be printed. */
 	async function refreshReceiptContext(profileName: string): Promise<void> {
 		if (!isOnline() || !profileName) return;
-		if (!isElectron() && !useOfflineMode.value) return;
+		if (!useOfflineMode.value) return;
 		try {
 			const ctx = await call<ReceiptContext>("xpos.api.print_formats.get_receipt_context", {
 				pos_profile: profileName,

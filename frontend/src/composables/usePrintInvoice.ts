@@ -121,49 +121,6 @@ export function usePrintInvoice() {
 		}
 	}
 
-	async function printInvoiceLocal(localId: number) {
-		try {
-			if (!window.electronAPI?.db || !window.electronAPI?.print) {
-				showError(__("Print not available"));
-				return;
-			}
-
-			const invoice = await window.electronAPI.db.getPendingInvoice(localId);
-			if (!invoice) {
-				showError(__("Invoice not found for printing"));
-				return;
-			}
-			const snapshot = (invoice.data as Record<string, unknown>)?.receipt as
-				| ReceiptSnapshot
-				| undefined;
-			const context = await getCachedReceiptContext(posStore.profileName);
-
-			if (snapshot && context) {
-				if (!snapshot.name) snapshot.name = `LOCAL-${localId}`;
-				const html = buildReceiptHtml(snapshot, context);
-				const result = await window.electronAPI.print.printReport(html);
-				if (!result?.success) {
-					showError(__("Failed to print invoice locally"));
-				}
-				return;
-			}
-
-			await window.electronAPI.print.printInvoice({
-				localId,
-				data: invoice.data,
-				customerName: invoice.customer_name || "",
-				grandTotal: invoice.grand_total,
-				isReturn: invoice.is_return,
-				printFormat: posStore.printSettings?.print_format || "POS Invoice",
-				letterHead: posStore.printSettings?.letter_head || "",
-				companyName: posStore.posProfile?.company || "",
-			});
-		} catch (error) {
-			console.error("Local print error:", error);
-			showError(__("Failed to print invoice locally"));
-		}
-	}
-
 	/**
 	 * Print a sale that exists only on this device. The server's print view is unreachable
 	 * offline, so the receipt is built from the sale's snapshot and the cached receipt layout.
@@ -188,5 +145,5 @@ export function usePrintInvoice() {
 		}
 	}
 
-	return { printInvoice, printInvoiceLocal, printReceiptOffline, openInvoicePrintView };
+	return { printInvoice, printReceiptOffline, openInvoicePrintView };
 }

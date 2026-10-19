@@ -1,7 +1,7 @@
 /**
  * Every documented keyboard shortcut, pressed as a real key (CDP), with its visible effect.
  *
- * Written against what the shortcut registry, KeyboardShortcutsDialog, MenuBar and CommandSearch
+ * Written against what the shortcut registry, KeyboardShortcutsDialog and CommandSearch
  * promise. Selectors stay layout-agnostic (dialog titles, focus, URL, stub calls) so the same spec
  * runs on older builds to compare behaviour.
  */

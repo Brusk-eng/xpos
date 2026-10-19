@@ -38,7 +38,6 @@ Fixes #
 - [ ] Frontend unit tests pass (`cd frontend && yarn test:run`)
 - [ ] TypeScript type check passes (`cd frontend && yarn typecheck`)
 - [ ] Manual testing in browser
-- [ ] Manual testing in Electron (if applicable)
 
 <!-- Describe what you tested manually, and on which Frappe/ERPNext version. -->
 

@@ -226,7 +226,6 @@ import {
 	Wallet,
 	Landmark,
 	Barcode,
-	Settings,
 	LogOut,
 	Repeat,
 	RotateCcw,
@@ -375,15 +374,6 @@ const pages: CommandResult[] = [
 		description: __("Print barcode labels"),
 		icon: Barcode,
 		action: () => router.push("/barcode-print"),
-	},
-	{
-		id: "page-settings",
-		type: "page",
-		label: __("Settings"),
-		description: __("Application settings"),
-		shortcut: "Ctrl+,",
-		icon: Settings,
-		action: () => router.push("/settings"),
 	},
 ];
 
