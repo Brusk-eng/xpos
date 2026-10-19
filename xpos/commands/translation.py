@@ -6,7 +6,7 @@ import frappe
 from frappe.gettext.translate import generate_pot, get_catalog, get_locales, update_po
 
 
-def _update_csv_from_po(app: str, locale: str | None = None):
+def write_csv_from_po(app: str, locale: str | None = None):
 	"""Writes new strings from PO files to CSV
 
 	Steps:
@@ -66,4 +66,4 @@ def update_csv_from_po(app: str, locale: str | None = None) -> None:
 	This command is intended for backporting translations from the new translation system to the old one.
 	"""
 
-	_update_csv_from_po(app, locale)
+	write_csv_from_po(app, locale)

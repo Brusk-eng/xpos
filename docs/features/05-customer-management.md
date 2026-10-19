@@ -31,6 +31,8 @@ X POS provides full customer management directly from the POS screen - search ex
 ### Customer Groups
 - If the POS Profile has customer group restrictions, only customers belonging to allowed groups are shown
 - Customer group hierarchy is respected - child groups are included
+- The same limit applies everywhere in the POS, not just the search list. A cashier cannot open, edit, enrol in loyalty, or see the addresses or credit of a customer outside the allowed groups. Asking for one shows a "not permitted" message
+- Users who can open that customer in ERPNext Desk (through their roles and User Permissions) are not limited by the POS Profile's groups
 
 ---
 
@@ -99,13 +101,9 @@ Once a customer is selected, X POS can display:
 
 ## Adding Customer Addresses
 
-- Create a new address directly from the POS interface
-- Fields include:
-  - Address Line 1 (required)
-  - City
-  - Country
-- The address is linked to the customer in ERPNext
-- Available for future orders and delivery purposes
+- Add an address while creating a new customer: fill in **Address Line 1** and **City** (and optionally **Country**) in the quick create form
+- The address is linked to the customer in ERPNext and is used as the primary address
+- To add more addresses to an existing customer, use the Customer record in ERPNext Desk
 
 ---
 

@@ -40,11 +40,11 @@ ALL_PERMISSION_NAMES = tuple(name for name, _label, _group in POS_PERMISSIONS)
 # Cashiers ring up sales out of the box; every catalog permission is an elevated
 # capability, so none are enabled by default.
 _CASHIER_ENABLED: set[str] = set()
-_MANAGER_DISABLED = {"manage_role_permissions"}
+MANAGER_DISABLED = {"manage_role_permissions"}
 
 DEFAULT_ROLES = (
 	("Cashier", _CASHIER_ENABLED),
-	("Manager", set(ALL_PERMISSION_NAMES) - _MANAGER_DISABLED),
+	("Manager", set(ALL_PERMISSION_NAMES) - MANAGER_DISABLED),
 	("Administrator", set(ALL_PERMISSION_NAMES)),
 )
 

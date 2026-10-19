@@ -241,19 +241,6 @@ def verified_offer_free_line(
 	return abs(flt(line.get("qty"))) <= max_qty
 
 
-def check_zero_price_line(pos, item_code: str, net_rate: float, verified_free: bool) -> None:
-	"""Reject an unauthorised zero-price sale line (100% discounts count as zero-price)."""
-	if net_rate > 0 or verified_free:
-		return
-	if not profile_flag(pos, "allow_zero_rated_items"):
-		frappe.throw(
-			_("Item {0} has a zero price. Zero-price sale lines are not allowed on POS Profile {1}.").format(
-				item_code, pos.name
-			),
-			title=_("Zero price not allowed"),
-		)
-
-
 def manual_discount_cap(pos, user: str | None = None) -> float:
 	"""Largest manual discount (%) ``user`` may give through ``pos``.
 

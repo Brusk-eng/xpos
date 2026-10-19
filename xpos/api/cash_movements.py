@@ -227,7 +227,7 @@ def create_pos_expense(payload: str | dict):
 	je.insert(ignore_permissions=True)
 	je.submit()
 
-	movement = _create_cash_movement_record(
+	movement = create_cash_movement_record(
 		pos_profile=frappe.db.get_value("POS Opening Shift", pos_opening_shift, "pos_profile"),
 		pos_opening_shift=pos_opening_shift,
 		source_account=cash_account,
@@ -316,7 +316,7 @@ def create_cash_deposit(payload: str | dict):
 	je.insert(ignore_permissions=True)
 	je.submit()
 
-	movement = _create_cash_movement_record(
+	movement = create_cash_movement_record(
 		pos_profile=frappe.db.get_value("POS Opening Shift", pos_opening_shift, "pos_profile"),
 		pos_opening_shift=pos_opening_shift,
 		source_account=cash_account,
@@ -385,7 +385,7 @@ def get_shift_cash_movements(
 	return {"data": data, "total": total}
 
 
-def _create_cash_movement_record(**kwargs):
+def create_cash_movement_record(**kwargs):
 	"""Create a POS Cash Movement record if the doctype exists."""
 	movement = frappe.get_doc(
 		{

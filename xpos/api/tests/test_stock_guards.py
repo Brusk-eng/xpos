@@ -47,7 +47,7 @@ class FakeRow(dict):
 
 
 class TestCollectStockErrors(unittest.TestCase):
-	"""``_collect_stock_errors`` is what decides whether a sale is blocked."""
+	"""``collect_stock_errors`` is what decides whether a sale is blocked."""
 
 	def setUp(self):
 		patcher = patch.object(stock_module, "frappe")
@@ -57,18 +57,18 @@ class TestCollectStockErrors(unittest.TestCase):
 		self.mock_frappe.db.get_single_value.return_value = 0
 		self.mock_frappe.get_cached_value.return_value = 0
 
-	def _collect(self, items, available):
+	def collect_errors(self, items, available):
 		with patch.object(stock_module, "get_bulk_stock_availability", return_value=available):
-			return stock_module._collect_stock_errors(items)
+			return stock_module.collect_stock_errors(items)
 
 	def test_qty_within_stock_is_allowed(self):
 		items = [{"item_code": "IT-1", "warehouse": "WH", "qty": 3, "is_stock_item": 1}]
-		errors = self._collect(items, {("IT-1", "WH", ""): 5.0})
+		errors = self.collect_errors(items, {("IT-1", "WH", ""): 5.0})
 		self.assertEqual(errors, [])
 
 	def test_qty_beyond_stock_is_blocked(self):
 		items = [{"item_code": "IT-1", "warehouse": "WH", "qty": 8, "is_stock_item": 1}]
-		errors = self._collect(items, {("IT-1", "WH", ""): 5.0})
+		errors = self.collect_errors(items, {("IT-1", "WH", ""): 5.0})
 		self.assertEqual(len(errors), 1)
 		self.assertEqual(errors[0]["requested_qty"], 8)
 		self.assertEqual(errors[0]["available_qty"], 5.0)
@@ -88,7 +88,7 @@ class TestCollectStockErrors(unittest.TestCase):
 				"is_stock_item": 1,
 			}
 		]
-		errors = self._collect(items, {("IT-1", "WH", ""): 5.0})
+		errors = self.collect_errors(items, {("IT-1", "WH", ""): 5.0})
 		self.assertEqual(len(errors), 1)
 		self.assertEqual(errors[0]["requested_qty"], 24)
 
@@ -103,12 +103,12 @@ class TestCollectStockErrors(unittest.TestCase):
 				"is_stock_item": 1,
 			}
 		]
-		errors = self._collect(items, {("IT-1", "WH", ""): 5.0})
+		errors = self.collect_errors(items, {("IT-1", "WH", ""): 5.0})
 		self.assertEqual(errors[0]["requested_qty"], 24)
 
 	def test_return_rows_are_skipped(self):
 		items = [{"item_code": "IT-1", "warehouse": "WH", "qty": -3, "is_stock_item": 1}]
-		errors = self._collect(items, {("IT-1", "WH", ""): 0.0})
+		errors = self.collect_errors(items, {("IT-1", "WH", ""): 0.0})
 		self.assertEqual(errors, [])
 
 
@@ -119,7 +119,7 @@ class TestValidateStockOnInvoice(unittest.TestCase):
 		"""``is_stock_item`` is not a field on Sales/POS Invoice Item.
 
 		Filtering rows on it silently emptied the list and turned the whole
-		validation into a no-op, so rows must reach ``_collect_stock_errors``
+		validation into a no-op, so rows must reach ``collect_stock_errors``
 		even when they carry no such key.
 		"""
 		invoice = FakeDoc(
@@ -128,7 +128,7 @@ class TestValidateStockOnInvoice(unittest.TestCase):
 			pos_profile="POS-1",
 		)
 
-		with patch.object(stock_module, "_collect_stock_errors", return_value=[]) as collect:
+		with patch.object(stock_module, "collect_stock_errors", return_value=[]) as collect:
 			stock_module.validate_stock_on_invoice(invoice)
 
 		collect.assert_called_once()
@@ -145,8 +145,8 @@ class TestValidateStockOnInvoice(unittest.TestCase):
 		errors = [{"item_code": "IT-1", "warehouse": "WH", "requested_qty": 8, "available_qty": 5}]
 
 		with (
-			patch.object(stock_module, "_collect_stock_errors", return_value=errors),
-			patch.object(stock_module, "_should_block", return_value=True),
+			patch.object(stock_module, "collect_stock_errors", return_value=errors),
+			patch.object(stock_module, "should_block", return_value=True),
 			self.assertRaises(stock_module.XPosInsufficientStockError),
 		):
 			stock_module.validate_stock_on_invoice(invoice)
@@ -160,8 +160,8 @@ class TestValidateStockOnInvoice(unittest.TestCase):
 		errors = [{"item_code": "IT-1", "warehouse": "WH", "requested_qty": 8, "available_qty": 5}]
 
 		with (
-			patch.object(stock_module, "_collect_stock_errors", return_value=errors),
-			patch.object(stock_module, "_should_block", return_value=False),
+			patch.object(stock_module, "collect_stock_errors", return_value=errors),
+			patch.object(stock_module, "should_block", return_value=False),
 		):
 			stock_module.validate_stock_on_invoice(invoice)  # must not raise
 
@@ -187,15 +187,15 @@ class TestConsolidationStockGuard(unittest.TestCase):
 		self.addCleanup(negative_patcher.stop)
 
 	@staticmethod
-	def _sale(item_code, warehouse, stock_qty):
+	def sale(item_code, warehouse, stock_qty):
 		return FakeDoc(items=[{"item_code": item_code, "warehouse": warehouse, "stock_qty": stock_qty}])
 
 	def test_returns_net_off_against_sales(self):
 		"""Return rows carry negative stock_qty, so summing gives the net."""
 		docs = [
-			self._sale("IT-1", "WH", 1),
-			self._sale("IT-1", "WH", -1),  # customer returned it
-			self._sale("IT-1", "WH", 1),  # sold again
+			self.sale("IT-1", "WH", 1),
+			self.sale("IT-1", "WH", -1),  # customer returned it
+			self.sale("IT-1", "WH", 1),  # sold again
 		]
 		movement = self.log.collect_net_stock_movement(docs)
 		self.assertEqual(movement[("IT-1", "WH")], 1)
@@ -208,16 +208,16 @@ class TestConsolidationStockGuard(unittest.TestCase):
 		stock moments later in the same transaction.
 		"""
 		docs = [
-			self._sale("IT-1", "WH", 1),
-			self._sale("IT-1", "WH", -1),
-			self._sale("IT-1", "WH", 1),
+			self.sale("IT-1", "WH", 1),
+			self.sale("IT-1", "WH", -1),
+			self.sale("IT-1", "WH", 1),
 		]
 
 		with patch("xpos.x_pos.overrides.pos_invoice_merge_log.get_stock_availability", return_value=1.0):
 			self.log.validate_net_stock(docs)  # must not raise
 
 	def test_genuine_shortfall_is_blocked(self):
-		docs = [self._sale("IT-1", "WH", 2)]
+		docs = [self.sale("IT-1", "WH", 2)]
 
 		with (
 			patch("xpos.x_pos.overrides.pos_invoice_merge_log.get_stock_availability", return_value=1.0),
@@ -236,7 +236,7 @@ class TestConsolidationStockGuard(unittest.TestCase):
 		self.assertEqual(movement[("IT-1", "WH")], 10)
 
 	def test_check_is_skipped_when_negative_stock_is_allowed(self):
-		docs = [self._sale("IT-1", "WH", 999)]
+		docs = [self.sale("IT-1", "WH", 999)]
 
 		with (
 			patch(
@@ -248,7 +248,7 @@ class TestConsolidationStockGuard(unittest.TestCase):
 			self.log.validate_net_stock(docs)  # must not raise
 
 	def test_post_submit_assertion_catches_negative_bin(self):
-		docs = [self._sale("IT-1", "WH", 1)]
+		docs = [self.sale("IT-1", "WH", 1)]
 
 		with patch("xpos.x_pos.overrides.pos_invoice_merge_log.frappe") as mock_frappe:
 			mock_frappe.get_cached_value.return_value = 1

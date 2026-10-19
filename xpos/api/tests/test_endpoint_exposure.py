@@ -58,16 +58,31 @@ class TestExchangeRateHelpersAreNotExposed(unittest.TestCase):
 		self.assertTrue(is_whitelisted("xpos.api.exchange", "get_tender_rates"))
 
 
-class TestForceDeleteEndpointsAreGone(unittest.TestCase):
-	"""Endpoints that force-deleted submitted invoices have been removed."""
+class TestLegacyApiModulesAreGone(unittest.TestCase):
+	"""The unused `xpos.x_pos.api` facades are removed, so none of them stays reachable over HTTP."""
 
-	def test_delete_invoice_facade_is_removed(self):
-		"""`frappe.delete_doc(..., force=1)` skips the docstatus and link checks."""
-		self.assertFalse(function_exists("xpos.x_pos.api.invoices", "delete_invoice"))
+	def test_legacy_modules_are_removed(self):
+		"""`invoices.get_draft_invoice_doc` loaded any doctype by name with no permission check,
+		and `customers` read and wrote any customer."""
+		for module in (
+			"xpos.x_pos.api.invoices",
+			"xpos.x_pos.api.customers",
+			"xpos.x_pos.api.invoice_processing.creation",
+			"xpos.x_pos.api.payment_processing.processor",
+			"xpos.x_pos.api.cash_movement.service",
+			"xpos.x_pos.api.qz",
+		):
+			with self.subTest(module), self.assertRaises(ImportError):
+				importlib.import_module(module)
 
-	def test_delete_sales_invoice_facade_is_removed(self):
-		"""This one had no guard at all, not even the printed-invoice check."""
-		self.assertFalse(function_exists("xpos.x_pos.api.invoices", "delete_sales_invoice"))
+	def test_legacy_customer_wrappers_are_removed(self):
+		for name in ("get_customer_balance", "create_customer"):
+			self.assertFalse(function_exists("xpos.x_pos.api.customer", name), name)
+
+	def test_address_helper_is_not_an_endpoint(self):
+		"""Only `create_customer` uses it, after the customer has been created."""
+		self.assertTrue(function_exists("xpos.api.customers", "make_address"))
+		self.assertFalse(is_whitelisted("xpos.api.customers", "make_address"))
 
 
 class TestRepricingEndpointIsGone(unittest.TestCase):

@@ -21,7 +21,7 @@ def ensure_allowed(profile: dict, flag: str, label: str):
 		)
 
 
-def _resolve_supplier(supplier_value: str | dict | None) -> str | None:
+def resolve_supplier(supplier_value: str | dict | None) -> str | None:
 	if isinstance(supplier_value, dict):
 		supplier_value = (
 			supplier_value.get("name")
@@ -56,7 +56,7 @@ def _resolve_supplier(supplier_value: str | dict | None) -> str | None:
 	return None
 
 
-def _upsert_item_price(
+def upsert_item_price(
 	item_code: str,
 	price_list: str,
 	rate: float,
@@ -96,7 +96,7 @@ def _upsert_item_price(
 	return doc.name
 
 
-def _build_items_map(items: list[dict]) -> dict[str, list[dict]]:
+def build_items_map(items: list[dict]) -> dict[str, list[dict]]:
 	items_by_code = {}
 	for row in items or []:
 		item_code = row.get("item_code")
@@ -106,14 +106,14 @@ def _build_items_map(items: list[dict]) -> dict[str, list[dict]]:
 	return items_by_code
 
 
-def _resolve_input_row(items_by_code: dict[str, list[dict]], item_code: str) -> dict:
+def resolve_input_row(items_by_code: dict[str, list[dict]], item_code: str) -> dict:
 	rows = items_by_code.get(item_code)
 	if not rows:
 		return {}
 	return rows.pop(0)
 
 
-def _build_purchase_taxes(profile: dict, items: list[dict]) -> list[dict]:
+def build_purchase_taxes(profile: dict, items: list[dict]) -> list[dict]:
 	"""Build Actual taxes_and_charges rows from POS Profile purchase_taxes and per-item tax percentages.
 
 	Each item in *items* must have ``qty``, ``rate``, and optionally ``taxes``
@@ -165,7 +165,7 @@ def _build_purchase_taxes(profile: dict, items: list[dict]) -> list[dict]:
 	return rows
 
 
-def _create_purchase_receipt(
+def create_purchase_receipt(
 	po_doc: dict, payload: dict, default_warehouse: str | None, transaction_date: str
 ) -> str:
 	receipt_date = payload.get("receipt_date") or payload.get("posting_date") or transaction_date
@@ -181,10 +181,10 @@ def _create_purchase_receipt(
 	if default_warehouse:
 		receipt.set_warehouse = default_warehouse
 
-	items_by_code = _build_items_map(payload.get("items"))
+	items_by_code = build_items_map(payload.get("items"))
 
 	for po_item in po_doc.items:
-		payload_row = _resolve_input_row(items_by_code, po_item.item_code)
+		payload_row = resolve_input_row(items_by_code, po_item.item_code)
 		if (
 			payload.get("receive")
 			and not payload_row.get("received_qty")
@@ -344,14 +344,14 @@ def create_purchase_item(data: str | dict) -> dict:
 	selling_price = payload.get("selling_price")
 	buying_price = payload.get("buying_price")
 
-	_upsert_item_price(
+	upsert_item_price(
 		item_code,
 		selling_price_list,
 		selling_price,
 		uom=stock_uom,
 		selling=True,
 	)
-	_upsert_item_price(
+	upsert_item_price(
 		item_code,
 		buying_price_list,
 		buying_price,
@@ -369,7 +369,7 @@ def create_purchase_item(data: str | dict) -> dict:
 	}
 
 
-def _get_mode_of_payment_account(mode: str, company: str) -> str:
+def get_mode_of_payment_account(mode: str, company: str) -> str:
 	account = frappe.db.get_value(
 		"Mode of Payment Account",
 		{"parent": mode, "company": company},
@@ -382,7 +382,7 @@ def _get_mode_of_payment_account(mode: str, company: str) -> str:
 	return account
 
 
-def _create_payment_entry(
+def create_payment_entry(
 	reference_doc: dict, payments: list[dict], company: str, transaction_date: str
 ) -> list[str]:
 	if not payments:
@@ -406,7 +406,7 @@ def _create_payment_entry(
 		if amount <= 0:
 			continue
 
-		paid_from_account = _get_mode_of_payment_account(mode, company)
+		paid_from_account = get_mode_of_payment_account(mode, company)
 
 		pe = frappe.new_doc("Payment Entry")
 		pe.payment_type = "Pay"
@@ -461,7 +461,7 @@ def create_purchase_order(data: str | dict) -> dict:
 	if not supplier_input:
 		frappe.throw(_("Supplier is required."))
 
-	supplier = _resolve_supplier(supplier_input)
+	supplier = resolve_supplier(supplier_input)
 	if not supplier:
 		frappe.throw(_("Supplier {0} was not found.").format(supplier_input))
 
@@ -578,7 +578,7 @@ def create_purchase_order(data: str | dict) -> dict:
 	if not po_doc.items:
 		frappe.throw(_("Purchase order requires at least one item with quantity."))
 
-	for tax_row in _build_purchase_taxes(profile, items):
+	for tax_row in build_purchase_taxes(profile, items):
 		po_doc.append("taxes", tax_row)
 
 	po_doc.flags.ignore_permissions = True
@@ -592,12 +592,12 @@ def create_purchase_order(data: str | dict) -> dict:
 		receipt_name = None
 		receipt_doc = None
 		if receive_now:
-			receipt_name = _create_purchase_receipt(po_doc, payload, warehouse, transaction_date)
+			receipt_name = create_purchase_receipt(po_doc, payload, warehouse, transaction_date)
 			if receipt_name:
 				receipt_doc = frappe.get_doc("Purchase Receipt", receipt_name)
 		invoice_name = None
 		if cint(payload.get("create_invoice", 0)):
-			invoice_name = _create_purchase_invoice(
+			invoice_name = create_purchase_invoice(
 				po_doc,
 				payload,
 				warehouse,
@@ -609,7 +609,7 @@ def create_purchase_order(data: str | dict) -> dict:
 		payments = payload.get("payments")
 		if payments:
 			ref_doc = frappe.get_doc("Purchase Invoice", invoice_name) if invoice_name else po_doc
-			_create_payment_entry(ref_doc, payments, company, transaction_date)
+			create_payment_entry(ref_doc, payments, company, transaction_date)
 
 		return {
 			"purchase_order": po_doc.name,
@@ -631,7 +631,7 @@ def create_purchase_invoice_direct(data: str | dict) -> dict:
 	if update_stock:
 		ensure_allowed(profile, "allow_purchase_receipt", _("Receive stock"))
 
-	supplier = _resolve_supplier(payload.get("supplier"))
+	supplier = resolve_supplier(payload.get("supplier"))
 	if not supplier:
 		frappe.throw(_("Supplier is required."))
 
@@ -678,7 +678,7 @@ def create_purchase_invoice_direct(data: str | dict) -> dict:
 	if is_paid and mode_of_payment:
 		invoice.is_paid = 1
 		invoice.mode_of_payment = mode_of_payment
-		cash_bank_account = _get_mode_of_payment_account(mode_of_payment, company)
+		cash_bank_account = get_mode_of_payment_account(mode_of_payment, company)
 		invoice.cash_bank_account = cash_bank_account
 
 	if warehouse and update_stock:
@@ -733,7 +733,7 @@ def create_purchase_invoice_direct(data: str | dict) -> dict:
 	if not invoice.items:
 		frappe.throw(_("Purchase invoice requires at least one item with quantity."))
 
-	profile_tax_rows = _build_purchase_taxes(profile, items)
+	profile_tax_rows = build_purchase_taxes(profile, items)
 	if profile_tax_rows:
 		for tax_row in profile_tax_rows:
 			invoice.append("taxes", tax_row)
@@ -891,7 +891,7 @@ def search_item_by_barcode(barcode: str, pos_profile: str | None = None) -> dict
 			"barcode": barcode_data.barcode,
 			"uom": barcode_data.uom or item.stock_uom,
 			"stock_uom": item.stock_uom,
-			"standard_rate": _get_buying_rate(item.name),
+			"standard_rate": get_buying_rate(item.name),
 		}
 
 	if frappe.db.exists("Item", barcode):
@@ -902,13 +902,13 @@ def search_item_by_barcode(barcode: str, pos_profile: str | None = None) -> dict
 			"barcode": barcode,
 			"uom": item.stock_uom,
 			"stock_uom": item.stock_uom,
-			"standard_rate": _get_buying_rate(item.name),
+			"standard_rate": get_buying_rate(item.name),
 		}
 
 	return None
 
 
-def _create_purchase_invoice(
+def create_purchase_invoice(
 	po_doc: dict,
 	payload: dict,
 	default_warehouse: str | None,
@@ -930,12 +930,12 @@ def _create_purchase_invoice(
 	if default_warehouse:
 		invoice.set_warehouse = default_warehouse
 
-	items_by_code = _build_items_map(payload.get("items"))
+	items_by_code = build_items_map(payload.get("items"))
 	receipt_items = (
 		{item.purchase_order_item: item for item in (receipt_doc.items or [])} if receipt_doc else {}
 	)
 	for po_item in po_doc.items:
-		payload_row = _resolve_input_row(items_by_code, po_item.item_code)
+		payload_row = resolve_input_row(items_by_code, po_item.item_code)
 		qty = flt(payload_row.get("qty") or po_item.qty)
 		if qty <= 0:
 			continue
@@ -979,7 +979,7 @@ def _create_purchase_invoice(
 				}
 			)
 
-		for tax_row in _build_purchase_taxes(profile, combined_items):
+		for tax_row in build_purchase_taxes(profile, combined_items):
 			invoice.append("taxes", tax_row)
 
 	invoice.flags.ignore_permissions = True
@@ -1301,21 +1301,21 @@ def get_category_items(
 	items = []
 
 	if po_category == "Projection Period":
-		items = _get_items_from_projection(supplier, warehouse, from_date, to_date)
+		items = get_items_from_projection(supplier, warehouse, from_date, to_date)
 
 	elif po_category == "Reorder Level":
-		items = _get_items_below_reorder(supplier, warehouse)
+		items = get_items_below_reorder(supplier, warehouse)
 
 	if items:
 		item_codes = [i.get("item_code") for i in items]
-		uom_data = _get_item_uoms(item_codes)
+		uom_data = get_item_uoms(item_codes)
 		for item in items:
 			item["item_uoms"] = uom_data.get(item.get("item_code"), [])
 
 	return items
 
 
-def _get_items_from_projection(
+def get_items_from_projection(
 	supplier: str,
 	warehouse: str | None = None,
 	from_date: str | None = None,
@@ -1327,7 +1327,7 @@ def _get_items_from_projection(
 	days when no dates are given), calculates the average daily sales, then
 	suggests a reorder quantity that covers the same period length.
 	"""
-	supplier_items = _get_supplier_item_codes(supplier)
+	supplier_items = get_supplier_item_codes(supplier)
 	if not supplier_items:
 		return []
 
@@ -1381,7 +1381,7 @@ def _get_items_from_projection(
 				"item_code": row.item_code,
 				"item_name": row.item_name,
 				"stock_uom": row.stock_uom,
-				"standard_rate": _get_buying_rate(row.item_code),
+				"standard_rate": get_buying_rate(row.item_code),
 				"qty": max(1, int(net_required)) if net_required > 0 else suggested_qty,
 				"item_group": item.item_group,
 				"custom_stock_in_hand": current_stock,
@@ -1392,9 +1392,9 @@ def _get_items_from_projection(
 	return items
 
 
-def _get_items_below_reorder(supplier: str, warehouse: str | None = None) -> list[dict]:
+def get_items_below_reorder(supplier: str, warehouse: str | None = None) -> list[dict]:
 	"""Get items below reorder level for this supplier."""
-	supplier_items = _get_supplier_item_codes(supplier)
+	supplier_items = get_supplier_item_codes(supplier)
 	if not supplier_items:
 		return []
 
@@ -1434,7 +1434,7 @@ def _get_items_below_reorder(supplier: str, warehouse: str | None = None) -> lis
 					"item_code": item_code,
 					"item_name": item.item_name,
 					"stock_uom": item.stock_uom,
-					"standard_rate": _get_buying_rate(item_code),
+					"standard_rate": get_buying_rate(item_code),
 					"qty": int(reorder_qty),
 					"item_group": item.item_group,
 					"custom_stock_in_hand": current_stock,
@@ -1445,7 +1445,7 @@ def _get_items_below_reorder(supplier: str, warehouse: str | None = None) -> lis
 	return items
 
 
-def _get_supplier_item_codes(supplier: str) -> list[str]:
+def get_supplier_item_codes(supplier: str) -> list[str]:
 	"""Get all item codes for a supplier."""
 	supplier_items = set()
 
@@ -1468,7 +1468,7 @@ def _get_supplier_item_codes(supplier: str) -> list[str]:
 	return list(supplier_items)
 
 
-def _get_buying_rate(item_code: str, price_list: str | None = None) -> float:
+def get_buying_rate(item_code: str, price_list: str | None = None) -> float:
 	"""Get buying rate for an item."""
 	rate = 0
 	if price_list:
@@ -1482,7 +1482,7 @@ def _get_buying_rate(item_code: str, price_list: str | None = None) -> float:
 	return flt(rate)
 
 
-def _get_item_uoms(item_codes: list[str]) -> dict[str, list[dict[str, float]]]:
+def get_item_uoms(item_codes: list[str]) -> dict[str, list[dict[str, float]]]:
 	"""Get UOM conversion details for items."""
 	if not item_codes:
 		return {}
@@ -1532,7 +1532,7 @@ def save_po_draft(data: str | dict, pos_profile: str) -> dict:
 	if not supplier_input:
 		frappe.throw(_("Please select a supplier before saving a draft."))
 
-	supplier = _resolve_supplier(supplier_input)
+	supplier = resolve_supplier(supplier_input)
 	if not supplier:
 		frappe.throw(_("Supplier '{0}' not found.").format(supplier_input))
 
@@ -1649,7 +1649,7 @@ def load_po_draft(name: str) -> dict:
 		frappe.throw(_("Purchase Order '{0}' is not a draft.").format(name))
 
 	item_codes = [item.item_code for item in po.items]
-	uom_data_map = _get_item_uoms(item_codes) if item_codes else {}
+	uom_data_map = get_item_uoms(item_codes) if item_codes else {}
 
 	items = []
 	for item in po.items:
@@ -1765,7 +1765,7 @@ def save_pi_draft(data: str | dict) -> dict:
 	"""
 	payload = json.loads(data) if isinstance(data, str) else data
 
-	supplier = _resolve_supplier(payload.get("supplier"))
+	supplier = resolve_supplier(payload.get("supplier"))
 	if not supplier:
 		frappe.throw(_("Supplier is required to save a draft."))
 
@@ -2049,7 +2049,7 @@ def get_purchase_orders_for_invoice(
 	Returns:
 	        List of PO dicts with items that can be invoiced.
 	"""
-	supplier = _resolve_supplier(supplier)
+	supplier = resolve_supplier(supplier)
 	if not supplier:
 		return []
 
@@ -2155,7 +2155,7 @@ def update_item_prices(items: list, pos_profile: dict):
 			continue
 
 		if selling_price_list and pos_profile.get("update_selling_price"):
-			_upsert_item_price(
+			upsert_item_price(
 				item_code,
 				selling_price_list,
 				sale_price / flt(row.get("conversion_factor") or 1),
@@ -2164,7 +2164,7 @@ def update_item_prices(items: list, pos_profile: dict):
 			)
 
 		if buying_price_list and pos_profile.get("update_buying_price"):
-			_upsert_item_price(
+			upsert_item_price(
 				item_code,
 				buying_price_list,
 				rate / flt(row.get("conversion_factor") or 1),

@@ -135,13 +135,6 @@ def get_mode_tender_currencies(modes: list[str]) -> dict[str, dict]:
 	}
 
 
-def resolve_mode_tender_currency(mode_of_payment: str) -> str | None:
-	"""Return the tender currency tagged on `mode_of_payment`, or None when untagged."""
-	if not mode_of_payment or not tender_currency_field_exists():
-		return None
-	return frappe.db.get_value("Mode of Payment", mode_of_payment, "pos_tender_currency") or None
-
-
 def build_tender_rate_payload(pos_profile_doc, posting_date: str | None = None) -> list[dict]:
 	"""Return one row per payment mode on the profile, with its currency and today's rate."""
 	from xpos.x_pos.doctype.pos_closing_shift.closing_processing.reclass import (

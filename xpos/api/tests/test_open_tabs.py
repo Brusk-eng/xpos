@@ -105,7 +105,7 @@ class TestStaleDraftGuard(unittest.TestCase):
 	@patch("xpos.api.invoices.frappe")
 	def test_no_token_skips_the_check(self, mock_frappe):
 		"""Offline replay sends no token, and must keep working."""
-		invoices._guard_stale_draft("Sales Invoice", "SI-001", None)
+		invoices.guard_stale_draft("Sales Invoice", "SI-001", None)
 
 		mock_frappe.db.get_value.assert_not_called()
 		mock_frappe.throw.assert_not_called()
@@ -114,7 +114,7 @@ class TestStaleDraftGuard(unittest.TestCase):
 	def test_matching_token_passes(self, mock_frappe):
 		mock_frappe.db.get_value.return_value = "2026-08-10 21:00:00"
 
-		invoices._guard_stale_draft("Sales Invoice", "SI-001", "2026-08-10 21:00:00")
+		invoices.guard_stale_draft("Sales Invoice", "SI-001", "2026-08-10 21:00:00")
 
 		mock_frappe.throw.assert_not_called()
 
@@ -124,14 +124,14 @@ class TestStaleDraftGuard(unittest.TestCase):
 		mock_frappe.throw.side_effect = raising_throw
 
 		with self.assertRaises(Exception):
-			invoices._guard_stale_draft("Sales Invoice", "SI-001", "2026-08-10 21:00:00")
+			invoices.guard_stale_draft("Sales Invoice", "SI-001", "2026-08-10 21:00:00")
 
 	@patch("xpos.api.invoices.frappe")
 	def test_missing_row_does_not_throw(self, mock_frappe):
 		"""A draft that vanished is someone else's error to report, not this guard's."""
 		mock_frappe.db.get_value.return_value = None
 
-		invoices._guard_stale_draft("Sales Invoice", "SI-001", "2026-08-10 21:00:00")
+		invoices.guard_stale_draft("Sales Invoice", "SI-001", "2026-08-10 21:00:00")
 
 		mock_frappe.throw.assert_not_called()
 
@@ -148,7 +148,7 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 		patcher.start()
 		self.addCleanup(patcher.stop)
 
-	def _pos_profile(self):
+	def profile_mock(self):
 		pos = MagicMock()
 		pos.name = PROFILE
 		pos.company = "Test Co"
@@ -159,7 +159,7 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 		pos.get.return_value = 0
 		return pos
 
-	def _payload(self, **overrides):
+	def draft_payload(self, **overrides):
 		payload = {
 			"pos_profile": PROFILE,
 			"customer": "CUST-001",
@@ -170,12 +170,12 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 		payload.update(overrides)
 		return payload
 
-	@patch("xpos.api.invoices._ensure_pos_invoice_payment_row")
-	@patch("xpos.api.invoices._apply_invoice_delivery_charge_fields")
+	@patch("xpos.api.invoices.ensure_pos_invoice_payment_row")
+	@patch("xpos.api.invoices.apply_invoice_delivery_charge_fields")
 	@patch("xpos.api.invoices.get_invoice_type", return_value="Sales Invoice")
 	@patch("xpos.api.invoices.frappe")
 	def test_stale_token_blocks_the_save(self, mock_frappe, _mock_type, _mock_charges, _mock_row):
-		mock_frappe.get_cached_doc.return_value = self._pos_profile()
+		mock_frappe.get_cached_doc.return_value = self.profile_mock()
 		mock_frappe.db.exists.return_value = True
 		mock_frappe.db.get_value.return_value = "2026-08-10 21:05:00"
 		mock_frappe.throw.side_effect = raising_throw
@@ -185,15 +185,15 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 		mock_frappe.get_doc.return_value = draft
 
 		with self.assertRaises(Exception):
-			invoices.save_draft_invoice(self._payload(modified="2026-08-10 21:00:00"))
+			invoices.save_draft_invoice(self.draft_payload(modified="2026-08-10 21:00:00"))
 
 		draft.save.assert_not_called()
 
 	@patch("xpos.api.invoices.now_datetime")
 	@patch("xpos.api.invoices.nowdate", return_value="2026-08-10")
-	@patch("xpos.api.invoices._ensure_pos_invoice_payment_row")
-	@patch("xpos.api.invoices._apply_invoice_delivery_charge_fields")
-	@patch("xpos.api.invoices._get_item_rate_precision", return_value=2)
+	@patch("xpos.api.invoices.ensure_pos_invoice_payment_row")
+	@patch("xpos.api.invoices.apply_invoice_delivery_charge_fields")
+	@patch("xpos.api.invoices.get_item_rate_precision", return_value=2)
 	@patch("xpos.api.invoices.get_invoice_type", return_value="Sales Invoice")
 	@patch("xpos.api.invoices.frappe")
 	def test_matching_token_saves_and_rehomes_the_tab(
@@ -201,7 +201,7 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 	):
 		"""A recalled tab moves to the recalling cashier's shift, so their closing
 		shift reconciles. This is load-bearing for the whole feature."""
-		mock_frappe.get_cached_doc.return_value = self._pos_profile()
+		mock_frappe.get_cached_doc.return_value = self.profile_mock()
 		mock_frappe.db.exists.return_value = True
 		mock_frappe.db.get_value.return_value = "2026-08-10 21:00:00"
 
@@ -210,22 +210,22 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 		draft.name = "SI-001"
 		mock_frappe.get_doc.return_value = draft
 
-		invoices.save_draft_invoice(self._payload(modified="2026-08-10 21:00:00"))
+		invoices.save_draft_invoice(self.draft_payload(modified="2026-08-10 21:00:00"))
 
 		draft.save.assert_called_once()
 		self.assertEqual(draft.pos_opening_shift, SHIFT_B)
 
 	@patch("xpos.api.invoices.now_datetime")
 	@patch("xpos.api.invoices.nowdate", return_value="2026-08-10")
-	@patch("xpos.api.invoices._ensure_pos_invoice_payment_row")
-	@patch("xpos.api.invoices._apply_invoice_delivery_charge_fields")
-	@patch("xpos.api.invoices._get_item_rate_precision", return_value=2)
+	@patch("xpos.api.invoices.ensure_pos_invoice_payment_row")
+	@patch("xpos.api.invoices.apply_invoice_delivery_charge_fields")
+	@patch("xpos.api.invoices.get_item_rate_precision", return_value=2)
 	@patch("xpos.api.invoices.get_invoice_type", return_value="Sales Invoice")
 	@patch("xpos.api.invoices.frappe")
 	def test_no_token_still_saves(
 		self, mock_frappe, _mock_type, _mock_precision, _mock_charges, _mock_row, _mock_nowdate, _mock_now
 	):
-		mock_frappe.get_cached_doc.return_value = self._pos_profile()
+		mock_frappe.get_cached_doc.return_value = self.profile_mock()
 		mock_frappe.db.exists.return_value = True
 
 		draft = MagicMock()
@@ -233,7 +233,7 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 		draft.name = "SI-001"
 		mock_frappe.get_doc.return_value = draft
 
-		invoices.save_draft_invoice(self._payload())
+		invoices.save_draft_invoice(self.draft_payload())
 
 		draft.save.assert_called_once()
 
@@ -241,7 +241,7 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 class TestDeleteDraftInvoiceGuard(unittest.TestCase):
 	"""A colleague's live tab must not be one stray click from deletion."""
 
-	def _draft(self, shift):
+	def draft_tab(self, shift):
 		draft = MagicMock()
 		draft.docstatus = 0
 		draft.get.side_effect = lambda key: {
@@ -250,11 +250,11 @@ class TestDeleteDraftInvoiceGuard(unittest.TestCase):
 		}.get(key)
 		return draft
 
-	@patch("xpos.api.invoices._detect_invoice_doctype", return_value="Sales Invoice")
+	@patch("xpos.api.invoices.detect_invoice_doctype", return_value="Sales Invoice")
 	@patch("xpos.api.invoices.can_recall_other_shift_tabs", return_value=False)
 	@patch("xpos.api.invoices.frappe")
 	def test_foreign_tab_denied_without_permission(self, mock_frappe, _mock_can_recall, _mock_detect):
-		draft = self._draft(SHIFT_A)
+		draft = self.draft_tab(SHIFT_A)
 		mock_frappe.get_doc.return_value = draft
 		mock_frappe.throw.side_effect = raising_throw
 
@@ -263,22 +263,22 @@ class TestDeleteDraftInvoiceGuard(unittest.TestCase):
 
 		draft.delete.assert_not_called()
 
-	@patch("xpos.api.invoices._detect_invoice_doctype", return_value="Sales Invoice")
+	@patch("xpos.api.invoices.detect_invoice_doctype", return_value="Sales Invoice")
 	@patch("xpos.api.invoices.can_recall_other_shift_tabs", return_value=True)
 	@patch("xpos.api.invoices.frappe")
 	def test_foreign_tab_allowed_with_permission(self, mock_frappe, _mock_can_recall, _mock_detect):
-		draft = self._draft(SHIFT_A)
+		draft = self.draft_tab(SHIFT_A)
 		mock_frappe.get_doc.return_value = draft
 
 		invoices.delete_draft_invoice("SI-001", pos_opening_shift=SHIFT_B)
 
 		draft.delete.assert_called_once()
 
-	@patch("xpos.api.invoices._detect_invoice_doctype", return_value="Sales Invoice")
+	@patch("xpos.api.invoices.detect_invoice_doctype", return_value="Sales Invoice")
 	@patch("xpos.api.invoices.can_recall_other_shift_tabs", return_value=False)
 	@patch("xpos.api.invoices.frappe")
 	def test_own_tab_needs_no_permission(self, mock_frappe, _mock_can_recall, _mock_detect):
-		draft = self._draft(SHIFT_B)
+		draft = self.draft_tab(SHIFT_B)
 		mock_frappe.get_doc.return_value = draft
 
 		invoices.delete_draft_invoice("SI-001", pos_opening_shift=SHIFT_B)
@@ -339,7 +339,7 @@ class TestGetOutstandingInvoices(unittest.TestCase):
 class TestSettleOutstandingInvoice(unittest.TestCase):
 	"""Settling a past credit sale, including the closing-shift contract."""
 
-	def _invoice(self, docstatus=1, outstanding=250.0):
+	def outstanding_invoice(self, docstatus=1, outstanding=250.0):
 		invoice = MagicMock()
 		invoice.docstatus = docstatus
 		invoice.outstanding_amount = outstanding
@@ -370,7 +370,7 @@ class TestSettleOutstandingInvoice(unittest.TestCase):
 	@patch("xpos.api.payments.frappe")
 	def test_rejects_a_draft_invoice(self, mock_frappe, _mock_can_settle):
 		mock_frappe.db.exists.return_value = True
-		mock_frappe.get_doc.return_value = self._invoice(docstatus=0)
+		mock_frappe.get_doc.return_value = self.outstanding_invoice(docstatus=0)
 		mock_frappe.throw.side_effect = raising_throw
 
 		with self.assertRaises(Exception):
@@ -380,7 +380,7 @@ class TestSettleOutstandingInvoice(unittest.TestCase):
 	@patch("xpos.api.payments.frappe")
 	def test_rejects_a_settled_invoice(self, mock_frappe, _mock_can_settle):
 		mock_frappe.db.exists.return_value = True
-		mock_frappe.get_doc.return_value = self._invoice(outstanding=0)
+		mock_frappe.get_doc.return_value = self.outstanding_invoice(outstanding=0)
 		mock_frappe.throw.side_effect = raising_throw
 
 		with self.assertRaises(Exception):
@@ -391,7 +391,7 @@ class TestSettleOutstandingInvoice(unittest.TestCase):
 	def test_rejects_overpayment(self, mock_frappe, _mock_can_settle):
 		"""A POS settles a balance; it does not take money on account."""
 		mock_frappe.db.exists.return_value = True
-		mock_frappe.get_doc.return_value = self._invoice(outstanding=250.0)
+		mock_frappe.get_doc.return_value = self.outstanding_invoice(outstanding=250.0)
 		mock_frappe.throw.side_effect = raising_throw
 
 		with self.assertRaises(Exception):
@@ -401,7 +401,7 @@ class TestSettleOutstandingInvoice(unittest.TestCase):
 	@patch("xpos.api.payments.frappe")
 	def test_rejects_non_positive_amount(self, mock_frappe, _mock_can_settle):
 		mock_frappe.db.exists.return_value = True
-		mock_frappe.get_doc.return_value = self._invoice()
+		mock_frappe.get_doc.return_value = self.outstanding_invoice()
 		mock_frappe.throw.side_effect = raising_throw
 
 		with self.assertRaises(Exception):
@@ -414,7 +414,7 @@ class TestSettleOutstandingInvoice(unittest.TestCase):
 		"""``reference_no`` is how POS Closing Shift finds the payment - see
 		``get_payments_entries``. Without it the drawer reconciles short."""
 		mock_frappe.db.exists.return_value = True
-		mock_frappe.get_doc.return_value = self._invoice(outstanding=250.0)
+		mock_frappe.get_doc.return_value = self.outstanding_invoice(outstanding=250.0)
 		mock_frappe.db.get_value.return_value = 150.0
 		mock_create_pe.return_value = {"name": "PE-001", "paid_amount": 100}
 
@@ -438,7 +438,7 @@ class TestSettleOutstandingInvoice(unittest.TestCase):
 	def test_allows_settling_the_exact_outstanding(self, mock_frappe, _mock_can_settle, mock_create_pe):
 		"""Paying a tab off in full is the common case and must not trip the cap."""
 		mock_frappe.db.exists.return_value = True
-		mock_frappe.get_doc.return_value = self._invoice(outstanding=250.0)
+		mock_frappe.get_doc.return_value = self.outstanding_invoice(outstanding=250.0)
 		mock_frappe.db.get_value.return_value = 0.0
 		mock_create_pe.return_value = {"name": "PE-002"}
 

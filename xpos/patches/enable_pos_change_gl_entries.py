@@ -14,10 +14,10 @@ def execute():
 			"This is required for mixed-currency cash tender to post correctly."
 		)
 
-	_audit_tender_modes()
+	audit_tender_modes()
 
 
-def _audit_tender_modes():
+def audit_tender_modes():
 	"""Warn about currency-tagged modes that cannot post, rather than failing the migration.
 
 	Two master-data requirements are enforced by ERPNext at invoice time, not here:

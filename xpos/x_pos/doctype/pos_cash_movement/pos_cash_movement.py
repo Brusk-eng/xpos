@@ -35,10 +35,10 @@ class POSCashMovement(Document):
 	# end: auto-generated types
 
 	def validate(self):
-		self._validate_amount()
-		self._validate_company_links()
-		self._validate_accounts()
-		self._validate_movement_type_rules()
+		self.validate_amount()
+		self.validate_company_links()
+		self.validate_accounts()
+		self.validate_movement_type_rules()
 
 	def on_cancel(self):
 		if self.journal_entry:
@@ -48,11 +48,11 @@ class POSCashMovement(Document):
 		if self.docstatus != 2:
 			frappe.throw(_("Only cancelled POS Cash Movement records can be deleted."))
 
-	def _validate_amount(self):
+	def validate_amount(self):
 		if flt(self.amount) <= 0:
 			frappe.throw(_("Amount must be greater than zero."))
 
-	def _validate_company_links(self):
+	def validate_company_links(self):
 		pos_profile_company = frappe.db.get_value("POS Profile", self.pos_profile, "company")
 		if pos_profile_company and self.company != pos_profile_company:
 			frappe.throw(_("Company must match the selected POS Profile company."))
@@ -75,7 +75,7 @@ class POSCashMovement(Document):
 		if opening_shift.user != self.user:
 			frappe.throw(_("User must match the selected POS Opening Shift user."))
 
-	def _validate_accounts(self):
+	def validate_accounts(self):
 		if not self.source_account or not self.target_account:
 			frappe.throw(_("Source and target accounts are required."))
 
@@ -88,7 +88,7 @@ class POSCashMovement(Document):
 		if target_company and target_company != self.company:
 			frappe.throw(_("Target account must belong to the selected company."))
 
-	def _validate_movement_type_rules(self):
+	def validate_movement_type_rules(self):
 		movement_type = (self.movement_type or "").strip()
 		if movement_type not in {"Expense", "Deposit"}:
 			frappe.throw(_("Movement Type must be Expense or Deposit."))

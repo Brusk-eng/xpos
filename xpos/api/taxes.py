@@ -32,13 +32,13 @@ def get_item_tax_template(item_code: str, company: str, tax_category: str | None
 	today = nowdate()
 	tax_category = cstr(tax_category or "")
 
-	item_tax_template = _resolve_tax_template(item.taxes, company, tax_category, today)
+	item_tax_template = resolve_tax_template(item.taxes, company, tax_category, today)
 
 	if not item_tax_template:
 		item_group = item.item_group
 		while item_group and not item_tax_template:
 			item_group_doc = frappe.get_cached_doc("Item Group", item_group)
-			item_tax_template = _resolve_tax_template(item_group_doc.taxes, company, tax_category, today)
+			item_tax_template = resolve_tax_template(item_group_doc.taxes, company, tax_category, today)
 			item_group = item_group_doc.parent_item_group
 
 	item_tax_map = {}
@@ -54,7 +54,7 @@ def get_item_tax_template(item_code: str, company: str, tax_category: str | None
 	}
 
 
-def _resolve_tax_template(taxes: list, company: str, tax_category: str, today: str):
+def resolve_tax_template(taxes: list, company: str, tax_category: str, today: str):
 	"""Find the best matching Item Tax Template from a list of tax rows.
 
 	Args:

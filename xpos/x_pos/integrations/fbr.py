@@ -16,9 +16,9 @@ LOCAL_SERVICE_PATH = "/api/IMSFiscal/GetInvoiceNumberByModel"
 FBR_REQUEST_TIMEOUT = (5, 25)
 FBR_SUCCESS_CODES = {"100", 100}
 PERCENTAGE_CHARGE_TYPES = {"On Net Total", "On Previous Row Amount", "On Previous Row Total"}
-_CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
-_NTN_PATTERN = re.compile(r"^\d{7}-?\d$")
-_CNIC_PATTERN = re.compile(r"^\d{5}-?\d{7}-?\d$")
+CONTROL_CHAR_PATTERN = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+NTN_PATTERN = re.compile(r"^\d{7}-?\d$")
+CNIC_PATTERN = re.compile(r"^\d{5}-?\d{7}-?\d$")
 
 
 class FBRIntegrationError(frappe.ValidationError):
@@ -82,27 +82,27 @@ def prepare_fiscalization(doc: Any) -> FiscalizationOutcome:
 	"""
 	from xpos.x_pos.integrations import fiscal_ledger
 
-	if not cint(_get_doc_value(doc, "is_pos", 0)):
+	if not cint(get_doc_value(doc, "is_pos", 0)):
 		return FiscalizationOutcome("disabled")
 
-	pos_profile = cstr(_get_doc_value(doc, "pos_profile", "")).strip()
+	pos_profile = cstr(get_doc_value(doc, "pos_profile", "")).strip()
 	if not pos_profile:
 		return FiscalizationOutcome("disabled")
 
-	if cstr(_get_doc_value(doc, "fbr_invoice_number", "")).strip():
+	if cstr(get_doc_value(doc, "fbr_invoice_number", "")).strip():
 		return FiscalizationOutcome("disabled")
 
-	settings = _get_fbr_settings(pos_profile)
+	settings = get_fbr_settings(pos_profile)
 	if not settings.enabled:
 		return FiscalizationOutcome("disabled")
 
-	payload = _build_payload(doc, settings)
+	payload = build_payload(doc, settings)
 	known = fiscal_ledger.begin_cloud_attempt(
 		doc,
 		settings.pos_id,
 		payload["USIN"],
 		payload,
-		held_uncertain=_get_doc_value(doc, "xpos_fiscal_state", "") == "Uncertain",
+		held_uncertain=get_doc_value(doc, "xpos_fiscal_state", "") == "Uncertain",
 	)
 	if known.kind == "recorded":
 		return recorded_outcome(known, payload)
@@ -110,7 +110,7 @@ def prepare_fiscalization(doc: Any) -> FiscalizationOutcome:
 		return FiscalizationOutcome("uncertain", payload=payload)
 
 	try:
-		response_data = _post_invoice(doc, payload, settings)
+		response_data = post_invoice(doc, payload, settings)
 	except FBRConnectionError as exc:
 		fiscal_ledger.finish_attempt(known.attempt, "Uncertain" if exc.sent else "Not Sent", response=exc)
 		if exc.sent:
@@ -125,10 +125,10 @@ def prepare_fiscalization(doc: Any) -> FiscalizationOutcome:
 		fiscal_ledger.finish_attempt(known.attempt, "Uncertain", response=exc)
 		raise
 
-	invoice_number = cstr(_extract_value(response_data, "FBRInvoiceNumber", "InvoiceNumber") or "").strip()
-	response_code = cstr(_extract_value(response_data, "Code", default="")).strip()
+	invoice_number = cstr(extract_value(response_data, "FBRInvoiceNumber", "InvoiceNumber") or "").strip()
+	response_code = cstr(extract_value(response_data, "Code", default="")).strip()
 	response_message = cstr(
-		_extract_value(response_data, "Response", "Message", "message", default="")
+		extract_value(response_data, "Response", "Message", "message", default="")
 	).strip()
 
 	if response_code and response_code not in {str(code) for code in FBR_SUCCESS_CODES}:
@@ -167,13 +167,13 @@ def ledger_outcome(doc: Any) -> FiscalizationOutcome | None:
 	"""
 	from xpos.x_pos.integrations import fiscal_ledger
 
-	pos_profile = cstr(_get_doc_value(doc, "pos_profile", "")).strip()
-	if not cint(_get_doc_value(doc, "is_pos", 0)) or not pos_profile:
+	pos_profile = cstr(get_doc_value(doc, "pos_profile", "")).strip()
+	if not cint(get_doc_value(doc, "is_pos", 0)) or not pos_profile:
 		return None
-	settings = _get_fbr_settings(pos_profile)
+	settings = get_fbr_settings(pos_profile)
 	if not settings.enabled:
 		return None
-	payload = _build_payload(doc, settings)
+	payload = build_payload(doc, settings)
 	known = fiscal_ledger.lookup(settings.pos_id, payload["USIN"])
 	if known.kind == "recorded":
 		return recorded_outcome(known, payload)
@@ -186,16 +186,16 @@ def record_local_result(doc: Any, invoice_number: str | None) -> None:
 	"""Keep what the local FBR service answered (``None``: no answer) in the fiscal ledger."""
 	from xpos.x_pos.integrations import fiscal_ledger
 
-	settings = _get_fbr_settings(cstr(_get_doc_value(doc, "pos_profile", "")).strip())
+	settings = get_fbr_settings(cstr(get_doc_value(doc, "pos_profile", "")).strip())
 	if not settings.enabled:
 		return
-	payload = _build_payload(doc, settings)
+	payload = build_payload(doc, settings)
 	fiscal_ledger.record_local(doc, settings.pos_id, payload["USIN"], payload, invoice_number)
 
 
 def fbr_pos_id(pos_profile: str) -> str:
 	"""The profile's FBR POS ID; FBR must be enabled on it."""
-	settings = _get_fbr_settings(pos_profile)
+	settings = get_fbr_settings(pos_profile)
 	if not settings.enabled:
 		frappe.throw(_("FBR integration is not enabled on POS Profile {0}.").format(pos_profile))
 	return settings.pos_id
@@ -203,16 +203,16 @@ def fbr_pos_id(pos_profile: str) -> str:
 
 def local_fiscalization_outcome(doc: Any) -> FiscalizationOutcome:
 	"""The local-service handshake for a draft already waiting for it; FBR's cloud is not called again."""
-	settings = _get_fbr_settings(cstr(_get_doc_value(doc, "pos_profile", "")).strip())
+	settings = get_fbr_settings(cstr(get_doc_value(doc, "pos_profile", "")).strip())
 	return FiscalizationOutcome(
-		"local_required", payload=_build_payload(doc, settings), local_service_url=settings.local_service_url
+		"local_required", payload=build_payload(doc, settings), local_service_url=settings.local_service_url
 	)
 
 
 def apply_fiscal_number(doc: Any, invoice_number: str, posted_on: Any = None) -> None:
 	"""Write a fiscal invoice number (from cloud or local service) onto the document."""
-	_set_field_if_available(doc, "fbr_invoice_number", cstr(invoice_number).strip())
-	_set_field_if_available(doc, "fbr_posted_on", posted_on or now_datetime())
+	set_field_if_available(doc, "fbr_invoice_number", cstr(invoice_number).strip())
+	set_field_if_available(doc, "fbr_posted_on", posted_on or now_datetime())
 
 
 def fiscalize_invoice(doc: Any) -> None:
@@ -232,7 +232,7 @@ def fiscalize_invoice(doc: Any) -> None:
 			_(
 				"FBR may have received invoice {0} without answering. Check the FBR records "
 				"before fiscalizing it again."
-			).format(_get_doc_value(doc, "name", ""))
+			).format(get_doc_value(doc, "name", ""))
 		)
 	elif outcome.status == "local_required":
 		raise FBRConnectionError(
@@ -243,7 +243,7 @@ def fiscalize_invoice(doc: Any) -> None:
 		)
 
 
-def _get_fbr_settings(pos_profile: str) -> FBRSettings:
+def get_fbr_settings(pos_profile: str) -> FBRSettings:
 	profile_doc = frappe.get_doc("POS Profile", pos_profile)
 	enabled = cint(getattr(profile_doc, "enable_fbr_integration", 0))
 	if not enabled:
@@ -260,7 +260,7 @@ def _get_fbr_settings(pos_profile: str) -> FBRSettings:
 	environment = cstr(getattr(profile_doc, "fbr_environment", "Sandbox") or "Sandbox").strip()
 	pos_id = cstr(getattr(profile_doc, "fbr_pos_id", "") or "").strip()
 	bearer_token = cstr(profile_doc.get_password("fbr_bearer_token") or "").strip()
-	api_url = cstr(getattr(profile_doc, "fbr_api_url", "") or "").strip() or _default_api_url(environment)
+	api_url = cstr(getattr(profile_doc, "fbr_api_url", "") or "").strip() or default_api_url(environment)
 	skip_ssl_verification = cint(getattr(profile_doc, "fbr_skip_ssl_verification", 0)) == 1
 	local_service_url = (
 		cstr(getattr(profile_doc, "fbr_local_service_url", "") or "").strip().rstrip("/")
@@ -291,48 +291,48 @@ def _get_fbr_settings(pos_profile: str) -> FBRSettings:
 	)
 
 
-def _default_api_url(environment: str) -> str:
+def default_api_url(environment: str) -> str:
 	return FBR_PRODUCTION_URL if cstr(environment).strip().lower() == "production" else FBR_SANDBOX_URL
 
 
-def _build_payload(doc: Any, settings: FBRSettings) -> dict[str, Any]:
+def build_payload(doc: Any, settings: FBRSettings) -> dict[str, Any]:
 	item_cache: dict[str, dict[str, Any]] = {}
-	is_return = cint(_get_doc_value(doc, "is_return", 0)) == 1
+	is_return = cint(get_doc_value(doc, "is_return", 0)) == 1
 	invoice_type = 3 if is_return else 1
 	items = []
 	total_sale_value = 0.0
 	total_tax_charged = 0.0
-	total_discount = abs(_company_amount(doc, "discount_amount"))
+	total_discount = abs(company_amount(doc, "discount_amount"))
 	total_quantity = 0.0
 
-	for item in _get_doc_value(doc, "items", []) or []:
-		qty = abs(flt(_get_doc_value(item, "qty", 0)))
+	for item in get_doc_value(doc, "items", []) or []:
+		qty = abs(flt(get_doc_value(item, "qty", 0)))
 		if qty <= 0:
 			continue
 
-		item_code = cstr(_get_doc_value(item, "item_code", "")).strip()
-		item_meta = _get_item_metadata(item_code, item_cache)
+		item_code = cstr(get_doc_value(item, "item_code", "")).strip()
+		item_meta = get_item_metadata(item_code, item_cache)
 		pct_code = cstr(item_meta.get("customs_tariff_number") or "").strip()
 		if not pct_code:
 			raise FBRIntegrationError(
 				_("Item {0} is missing Customs Tariff Number, which FBR requires as the PCT Code.").format(
-					item_code or _get_doc_value(item, "item_name", _("Unknown Item"))
+					item_code or get_doc_value(item, "item_name", _("Unknown Item"))
 				)
 			)
 
-		line_invoice_type = _resolve_item_invoice_type(is_return, item_meta)
-		actual_sale_value = abs(_company_amount(item, "net_amount")) or abs(_company_amount(item, "amount"))
+		line_invoice_type = resolve_item_invoice_type(is_return, item_meta)
+		actual_sale_value = abs(company_amount(item, "net_amount")) or abs(company_amount(item, "amount"))
 		gross_sale_value = (
-			abs(flt(_get_doc_value(item, "price_list_rate", 0) or _get_doc_value(item, "rate", 0))) * qty
+			abs(flt(get_doc_value(item, "price_list_rate", 0) or get_doc_value(item, "rate", 0))) * qty
 		)
 		line_discount = max(gross_sale_value - actual_sale_value, 0.0)
-		line_tax_charged, line_tax_rate = _resolve_item_tax(item, doc, actual_sale_value)
-		line_total = abs(_company_amount(item, "amount")) or (actual_sale_value + line_tax_charged)
+		line_tax_charged, line_tax_rate = resolve_item_tax(item, doc, actual_sale_value)
+		line_total = abs(company_amount(item, "amount")) or (actual_sale_value + line_tax_charged)
 
 		items.append(
 			{
 				"ItemCode": item_code,
-				"ItemName": _sanitize_text(_get_doc_value(item, "item_name", item_code), max_length=150),
+				"ItemName": sanitize_text(get_doc_value(item, "item_name", item_code), max_length=150),
 				"Quantity": qty,
 				"PCTCode": pct_code,
 				"TaxRate": line_tax_rate,
@@ -342,7 +342,7 @@ def _build_payload(doc: Any, settings: FBRSettings) -> dict[str, Any]:
 				"Discount": line_discount,
 				"FurtherTax": 0.0,
 				"InvoiceType": line_invoice_type,
-				"RefUSIN": _get_reference_usin(doc) if is_return else None,
+				"RefUSIN": get_reference_usin(doc) if is_return else None,
 			}
 		)
 
@@ -351,40 +351,40 @@ def _build_payload(doc: Any, settings: FBRSettings) -> dict[str, Any]:
 		total_discount += line_discount
 		total_quantity += qty
 
-	buyer_name = _sanitize_text(_get_doc_value(doc, "customer_name", ""), max_length=150)
-	buyer_phone = _sanitize_text(
-		_get_doc_value(doc, "contact_mobile", "") or _get_doc_value(doc, "contact_phone", ""),
+	buyer_name = sanitize_text(get_doc_value(doc, "customer_name", ""), max_length=150)
+	buyer_phone = sanitize_text(
+		get_doc_value(doc, "contact_mobile", "") or get_doc_value(doc, "contact_phone", ""),
 		max_length=20,
 	)
-	buyer_ntn, buyer_cnic = _split_tax_identifier(_get_doc_value(doc, "tax_id", ""))
+	buyer_ntn, buyer_cnic = split_tax_identifier(get_doc_value(doc, "tax_id", ""))
 
 	return {
 		"InvoiceNumber": "",
-		"POSID": _coerce_pos_id(settings.pos_id),
-		"USIN": _sanitize_text(
-			_get_doc_value(doc, "xpos_local_id", "") or _get_doc_value(doc, "name", ""),
+		"POSID": coerce_pos_id(settings.pos_id),
+		"USIN": sanitize_text(
+			get_doc_value(doc, "xpos_local_id", "") or get_doc_value(doc, "name", ""),
 			max_length=50,
 		),
-		"DateTime": _build_posting_datetime(doc),
+		"DateTime": build_posting_datetime(doc),
 		"BuyerNTN": buyer_ntn,
 		"BuyerCNIC": buyer_cnic,
 		"BuyerName": buyer_name,
 		"BuyerPhoneNumber": buyer_phone,
-		"TotalBillAmount": abs(_company_amount(doc, "rounded_total"))
-		or abs(_company_amount(doc, "grand_total")),
+		"TotalBillAmount": abs(company_amount(doc, "rounded_total"))
+		or abs(company_amount(doc, "grand_total")),
 		"TotalQuantity": total_quantity,
 		"TotalSaleValue": total_sale_value,
 		"TotalTaxCharged": total_tax_charged,
 		"Discount": total_discount,
 		"FurtherTax": 0.0,
-		"PaymentMode": _resolve_payment_mode(doc),
-		"RefUSIN": _get_reference_usin(doc) if is_return else None,
+		"PaymentMode": resolve_payment_mode(doc),
+		"RefUSIN": get_reference_usin(doc) if is_return else None,
 		"InvoiceType": invoice_type,
 		"Items": items,
 	}
 
 
-def _post_invoice(doc: Any, payload: dict[str, Any], settings: FBRSettings) -> dict[str, Any]:
+def post_invoice(doc: Any, payload: dict[str, Any], settings: FBRSettings) -> dict[str, Any]:
 	headers = {
 		"Authorization": f"Bearer {settings.bearer_token}",
 		"Accept": "application/json",
@@ -401,18 +401,18 @@ def _post_invoice(doc: Any, payload: dict[str, Any], settings: FBRSettings) -> d
 		)
 	except requests.RequestException as exc:
 		frappe.log_error(
-			f"Invoice: {_get_doc_value(doc, 'name', '')}\nURL: {settings.api_url}\nError: {exc}\nPayload: {json.dumps(payload, default=str)}",
+			f"Invoice: {get_doc_value(doc, 'name', '')}\nURL: {settings.api_url}\nError: {exc}\nPayload: {json.dumps(payload, default=str)}",
 			"X POS FBR Request Error",
 		)
 		error = FBRConnectionError(_("FBR API call failed: {0}").format(cstr(exc)))
 		error.sent = request_may_have_reached_fbr(exc)
 		raise error from exc
 
-	response_data = _parse_response(response)
+	response_data = parse_response(response)
 	if response.status_code >= 500:
 		# A gateway error can come after FBR recorded the invoice.
 		frappe.log_error(
-			f"Invoice: {_get_doc_value(doc, 'name', '')}\nStatus: {response.status_code}\nResponse: {response.text}",
+			f"Invoice: {get_doc_value(doc, 'name', '')}\nStatus: {response.status_code}\nResponse: {response.text}",
 			"X POS FBR Response Error",
 		)
 		error = FBRConnectionError(_("FBR answered HTTP {0}.").format(response.status_code))
@@ -420,13 +420,13 @@ def _post_invoice(doc: Any, payload: dict[str, Any], settings: FBRSettings) -> d
 		raise error
 	if response.status_code >= 400:
 		message = cstr(
-			_extract_value(
+			extract_value(
 				response_data, "Response", "Message", "message", default=response.text or response.reason
 			)
 		).strip()
 		frappe.log_error(
 			(
-				f"Invoice: {_get_doc_value(doc, 'name', '')}\n"
+				f"Invoice: {get_doc_value(doc, 'name', '')}\n"
 				f"Status: {response.status_code}\n"
 				f"URL: {settings.api_url}\n"
 				f"Payload: {json.dumps(payload, default=str)}\n"
@@ -455,7 +455,7 @@ def request_may_have_reached_fbr(exc: requests.RequestException) -> bool:
 	return not isinstance(exc, requests.exceptions.MissingSchema | requests.exceptions.InvalidSchema)
 
 
-def _parse_response(response: requests.Response) -> dict[str, Any]:
+def parse_response(response: requests.Response) -> dict[str, Any]:
 	try:
 		payload = response.json()
 		return payload if isinstance(payload, dict) else {"data": payload}
@@ -470,18 +470,18 @@ def _parse_response(response: requests.Response) -> dict[str, Any]:
 			return {"message": text}
 
 
-def _extract_value(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
+def extract_value(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
 	for key in keys:
 		if key in data and data[key] not in (None, ""):
 			return data[key]
 	return default
 
 
-def _resolve_payment_mode(doc: Any) -> int:
+def resolve_payment_mode(doc: Any) -> int:
 	payments = [
 		payment
-		for payment in (_get_doc_value(doc, "payments", []) or [])
-		if abs(flt(_get_doc_value(payment, "amount", 0))) > 0
+		for payment in (get_doc_value(doc, "payments", []) or [])
+		if abs(flt(get_doc_value(payment, "amount", 0))) > 0
 	]
 	if len(payments) > 1:
 		return 5
@@ -489,7 +489,7 @@ def _resolve_payment_mode(doc: Any) -> int:
 		return 1
 
 	payment = payments[0]
-	mode_name = cstr(_get_doc_value(payment, "mode_of_payment", "")).strip()
+	mode_name = cstr(get_doc_value(payment, "mode_of_payment", "")).strip()
 	configured_code = cstr(
 		frappe.db.get_value("Mode of Payment", mode_name, "fbr_payment_mode_code") or ""
 	).strip()
@@ -515,25 +515,25 @@ def _resolve_payment_mode(doc: Any) -> int:
 	)
 
 
-def _get_reference_usin(doc: Any) -> str | None:
-	return_against = cstr(_get_doc_value(doc, "return_against", "")).strip()
+def get_reference_usin(doc: Any) -> str | None:
+	return_against = cstr(get_doc_value(doc, "return_against", "")).strip()
 	if not return_against:
 		return None
 
-	for doctype in (_get_doc_value(doc, "doctype", ""), "Sales Invoice", "POS Invoice"):
+	for doctype in (get_doc_value(doc, "doctype", ""), "Sales Invoice", "POS Invoice"):
 		if doctype and frappe.db.exists(doctype, return_against):
 			return return_against
 
 	return return_against
 
 
-def _resolve_item_invoice_type(is_return: bool, item_meta: dict[str, Any]) -> int:
+def resolve_item_invoice_type(is_return: bool, item_meta: dict[str, Any]) -> int:
 	if cint(item_meta.get("fbr_third_schedule", 0)):
 		return 12 if is_return else 11
 	return 3 if is_return else 1
 
 
-def _get_item_metadata(item_code: str, cache: dict[str, dict[str, Any]]) -> dict[str, Any]:
+def get_item_metadata(item_code: str, cache: dict[str, dict[str, Any]]) -> dict[str, Any]:
 	if item_code not in cache:
 		cache[item_code] = (
 			frappe.db.get_value(
@@ -547,32 +547,32 @@ def _get_item_metadata(item_code: str, cache: dict[str, dict[str, Any]]) -> dict
 	return cache[item_code]
 
 
-def _resolve_item_tax(item: Any, doc: Any, sale_value: float) -> tuple[float, float]:
-	amount_value = abs(_company_amount(item, "amount"))
-	net_amount_value = abs(_company_amount(item, "net_amount"))
+def resolve_item_tax(item: Any, doc: Any, sale_value: float) -> tuple[float, float]:
+	amount_value = abs(company_amount(item, "amount"))
+	net_amount_value = abs(company_amount(item, "net_amount"))
 	if amount_value and net_amount_value and abs(amount_value - net_amount_value) > 0.0001:
 		tax_charged = abs(amount_value - net_amount_value)
 		rate = flt((tax_charged / sale_value) * 100, 3) if sale_value else 0.0
 		return tax_charged, rate
 
-	tax_rate = _resolve_item_tax_rate(item, doc)
+	tax_rate = resolve_item_tax_rate(item, doc)
 	tax_charged = flt(sale_value * tax_rate / 100, 2) if sale_value and tax_rate else 0.0
 	return tax_charged, tax_rate
 
 
-def _resolve_item_tax_rate(item: Any, doc: Any) -> float:
-	item_tax_rate = _parse_json_mapping(_get_doc_value(item, "item_tax_rate", None))
+def resolve_item_tax_rate(item: Any, doc: Any) -> float:
+	item_tax_rate = parse_json_mapping(get_doc_value(item, "item_tax_rate", None))
 	if item_tax_rate:
 		return flt(sum(flt(value) for value in item_tax_rate.values()), 3)
 
 	total_rate = 0.0
-	for tax in _get_doc_value(doc, "taxes", []) or []:
-		if cstr(_get_doc_value(tax, "charge_type", "")).strip() in PERCENTAGE_CHARGE_TYPES:
-			total_rate += flt(_get_doc_value(tax, "rate", 0))
+	for tax in get_doc_value(doc, "taxes", []) or []:
+		if cstr(get_doc_value(tax, "charge_type", "")).strip() in PERCENTAGE_CHARGE_TYPES:
+			total_rate += flt(get_doc_value(tax, "rate", 0))
 	return flt(total_rate, 3)
 
 
-def _parse_json_mapping(value: Any) -> dict[str, Any]:
+def parse_json_mapping(value: Any) -> dict[str, Any]:
 	if isinstance(value, dict):
 		return value
 	if not value:
@@ -584,38 +584,36 @@ def _parse_json_mapping(value: Any) -> dict[str, Any]:
 		return {}
 
 
-def _split_tax_identifier(value: Any) -> tuple[str | None, str | None]:
-	tax_id = _sanitize_text(value, max_length=20)
+def split_tax_identifier(value: Any) -> tuple[str | None, str | None]:
+	tax_id = sanitize_text(value, max_length=20)
 	if not tax_id:
 		return None, None
-	if _NTN_PATTERN.match(tax_id):
+	if NTN_PATTERN.match(tax_id):
 		return tax_id, None
-	if _CNIC_PATTERN.match(tax_id):
+	if CNIC_PATTERN.match(tax_id):
 		return None, tax_id
 	return tax_id, None
 
 
-def _coerce_pos_id(value: str) -> int | str:
+def coerce_pos_id(value: str) -> int | str:
 	return int(value) if value.isdigit() else value
 
 
-def _build_posting_datetime(doc: Any) -> str:
-	posting_date = cstr(_get_doc_value(doc, "posting_date", "")).strip()
-	posting_time = cstr(_get_doc_value(doc, "posting_time", "")).strip() or now_datetime().strftime(
-		"%H:%M:%S"
-	)
+def build_posting_datetime(doc: Any) -> str:
+	posting_date = cstr(get_doc_value(doc, "posting_date", "")).strip()
+	posting_time = cstr(get_doc_value(doc, "posting_time", "")).strip() or now_datetime().strftime("%H:%M:%S")
 	return f"{posting_date} {posting_time}".strip()
 
 
-def _company_amount(doc: Any, fieldname: str) -> float:
+def company_amount(doc: Any, fieldname: str) -> float:
 	base_fieldname = f"base_{fieldname}"
-	base_value = _get_doc_value(doc, base_fieldname, None)
+	base_value = get_doc_value(doc, base_fieldname, None)
 	if base_value not in (None, ""):
 		return flt(base_value)
-	return flt(_get_doc_value(doc, fieldname, 0))
+	return flt(get_doc_value(doc, fieldname, 0))
 
 
-def _get_doc_value(doc: Any, fieldname: str, default: Any = None) -> Any:
+def get_doc_value(doc: Any, fieldname: str, default: Any = None) -> Any:
 	if hasattr(doc, "get"):
 		try:
 			value = doc.get(fieldname)
@@ -626,7 +624,7 @@ def _get_doc_value(doc: Any, fieldname: str, default: Any = None) -> Any:
 	return getattr(doc, fieldname, default)
 
 
-def _set_field_if_available(doc: Any, fieldname: str, value: Any) -> None:
+def set_field_if_available(doc: Any, fieldname: str, value: Any) -> None:
 	meta = getattr(doc, "meta", None)
 	if meta and hasattr(meta, "get_field") and not meta.get_field(fieldname):
 		return
@@ -636,10 +634,10 @@ def _set_field_if_available(doc: Any, fieldname: str, value: Any) -> None:
 		setattr(doc, fieldname, value)
 
 
-def _sanitize_text(value: Any, max_length: int | None = None) -> str | None:
+def sanitize_text(value: Any, max_length: int | None = None) -> str | None:
 	if value in (None, ""):
 		return None
-	text = _CONTROL_CHAR_PATTERN.sub("", cstr(value).strip())
+	text = CONTROL_CHAR_PATTERN.sub("", cstr(value).strip())
 	if max_length:
 		text = text[:max_length]
 	return text or None

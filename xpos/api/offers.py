@@ -54,7 +54,7 @@ def get_offers(pos_profile: str):
 		offer["max_qty"] = flt(offer.get("max_qty") or 0)
 		offer["min_amt"] = flt(offer.get("min_amt") or 0)
 		offer["max_amt"] = flt(offer.get("max_amt") or 0)
-		_normalize_discount_fields(offer)
+		normalize_discount_fields(offer)
 
 	promo_offers = get_promotional_scheme_offers(pos) or []
 	data.extend(promo_offers)
@@ -97,7 +97,7 @@ def get_pos_coupon(coupon: str, customer: str, company: str):
 	offer_data["max_qty"] = flt(offer_data.get("max_qty") or 0)
 	offer_data["min_amt"] = flt(offer_data.get("min_amt") or 0)
 	offer_data["max_amt"] = flt(offer_data.get("max_amt") or 0)
-	_normalize_discount_fields(offer_data)
+	normalize_discount_fields(offer_data)
 
 	return {"coupon": coupon_data, "offer": offer_data, "msg": "Apply"}
 
@@ -118,7 +118,7 @@ def get_active_gift_coupons(customer: str, company: str):
 		fields=["coupon_code", "valid_from", "valid_upto"],
 	)
 
-	return [row_value(c, "coupon_code") for c in coupons_data if _is_coupon_active(c, today)]
+	return [row_value(c, "coupon_code") for c in coupons_data if is_coupon_active(c, today)]
 
 
 @frappe.whitelist()
@@ -136,7 +136,7 @@ def get_applicable_delivery_charges(
 	return resolve_delivery_charges(company, pos_profile, customer, shipping_address_name)
 
 
-def _is_coupon_active(coupon_data: dict | object, today: Any):
+def is_coupon_active(coupon_data: dict | object, today: Any):
 	"""Return True if the coupon is valid for the provided date."""
 	valid_from = row_value(coupon_data, "valid_from")
 	valid_upto = row_value(coupon_data, "valid_upto")
@@ -147,7 +147,7 @@ def _is_coupon_active(coupon_data: dict | object, today: Any):
 	return True
 
 
-def _normalize_discount_fields(offer: dict):
+def normalize_discount_fields(offer: dict):
 	"""Ensure discount fields are numeric."""
 	for field in ("discount_percentage", "discount_amount", "rate"):
 		if field in offer:

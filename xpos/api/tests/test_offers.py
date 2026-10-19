@@ -181,13 +181,13 @@ class TestGetActiveGiftCoupons(unittest.TestCase):
 
 
 class TestNormalizeDiscountFields(unittest.TestCase):
-	"""Tests for _normalize_discount_fields."""
+	"""Tests for normalize_discount_fields."""
 
 	def test_string_amounts_are_coerced_to_float(self):
 		"""Values arriving as strings from the client are coerced to numbers."""
 		offer = {"discount_percentage": "12.5", "discount_amount": "30", "rate": "99.99"}
 
-		offers._normalize_discount_fields(offer)
+		offers.normalize_discount_fields(offer)
 
 		self.assertEqual(offer["discount_percentage"], 12.5)
 		self.assertEqual(offer["discount_amount"], 30.0)
@@ -197,7 +197,7 @@ class TestNormalizeDiscountFields(unittest.TestCase):
 		"""None must not survive into arithmetic downstream."""
 		offer = {"discount_percentage": None, "discount_amount": None}
 
-		offers._normalize_discount_fields(offer)
+		offers.normalize_discount_fields(offer)
 
 		self.assertEqual(offer["discount_percentage"], 0)
 		self.assertEqual(offer["discount_amount"], 0)
@@ -206,37 +206,37 @@ class TestNormalizeDiscountFields(unittest.TestCase):
 		"""Only fields already present are normalized."""
 		offer = {"name": "OFFER-1"}
 
-		offers._normalize_discount_fields(offer)
+		offers.normalize_discount_fields(offer)
 
 		self.assertEqual(offer, {"name": "OFFER-1"})
 
 
 class TestIsCouponActive(unittest.TestCase):
-	"""Tests for _is_coupon_active date-window logic."""
+	"""Tests for is_coupon_active date-window logic."""
 
 	def test_coupon_without_dates_is_active(self):
 		"""A coupon with no validity window is always active."""
 		self.assertTrue(
-			offers._is_coupon_active({"valid_from": None, "valid_upto": None}, getdate("2026-06-15"))
+			offers.is_coupon_active({"valid_from": None, "valid_upto": None}, getdate("2026-06-15"))
 		)
 
 	def test_coupon_not_yet_valid_is_inactive(self):
 		"""valid_from in the future excludes the coupon."""
 		coupon = {"valid_from": "2026-07-01", "valid_upto": None}
 
-		self.assertFalse(offers._is_coupon_active(coupon, getdate("2026-06-15")))
+		self.assertFalse(offers.is_coupon_active(coupon, getdate("2026-06-15")))
 
 	def test_expired_coupon_is_inactive(self):
 		"""valid_upto in the past excludes the coupon."""
 		coupon = {"valid_from": None, "valid_upto": "2026-06-01"}
 
-		self.assertFalse(offers._is_coupon_active(coupon, getdate("2026-06-15")))
+		self.assertFalse(offers.is_coupon_active(coupon, getdate("2026-06-15")))
 
 	def test_boundary_dates_are_inclusive(self):
 		"""A coupon is active on both its first and last day."""
 		coupon = {"valid_from": "2026-06-15", "valid_upto": "2026-06-15"}
 
-		self.assertTrue(offers._is_coupon_active(coupon, getdate("2026-06-15")))
+		self.assertTrue(offers.is_coupon_active(coupon, getdate("2026-06-15")))
 
 
 def make_scheme(

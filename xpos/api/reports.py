@@ -17,12 +17,12 @@ from frappe import _
 from frappe.utils import add_months, today
 
 
-def _company_default() -> str:
+def company_default() -> str:
 	"""Resolve the user's default company, mirroring the desk ``*.js`` defaults."""
 	return frappe.defaults.get_user_default("Company") or frappe.defaults.get_default("company") or ""
 
 
-def _company_filter():
+def company_filter():
 	return {
 		"fieldname": "company",
 		"label": "Company",
@@ -33,7 +33,7 @@ def _company_filter():
 	}
 
 
-def _warehouse_filter(required: bool = False, multi: bool = False):
+def warehouse_filter(required: bool = False, multi: bool = False):
 	return {
 		"fieldname": "warehouse",
 		"label": "Warehouses" if multi else "Warehouse",
@@ -45,7 +45,7 @@ def _warehouse_filter(required: bool = False, multi: bool = False):
 	}
 
 
-def _multi_link(fieldname: str, label: str, doctype: str, required: bool = False):
+def multi_link(fieldname: str, label: str, doctype: str, required: bool = False):
 	return {
 		"fieldname": fieldname,
 		"label": label,
@@ -55,7 +55,7 @@ def _multi_link(fieldname: str, label: str, doctype: str, required: bool = False
 	}
 
 
-def _link(fieldname: str, label: str, doctype: str, required: bool = False):
+def link(fieldname: str, label: str, doctype: str, required: bool = False):
 	return {
 		"fieldname": fieldname,
 		"label": label,
@@ -65,36 +65,36 @@ def _link(fieldname: str, label: str, doctype: str, required: bool = False):
 	}
 
 
-def _date(fieldname: str, label: str, required: bool = False, default=None):
+def date(fieldname: str, label: str, required: bool = False, default=None):
 	field = {"fieldname": fieldname, "label": label, "type": "date", "required": required}
 	if default is not None:
 		field["defaultValue"] = default
 	return field
 
 
-def _filters() -> dict:
+def report_filters() -> dict:
 	return {
 		"Current Stock Report": [
-			_company_filter(),
-			_warehouse_filter(required=True),
-			_link("supplier", "Supplier", "Supplier"),
-			_link("brand", "Brand", "Brand"),
-			_link("item_group", "Item Group", "Item Group"),
+			company_filter(),
+			warehouse_filter(required=True),
+			link("supplier", "Supplier", "Supplier"),
+			link("brand", "Brand", "Brand"),
+			link("item_group", "Item Group", "Item Group"),
 		],
 		"Current Stock By Brand": [
-			_multi_link("brand", "Brand", "Brand", required=True),
+			multi_link("brand", "Brand", "Brand", required=True),
 		],
 		"Current Stock Summary": [
-			_company_filter(),
-			_warehouse_filter(required=True),
+			company_filter(),
+			warehouse_filter(required=True),
 		],
 		"Current Stock With Levels": [
-			_company_filter(),
-			_warehouse_filter(required=False),
+			company_filter(),
+			warehouse_filter(required=False),
 		],
 		"Dead Stock Report": [
-			_company_filter(),
-			_warehouse_filter(required=False),
+			company_filter(),
+			warehouse_filter(required=False),
 			{"fieldname": "days", "label": "Days", "type": "integer", "required": True, "defaultValue": 30},
 			{
 				"fieldname": "min_value",
@@ -103,35 +103,35 @@ def _filters() -> dict:
 				"required": True,
 				"defaultValue": 1000,
 			},
-			_multi_link("supplier", "Supplier", "Supplier"),
+			multi_link("supplier", "Supplier", "Supplier"),
 		],
 		"Stock Value By Warehouse": [
-			_company_filter(),
+			company_filter(),
 		],
 		"Stock Value Summary By Date": [
-			_company_filter(),
-			_date("from_posting_date", "From Posting Date", required=True, default=today()),
+			company_filter(),
+			date("from_posting_date", "From Posting Date", required=True, default=today()),
 		],
 		"Warehouse Stock Movement": [
-			_company_filter(),
-			_date("from_date", "From Date", required=True, default=today()),
-			_date("to_date", "To Date", required=True, default=today()),
+			company_filter(),
+			date("from_date", "From Date", required=True, default=today()),
+			date("to_date", "To Date", required=True, default=today()),
 		],
 		"Branch Item Summary": [
-			_company_filter(),
-			_warehouse_filter(required=True),
-			_date("from_date", "From Date", required=True, default=today()),
-			_date("to_date", "To Date", required=True, default=today()),
+			company_filter(),
+			warehouse_filter(required=True),
+			date("from_date", "From Date", required=True, default=today()),
+			date("to_date", "To Date", required=True, default=today()),
 		],
 		"Branch Set Summary": [
-			_company_filter(),
-			_warehouse_filter(required=True),
-			_date("date", "Date", required=True, default=today()),
+			company_filter(),
+			warehouse_filter(required=True),
+			date("date", "Date", required=True, default=today()),
 		],
 		"Low Qty Sales Report": [
-			_company_filter(),
-			_date("from_date", "From Date", required=True, default=add_months(today(), -1)),
-			_date("to_date", "To Date", required=True, default=today()),
+			company_filter(),
+			date("from_date", "From Date", required=True, default=add_months(today(), -1)),
+			date("to_date", "To Date", required=True, default=today()),
 			{
 				"fieldname": "min_qty",
 				"label": "Min Qty",
@@ -141,28 +141,28 @@ def _filters() -> dict:
 			},
 		],
 		"Zero Qty Sales Report": [
-			_company_filter(),
-			_date("from_date", "From Date", required=True, default=today()),
-			_date("to_date", "To Date", required=True, default=today()),
+			company_filter(),
+			date("from_date", "From Date", required=True, default=today()),
+			date("to_date", "To Date", required=True, default=today()),
 		],
 		"Slow Fast Moving Items": [
-			_company_filter(),
-			_date("from_date", "From Date", required=True, default=add_months(today(), -1)),
-			_date("to_date", "To Date", required=True, default=today()),
-			_multi_link("supplier", "Supplier", "Supplier"),
+			company_filter(),
+			date("from_date", "From Date", required=True, default=add_months(today(), -1)),
+			date("to_date", "To Date", required=True, default=today()),
+			multi_link("supplier", "Supplier", "Supplier"),
 		],
 		"Stock Audit Report": [
-			_company_filter(),
-			_warehouse_filter(required=False, multi=True),
-			_multi_link("item_group", "Item Group", "Item Group"),
-			_multi_link("brand", "Brand", "Brand"),
-			_multi_link("supplier", "Supplier", "Supplier"),
+			company_filter(),
+			warehouse_filter(required=False, multi=True),
+			multi_link("item_group", "Item Group", "Item Group"),
+			multi_link("brand", "Brand", "Brand"),
+			multi_link("supplier", "Supplier", "Supplier"),
 		],
 		"Purchase Order Report": [
-			_company_filter(),
-			_link("supplier", "Supplier", "Supplier", required=True),
-			_date("from_date", "From Date", required=True),
-			_date("to_date", "To Date", required=True),
+			company_filter(),
+			link("supplier", "Supplier", "Supplier", required=True),
+			date("from_date", "From Date", required=True),
+			date("to_date", "To Date", required=True),
 			{
 				"fieldname": "type",
 				"label": "Type",
@@ -177,18 +177,18 @@ def _filters() -> dict:
 			},
 		],
 		"POS Shift Reconciliation": [
-			_link("pos_opening_shift", "Opening Shift", "POS Opening Shift"),
-			_link("company", "Company", "Company"),
-			_link("pos_profile", "POS Profile", "POS Profile"),
-			_date("from_date", "From Date"),
-			_date("to_date", "To Date"),
+			link("pos_opening_shift", "Opening Shift", "POS Opening Shift"),
+			link("company", "Company", "Company"),
+			link("pos_profile", "POS Profile", "POS Profile"),
+			date("from_date", "From Date"),
+			date("to_date", "To Date"),
 		],
 	}
 
 
-def _apply_company_defaults(filters: list) -> list:
+def apply_company_defaults(filters: list) -> list:
 	"""Inject the user's default company into the company filter at request time."""
-	company = _company_default()
+	company = company_default()
 	if not company:
 		return filters
 	for field in filters:
@@ -204,7 +204,7 @@ def get_report_meta(report: str) -> dict:
 	Columns are intentionally omitted - they arrive with the data from
 	``frappe.desk.query_report.run`` so no report execution is needed here.
 	"""
-	registry = _filters()
+	registry = report_filters()
 	filters = registry.get(report)
 	if filters is None:
 		frappe.throw(_("Unknown report: {0}").format(report), frappe.DoesNotExistError)
@@ -212,4 +212,4 @@ def get_report_meta(report: str) -> dict:
 	if not frappe.has_permission("Report", "read"):
 		frappe.throw(_("Not permitted to view reports"), frappe.PermissionError)
 
-	return {"filters": _apply_company_defaults(filters)}
+	return {"filters": apply_company_defaults(filters)}

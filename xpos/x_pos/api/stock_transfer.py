@@ -100,7 +100,7 @@ def get_in_transit_transfers(warehouse: str | None = None, limit: int = 50):
 			continue
 
 		for item in entry_items:
-			received = _get_received_qty(entry["name"], item["ste_detail"])
+			received = get_received_qty(entry["name"], item["ste_detail"])
 			item["received_qty"] = received
 			item["pending_qty"] = flt(item["qty"]) - received
 
@@ -127,7 +127,7 @@ def get_in_transit_transfers(warehouse: str | None = None, limit: int = 50):
 	return result
 
 
-def _get_received_qty(outgoing_entry: str, ste_detail: str) -> float:
+def get_received_qty(outgoing_entry: str, ste_detail: str) -> float:
 	"""Get how much quantity has already been received against an outgoing entry item."""
 	received = frappe.db.sql(
 		"""
@@ -157,7 +157,7 @@ def get_transfer_detail(stock_entry: str):
 
 	items = []
 	for item in se.items:
-		received = _get_received_qty(se.name, item.name)
+		received = get_received_qty(se.name, item.name)
 		pending = flt(item.qty) - received
 		if pending <= 0:
 			continue
@@ -274,7 +274,7 @@ def receive_transit_stock(data: str | dict):
 		if receive_qty <= 0:
 			continue
 
-		already_received = _get_received_qty(outgoing_entry_name, ste_detail)
+		already_received = get_received_qty(outgoing_entry_name, ste_detail)
 		max_receivable = flt(outgoing_item.qty) - already_received
 		if receive_qty > max_receivable:
 			receive_qty = max_receivable
@@ -389,7 +389,7 @@ def return_shortage_to_source(data: str | dict):
 		if return_qty <= 0:
 			continue
 
-		already_received = _get_received_qty(outgoing_entry_name, ste_detail)
+		already_received = get_received_qty(outgoing_entry_name, ste_detail)
 		max_in_transit = flt(outgoing_item.qty) - already_received
 		if return_qty > max_in_transit:
 			return_qty = max_in_transit

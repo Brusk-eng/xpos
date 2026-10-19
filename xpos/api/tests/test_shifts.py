@@ -69,7 +69,7 @@ class TestGetOpeningData(unittest.TestCase):
 class TestOpenShift(unittest.TestCase):
 	"""Tests for open_shift function."""
 
-	@patch("xpos.api.shifts._enrich_shift_data")
+	@patch("xpos.api.shifts.enrich_shift_data")
 	@patch("xpos.api.shifts.frappe")
 	def test_open_shift_creates_new_shift(self, mock_frappe, mock_enrich):
 		"""Test that open_shift creates a new POS Opening Shift."""
@@ -88,7 +88,7 @@ class TestOpenShift(unittest.TestCase):
 		mock_shift_doc.insert.assert_called_once_with(ignore_permissions=True)
 		self.assertIn("pos_opening_shift", result)
 
-	@patch("xpos.api.shifts._enrich_shift_data")
+	@patch("xpos.api.shifts.enrich_shift_data")
 	@patch("xpos.api.shifts.frappe")
 	def test_open_shift_handles_empty_balance(self, mock_frappe, mock_enrich):
 		"""Test that open_shift works with no balance details."""
@@ -109,7 +109,7 @@ class TestOpenShift(unittest.TestCase):
 class TestCheckOpenShift(unittest.TestCase):
 	"""Tests for check_open_shift function."""
 
-	@patch("xpos.api.shifts._enrich_shift_data")
+	@patch("xpos.api.shifts.enrich_shift_data")
 	@patch("xpos.api.shifts.frappe")
 	def test_check_open_shift_returns_existing_shift(self, mock_frappe, mock_enrich):
 		"""Test that check_open_shift returns active shift for user."""
@@ -136,7 +136,7 @@ class TestCheckOpenShift(unittest.TestCase):
 
 		self.assertIsNone(result)
 
-	@patch("xpos.api.shifts._enrich_shift_data")
+	@patch("xpos.api.shifts.enrich_shift_data")
 	@patch("xpos.api.shifts.frappe")
 	def test_check_open_shift_uses_provided_user(self, mock_frappe, mock_enrich):
 		"""Test that check_open_shift can check for specific user."""
@@ -331,7 +331,7 @@ class TestShiftExpectedAmounts(MigratedSchemaMixin, unittest.TestCase):
 	"""Tests that shift reconciliation figures are derived server-side."""
 
 	@staticmethod
-	def _opening(balance_details):
+	def shift_opening_mock(balance_details):
 		opening = MagicMock()
 		opening.name = "POS-OPEN-001"
 		opening.pos_profile = "POS-PROFILE-1"
@@ -352,7 +352,7 @@ class TestShiftExpectedAmounts(MigratedSchemaMixin, unittest.TestCase):
 		mock_frappe.db.get_value.return_value = "Cash"
 
 		expected = shifts.get_shift_expected_amounts(
-			self._opening([("Cash", 500, "LBP")]),
+			self.shift_opening_mock([("Cash", 500, "LBP")]),
 			"Sales Invoice",
 			[{"name": "INV-001", "currency": "LBP", "change_amount": 0}],
 		)
@@ -367,7 +367,7 @@ class TestShiftExpectedAmounts(MigratedSchemaMixin, unittest.TestCase):
 		mock_frappe.db.get_value.return_value = "Cash LBP"
 
 		expected = shifts.get_shift_expected_amounts(
-			self._opening([("Cash LBP", 1000000, "LBP"), ("Cash USD", 200, "USD")]),
+			self.shift_opening_mock([("Cash LBP", 1000000, "LBP"), ("Cash USD", 200, "USD")]),
 			"Sales Invoice",
 			[],
 		)
@@ -407,7 +407,7 @@ class TestShiftExpectedAmounts(MigratedSchemaMixin, unittest.TestCase):
 		mock_frappe.db.get_value.return_value = "Cash LBP"
 
 		expected = shifts.get_shift_expected_amounts(
-			self._opening([("Cash LBP", 1000000, "LBP"), ("Cash USD", 200, "USD")]),
+			self.shift_opening_mock([("Cash LBP", 1000000, "LBP"), ("Cash USD", 200, "USD")]),
 			"Sales Invoice",
 			[{"name": "INV-001", "currency": "LBP", "change_amount": 3107700}],
 		)

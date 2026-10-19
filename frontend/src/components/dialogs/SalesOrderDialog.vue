@@ -257,6 +257,7 @@ watch(
 		try {
 			addresses.value = await call<CustomerAddress[]>("xpos.api.customers.get_customer_addresses", {
 				customer,
+				pos_profile: posStore.profileName || undefined,
 			});
 			shippingAddress.value =
 				addresses.value.find((a) => a.is_shipping_address)?.name ||

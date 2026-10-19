@@ -18,7 +18,7 @@ class TestCatalogStock(unittest.TestCase):
 		with (
 			patch("xpos.api.items.frappe") as api,
 			patch("xpos.api.items.get_invoice_type", return_value="POS Invoice"),
-			patch("xpos.api.items._get_pending_pos_qty_map", return_value={"A": 3, "B": 2}) as pending,
+			patch("xpos.api.items.get_pending_pos_qty_map", return_value={"A": 3, "B": 2}) as pending,
 		):
 			api.db.get_value.return_value = 1
 			api.db.get_descendants.return_value = ["One", "Two"]

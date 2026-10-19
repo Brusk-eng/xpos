@@ -181,7 +181,7 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 			credit_note.posting_date = getdate(self.posting_date)
 			credit_note.posting_time = get_time(self.posting_time)
 
-			self._cap_item_rates_to_return_against(credit_note)
+			self.cap_item_rates_to_return_against(credit_note)
 
 			credit_note.save()
 			submit_allowing_negative_stock(credit_note)
@@ -191,7 +191,7 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 
 		return credit_notes
 
-	def _cap_item_rates_to_return_against(self, credit_note) -> None:
+	def cap_item_rates_to_return_against(self, credit_note) -> None:
 		"""
 		Cap credit note item rates that exceed the consolidated SI rate.
 		"""
@@ -213,17 +213,17 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 
 		if changed:
 			credit_note.calculate_taxes_and_totals()
-			self._normalize_return_payments(credit_note)
+			self.normalize_return_payments(credit_note)
 
 	def merge_pos_invoice_into(self, invoice, data):
 		invoice = super().merge_pos_invoice_into(invoice, data)
 
 		if getattr(invoice, "is_return", 0):
-			self._normalize_return_payments(invoice)
+			self.normalize_return_payments(invoice)
 
 		return invoice
 
-	def _normalize_return_payments(self, invoice) -> None:
+	def normalize_return_payments(self, invoice) -> None:
 		"""Clamp aggregated payment totals for consolidated return invoices."""
 
 		invoice_total = flt(invoice.rounded_total or invoice.grand_total)
@@ -275,7 +275,7 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 		difference = abs(flt(invoice.paid_amount)) + abs(flt(invoice.write_off_amount)) - invoice_total_abs
 
 		if difference > tolerance:
-			self._reduce_payment_difference(
+			self.reduce_payment_difference(
 				invoice,
 				difference,
 				invoice_sign,
@@ -286,7 +286,7 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 				min_unit,
 			)
 
-		self._cleanup_zero_amount_payments(invoice, tolerance, precision_base_paid)
+		self.cleanup_zero_amount_payments(invoice, tolerance, precision_base_paid)
 		invoice.set_paid_amount()
 
 		remaining_diff = (
@@ -308,10 +308,10 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 				precision_base_paid,
 			)
 
-			self._cleanup_zero_amount_payments(invoice, tolerance, precision_base_paid)
+			self.cleanup_zero_amount_payments(invoice, tolerance, precision_base_paid)
 			invoice.set_paid_amount()
 
-	def _reduce_payment_difference(
+	def reduce_payment_difference(
 		self,
 		invoice,
 		difference: float,
@@ -347,7 +347,7 @@ class CustomPOSInvoiceMergeLog(ERPNextPOSInvoiceMergeLog):
 			if remaining <= tolerance:
 				break
 
-	def _cleanup_zero_amount_payments(
+	def cleanup_zero_amount_payments(
 		self,
 		invoice,
 		tolerance: float,

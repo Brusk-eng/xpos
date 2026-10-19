@@ -22,7 +22,7 @@ from frappe.utils import add_days, flt, nowdate
 
 from xpos.api import invoices as invoices_api
 from xpos.api.auth import clear_role_permission_cache
-from xpos.api.invoices import _submit_invoice_job, create_invoice
+from xpos.api.invoices import create_invoice, submit_invoice_job
 from xpos.x_pos.integrations import fiscal_ledger
 
 COMPANY = "_Test Company"
@@ -355,7 +355,7 @@ class TestHeaderPriceList(HardeningTestCase):
 			result = sale([line(rate=100)], customer=customer, submit_in_background=1)
 		self.assertEqual(result["status"], "Queued")
 		enqueue.assert_called_once()
-		_submit_invoice_job(result["name"], "Sales Invoice")
+		submit_invoice_job(result["name"], "Sales Invoice")
 		return frappe.get_doc("Sales Invoice", result["name"])
 
 	def test_profile_list_when_customer_prices_not_forced(self):
@@ -1680,7 +1680,7 @@ class TestFiscalRecovery(FiscalTestCase):
 					frappe.db, "rollback", lambda *a, **k: real_rollback(save_point="xpos_test_job")
 				),
 			):
-				_submit_invoice_job(queued["name"])
+				submit_invoice_job(queued["name"])
 			self.assertEqual(self.state(queued["name"])[::2], (0, "FBR-CLOUD-1"))
 			done = sale([line()], local_id=self.local_id)
 		self.assertEqual(post.call_count, 1)
