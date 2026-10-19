@@ -69,7 +69,7 @@
 									loading="lazy"
 								/>
 								<AvatarFallback v-else class="bg-primary/10 text-primary text-sm font-bold">
-									{{ getInitials(cust.customer_name) }}
+									{{ initials(cust.customer_name) }}
 								</AvatarFallback>
 							</Avatar>
 							<div class="flex-1 min-w-0">
@@ -306,7 +306,7 @@ import type { AutocompleteOption } from "@/components/ui/autocomplete";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, ChevronRight, Users, UserPlus, ArrowLeft, Loader2 } from "lucide-vue-next";
 import __ from "@/lib/translate";
-import DateTimeInput from "../ui/date-time-input/DateTimeInput.vue";
+import { initials } from "@/lib/utils";
 import DateTimePicker from "../ui/datetime-picker/DateTimePicker.vue";
 
 const cartStore = useCartStore();
@@ -540,16 +540,6 @@ async function createAndSelect() {
 	} finally {
 		isCreating.value = false;
 	}
-}
-
-function getInitials(name: string) {
-	if (!name) return "?";
-	return name
-		.split(" ")
-		.slice(0, 2)
-		.map((w: string) => w[0])
-		.join("")
-		.toUpperCase();
 }
 
 function close() {

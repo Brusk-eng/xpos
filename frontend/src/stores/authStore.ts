@@ -57,8 +57,8 @@ export const useAuthStore = defineStore("auth", () => {
 					const bootUserInfo = xpos?.boot?.user_info[loggedUser] as any;
 					user.value = {
 						user: loggedUser,
-						user_email: bootUserInfo?.user_email || loggedUser,
-						user_fullname: bootUserInfo?.user_fullname || loggedUser,
+						user_email: bootUserInfo?.email || bootUserInfo?.user_email || loggedUser,
+						user_fullname: bootUserInfo?.fullname || bootUserInfo?.user_fullname || loggedUser,
 						image: bootUserInfo?.image || "",
 					};
 				}

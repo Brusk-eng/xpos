@@ -1,8 +1,9 @@
 <template>
 	<div
-		class="scroll-mt-1 rounded-2xl border bg-surface-raised p-3 shadow-raised transition-[border-color,box-shadow] duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+		class="scroll-mt-1 rounded-2xl border bg-surface-raised px-3 py-2.5 shadow-raised transition-[border-color,box-shadow] duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
 		:class="isSelected ? 'border-primary ring-1 ring-primary/40' : 'border-border'"
 		:data-cart-index="index"
+		:data-pending="pendingKind || undefined"
 		tabindex="0"
 		@focusin="selectRow"
 		@click="selectRow"
@@ -11,7 +12,7 @@
 	>
 		<div class="flex gap-3">
 			<div
-				class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card"
+				class="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-card"
 			>
 				<img
 					v-if="item.image"
@@ -23,65 +24,45 @@
 			</div>
 
 			<div class="min-w-0 flex-1">
-				<div class="flex items-start gap-2">
+				<div class="flex items-start gap-3">
 					<div class="min-w-0 flex-1">
 						<p class="line-clamp-2 text-[0.9375rem] font-semibold leading-snug text-foreground">
 							{{ item.item_name }}
 						</p>
-						<p class="truncate font-mono text-xs text-muted-foreground">{{ item.item_code }}</p>
+						<div
+							class="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-1.5 text-xs text-muted-foreground"
+						>
+							<span class="truncate font-mono">{{ item.item_code }}</span>
+							<span v-if="item.serial_no" class="truncate font-mono" data-testid="cart-serial">
+								&middot; {{ __("SN") }} {{ item.serial_no }}
+							</span>
+							<span v-if="item.batch_no" class="truncate font-mono" data-testid="cart-batch">
+								&middot; {{ __("Batch") }} {{ item.batch_no }}
+							</span>
+						</div>
 					</div>
-					<Popover v-model:open="menuOpen">
-						<PopoverTrigger as-child>
-							<Button
-								variant="ghost"
-								size="icon"
-								class="-me-1 size-9 shrink-0"
-								:aria-label="__('Line options')"
-							>
-								<MoreVertical class="size-5!" />
-							</Button>
-						</PopoverTrigger>
-						<PopoverContentStyled class="w-56 p-1.5" align="end" role="menu">
-							<PopoverMenuItem
-								v-if="hasMultipleUOMs"
-								shortcut="U"
-								@click="
-									menuOpen = false;
-									showUOMSelector = !showUOMSelector;
-								"
-							>
-								<template #icon><Ruler /></template>
-								{{ __("Change unit") }}
-							</PopoverMenuItem>
-							<PopoverMenuItem
-								v-if="hasPermission('show_edit_discount_field') && !item.pos_is_free_item"
-								@click="
-									menuOpen = false;
-									showDiscountInput = !showDiscountInput;
-								"
-							>
-								<template #icon><Percent /></template>
-								{{ hasItemDiscount ? __("Edit discount") : __("Add discount") }}
-							</PopoverMenuItem>
-							<PopoverMenuItem
-								destructive
-								shortcut="Del"
-								@click="
-									menuOpen = false;
-									$emit('remove', index);
-								"
-							>
-								<template #icon><Trash2 /></template>
-								{{ __("Remove") }}
-							</PopoverMenuItem>
-						</PopoverContentStyled>
-					</Popover>
+					<div class="flex min-w-22 shrink-0 flex-col items-end">
+						<span
+							class="text-base font-bold text-foreground tabular-nums"
+							data-testid="cart-amount"
+						>
+							{{ money(lineTotal) }}
+						</span>
+						<span
+							v-if="hasItemDiscount"
+							class="text-xs font-medium text-success-soft-foreground tabular-nums"
+						>
+							-{{ money(discountAmount) }}
+						</span>
+					</div>
 				</div>
 
 				<div class="mt-2 flex items-center gap-2">
 					<div class="flex min-w-0 flex-1 items-baseline gap-1 whitespace-nowrap">
 						<template v-if="hasPermission('allow_change_price') && !item.pos_is_free_item">
-							<span class="text-sm font-bold text-foreground">{{ currencySymbol }}</span>
+							<span class="text-sm font-semibold text-muted-foreground">{{
+								currencySymbol
+							}}</span>
 							<input
 								ref="rateInput"
 								:value="item.rate"
@@ -90,14 +71,14 @@
 								:step="rateStep"
 								:aria-label="__('Rate')"
 								:style="{ width: `${String(item.rate ?? '').length + 2}ch` }"
-								class="min-w-[4ch] rounded-md border border-transparent bg-transparent px-1 text-base font-bold text-foreground tabular-nums hover:border-border focus:bg-card focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+								class="min-w-[4ch] rounded-md border border-transparent bg-transparent px-1 text-sm font-semibold text-foreground tabular-nums hover:border-border focus:bg-card focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 								@change="onRateChange"
 								@keydown.up.prevent="focusAdjacentItem(-1, 'rate')"
 								@keydown.down.prevent="focusAdjacentItem(1, 'rate')"
 								@keydown="blockInvalidNumericKeys"
 							/>
 						</template>
-						<span v-else class="text-base font-bold text-foreground tabular-nums">
+						<span v-else class="text-sm font-semibold text-foreground tabular-nums">
 							{{ moneyRate(item.rate) }}
 						</span>
 						<span class="text-xs text-muted-foreground">/</span>
@@ -127,16 +108,21 @@
 					>
 						{{ __("Qty") }}: {{ qty(item.qty) }}
 					</div>
-					<div v-else class="flex shrink-0 items-center gap-1.5">
-						<Button
-							variant="outline"
-							size="icon"
-							class="size-9 rounded-xl"
+					<div
+						v-else
+						class="flex shrink-0 items-center rounded-xl border border-border bg-card shadow-inset"
+						role="group"
+						:aria-label="__('Quantity controls')"
+					>
+						<button
+							type="button"
+							class="flex size-10 items-center justify-center rounded-s-xl text-foreground transition-colors duration-fast hover:bg-surface-hover active:bg-surface-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
 							:aria-label="__('Decrease quantity')"
+							data-testid="cart-qty-decrease"
 							@click="decrementQty"
 						>
-							<Minus class="size-4!" />
-						</Button>
+							<Minus class="size-4" />
+						</button>
 						<input
 							ref="qtyInput"
 							:value="item.qty"
@@ -144,42 +130,69 @@
 							min="0"
 							data-testid="cart-qty"
 							:aria-label="__('Quantity')"
-							class="h-9 w-12 rounded-xl border border-border bg-card text-center text-base font-semibold text-foreground shadow-inset tabular-nums focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+							class="h-10 w-12 border-x border-border bg-transparent text-center text-base font-semibold text-foreground tabular-nums focus:bg-card focus:outline-none focus:ring-4 focus:ring-primary/12 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
 							@change="onQtyChange"
 							@keydown.up.prevent="focusAdjacentItem(-1, 'qty')"
 							@keydown.down.prevent="focusAdjacentItem(1, 'qty')"
 							@keydown="blockInvalidNumericKeys"
 						/>
-						<Button
-							variant="outline"
-							size="icon"
-							class="size-9 rounded-xl text-primary"
+						<button
+							type="button"
+							class="flex size-10 items-center justify-center rounded-e-xl text-primary transition-colors duration-fast hover:bg-surface-hover active:bg-surface-pressed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
 							:aria-label="__('Increase quantity')"
+							data-testid="cart-qty-increase"
 							@click="incrementQty"
 						>
-							<Plus class="size-4!" />
-						</Button>
+							<Plus class="size-4" />
+						</button>
 					</div>
 
-					<div class="flex min-w-20 shrink-0 flex-col items-end">
-						<span
-							class="text-base font-bold text-foreground tabular-nums"
-							data-testid="cart-amount"
-						>
-							{{ money(lineTotal) }}
-						</span>
-						<span
-							v-if="hasItemDiscount"
-							class="text-xs font-medium text-success-soft-foreground tabular-nums"
-						>
-							-{{ money(discountAmount) }}
-						</span>
-					</div>
+					<Popover v-model:open="menuOpen">
+						<PopoverTrigger as-child>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="-me-1 size-10 shrink-0"
+								:aria-label="__('Line options')"
+							>
+								<MoreVertical class="size-5!" />
+							</Button>
+						</PopoverTrigger>
+						<PopoverContentStyled class="w-56 p-1.5" align="end" role="menu">
+							<PopoverMenuItem v-if="pendingKind" @click="runMenu(openTrackingPicker)">
+								<template #icon><Box /></template>
+								{{ pendingKind === "serial" ? __("Choose serial") : __("Choose batch") }}
+							</PopoverMenuItem>
+							<PopoverMenuItem
+								v-if="hasMultipleUOMs"
+								shortcut="U"
+								@click="runMenu(() => (showUOMSelector = !showUOMSelector))"
+							>
+								<template #icon><Ruler /></template>
+								{{ __("Change unit") }}
+							</PopoverMenuItem>
+							<PopoverMenuItem
+								v-if="hasPermission('show_edit_discount_field') && !item.pos_is_free_item"
+								@click="runMenu(() => (showDiscountInput = !showDiscountInput))"
+							>
+								<template #icon><Percent /></template>
+								{{ hasItemDiscount ? __("Edit discount") : __("Add discount") }}
+							</PopoverMenuItem>
+							<PopoverMenuItem
+								destructive
+								shortcut="Del"
+								@click="runMenu(() => $emit('remove', index))"
+							>
+								<template #icon><Trash2 /></template>
+								{{ __("Remove") }}
+							</PopoverMenuItem>
+						</PopoverContentStyled>
+					</Popover>
 				</div>
 			</div>
 		</div>
 
-		<div v-if="statusBadges.length" class="mt-2 flex flex-wrap gap-1.5 ps-15">
+		<div v-if="statusBadges.length" class="mt-2 flex flex-wrap gap-1.5 ps-14">
 			<Badge
 				v-for="badge in statusBadges"
 				:key="badge.label"
@@ -193,15 +206,36 @@
 		</div>
 
 		<div
-			v-if="needsSerial"
-			class="mt-3 flex items-center gap-3 rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-info-soft-foreground"
+			v-if="pendingKind"
+			class="mt-2 flex items-center gap-2.5 rounded-xl border px-2.5 py-1.5"
+			:class="
+				pendingKind === 'serial'
+					? 'border-warning/30 bg-warning-soft text-warning-soft-foreground'
+					: 'border-info/25 bg-info-soft text-info-soft-foreground'
+			"
 			role="status"
+			data-testid="cart-pending"
 		>
-			<Box class="size-5 shrink-0" />
-			<div class="min-w-0">
-				<p class="text-sm font-semibold">{{ __("Serial required") }}</p>
-				<p class="text-xs">{{ __("This product requires a serial number.") }}</p>
-			</div>
+			<Box class="size-4.5 shrink-0" aria-hidden="true" />
+			<p
+				class="min-w-0 flex-1 text-sm font-semibold"
+				:title="
+					pendingKind === 'serial'
+						? __('Payment is blocked until a serial is chosen.')
+						: __('The server picks one if stock settings allow; choose it to be sure.')
+				"
+			>
+				{{ pendingKind === "serial" ? __("Serial needed to pay") : __("No batch chosen") }}
+			</p>
+			<Button
+				size="sm"
+				variant="outline"
+				class="shrink-0"
+				data-testid="cart-pending-resolve"
+				@click.stop="openTrackingPicker"
+			>
+				{{ pendingKind === "serial" ? __("Choose serial") : __("Choose batch") }}
+			</Button>
 		</div>
 
 		<div
@@ -296,7 +330,7 @@ import {
 	Ruler,
 	Box,
 } from "lucide-vue-next";
-import type { ItemUOM } from "@/types/pos.types";
+import type { ItemUOM, POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 import { useMoney } from "@/composables/useMoney";
 
@@ -321,7 +355,19 @@ const showUOMSelector = ref(false);
 const showDiscountInput = ref(false);
 const menuOpen = ref(false);
 
-const needsSerial = computed(() => !!props.item.has_serial_no && !props.item.serial_no);
+/** The serial/batch this line still needs, as the cart store reports it (returns need none). */
+const pendingKind = computed(
+	() => cartStore.pendingRequirements.find((r) => r.uid === props.item.uid)?.kind || "",
+);
+
+function openTrackingPicker() {
+	itemStore.openItemDetail(props.item as POSItem, posStore.profileName, posStore.warehouse, props.item.uid);
+}
+
+function runMenu(action: () => unknown) {
+	menuOpen.value = false;
+	action();
+}
 
 const statusBadges = computed(() => {
 	const badges: { label: string; variant: BadgeVariants["variant"]; title?: string; status?: boolean }[] =

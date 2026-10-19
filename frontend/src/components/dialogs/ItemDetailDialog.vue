@@ -21,7 +21,7 @@
 				</div>
 
 				<template v-else-if="detail">
-					<div v-if="detail.uoms && detail.uoms.length > 0">
+					<div v-if="!resolveLine && detail.uoms && detail.uoms.length > 0">
 						<label class="text-sm font-semibold text-foreground mb-1.5 block"
 							>Unit of Measure
 							<span class="text-[10px] font-normal text-muted-foreground ms-2"
@@ -60,7 +60,7 @@
 						</div>
 					</div>
 
-					<div>
+					<div v-if="!resolveLine">
 						<label class="text-sm font-semibold text-foreground mb-1.5 block">
 							{{ __("Price") }}
 						</label>
@@ -76,7 +76,15 @@
 						</span>
 					</div>
 
-					<div v-if="detail.has_batch_no && detail.batches.length > 0">
+					<p
+						v-if="resolveLine"
+						class="rounded-xl border border-info/25 bg-info-soft px-3 py-2.5 text-sm text-info-soft-foreground"
+						data-testid="resolve-line-note"
+					>
+						{{ resolveHint }}
+					</p>
+
+					<div v-if="showBatchPicker">
 						<label class="text-sm font-semibold text-foreground mb-1.5 block">
 							Batch
 							<span class="font-normal text-muted-foreground"
@@ -114,7 +122,7 @@
 						</div>
 					</div>
 
-					<div v-if="detail.has_serial_no && detail.serial_numbers.length > 0">
+					<div v-if="showSerialPicker">
 						<label class="text-sm font-semibold text-foreground mb-1.5 block">
 							Serial Number
 							<span class="font-normal text-muted-foreground"
@@ -162,7 +170,7 @@
 						</div>
 					</div>
 
-					<div>
+					<div v-if="!resolveLine">
 						<label class="text-sm font-semibold text-foreground mb-1.5 block">Quantity</label>
 						<NumberInput
 							ref="qtyInputRef"
@@ -194,7 +202,17 @@
 
 			<DialogFooter class="shrink-0 border-t border-border px-5 py-4">
 				<Button variant="outline" class="flex-1" @click="close">Cancel</Button>
-				<Button class="flex-1 font-bold" :disabled="!canAdd" @click="addToCart">
+				<Button
+					v-if="resolveLine"
+					class="flex-1 font-bold"
+					data-testid="resolve-line-apply"
+					:disabled="!canResolve"
+					@click="applyToLine"
+				>
+					<Check class="w-4 h-4" />
+					{{ __("Apply to line") }}
+				</Button>
+				<Button v-else class="flex-1 font-bold" :disabled="!canAdd" @click="addToCart">
 					<Plus class="w-4 h-4" />
 					{{ __("Add to Cart") }}
 				</Button>
@@ -275,12 +293,70 @@ watch(detail, (d) => {
 	}
 });
 
+const resolveLine = computed(() =>
+	itemStore.resolveLineUid ? cartStore.items.find((i) => i.uid === itemStore.resolveLineUid) || null : null,
+);
+const resolveQty = computed(() => Math.abs(Number(resolveLine.value?.qty) || 0));
+const resolveNeedsSerial = computed(
+	() => !!resolveLine.value?.has_serial_no && !resolveLine.value?.serial_no,
+);
+const resolveNeedsBatch = computed(() => !!resolveLine.value?.has_batch_no && !resolveLine.value?.batch_no);
+
+const showBatchPicker = computed(
+	() =>
+		!!detail.value?.has_batch_no &&
+		detail.value.batches.length > 0 &&
+		(!resolveLine.value || resolveNeedsBatch.value),
+);
+const showSerialPicker = computed(
+	() =>
+		!!detail.value?.has_serial_no &&
+		detail.value.serial_numbers.length > 0 &&
+		(!resolveLine.value || resolveNeedsSerial.value),
+);
+
+const resolveHint = computed(() => {
+	if (resolveNeedsSerial.value) {
+		return resolveQty.value === 1
+			? __("Choose the serial number for this line.")
+			: __("Choose {0} serial numbers for this line.", [String(resolveQty.value)]);
+	}
+	return __("Choose the batch for this line.");
+});
+
+const canResolve = computed(() => {
+	if (!resolveLine.value || !detail.value) return false;
+	if (resolveNeedsBatch.value && showBatchPicker.value && !selectedBatch.value) return false;
+	if (resolveNeedsSerial.value && selectedSerials.value.length !== resolveQty.value) return false;
+	return resolveNeedsBatch.value || resolveNeedsSerial.value;
+});
+
 const filteredSerials = computed(() => {
 	if (!detail.value?.serial_numbers) return [];
+	// a serial already on another cart line cannot be sold twice
+	const inCart = new Set(cartStore.items.map((i) => i.serial_no).filter(Boolean));
+	const available = resolveLine.value
+		? detail.value.serial_numbers.filter((sn) => !inCart.has(sn))
+		: detail.value.serial_numbers;
 	const term = serialSearch.value.toLowerCase();
-	if (!term) return detail.value.serial_numbers;
-	return detail.value.serial_numbers.filter((sn) => sn.toLowerCase().includes(term));
+	if (!term) return available;
+	return available.filter((sn) => sn.toLowerCase().includes(term));
 });
+
+function applyToLine(): void {
+	if (!canResolve.value || !resolveLine.value) return;
+	const index = cartStore.items.indexOf(resolveLine.value);
+	const result = cartStore.resolveLineTracking(index, {
+		serials: resolveNeedsSerial.value ? [...selectedSerials.value] : undefined,
+		batch: resolveNeedsBatch.value ? selectedBatch.value || undefined : undefined,
+		batches: detail.value?.batches,
+	});
+	if (!result.success) {
+		showError(result.message || __("Could not update the line"));
+		return;
+	}
+	close();
+}
 
 const canAdd = computed(() => {
 	if (!detail.value) return false;
@@ -352,7 +428,7 @@ function toggleSerial(sn: string): void {
 	const idx = selectedSerials.value.indexOf(sn);
 	if (idx >= 0) {
 		selectedSerials.value.splice(idx, 1);
-	} else {
+	} else if (!resolveLine.value || selectedSerials.value.length < resolveQty.value) {
 		selectedSerials.value.push(sn);
 	}
 	if (selectedSerials.value.length > 0) {

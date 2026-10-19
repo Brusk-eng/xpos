@@ -202,7 +202,8 @@ async function settle(inv: UnsettledInvoice) {
 		showError(__("Failed to open invoice for settlement"));
 		return;
 	}
-	cartStore.openPaymentDialog();
+	const opened = cartStore.openPaymentDialog();
+	if (!opened.success) showError(opened.message);
 }
 
 function scrollHighlightedIntoView() {

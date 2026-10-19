@@ -262,7 +262,8 @@ describe("open tabs - settling a past credit sale", () => {
 		cy.get("[data-testid='settle-confirm']").click();
 
 		cy.contains("[role='dialog']", "Settle Invoice").should("not.exist");
-		cy.then(() => {
+		// the refetch follows the dialog closing, so wait for it rather than sampling once
+		cy.wrap(null).should(() => {
 			expect(callsTo(OUTSTANDING).length).to.be.greaterThan(before);
 		});
 	});

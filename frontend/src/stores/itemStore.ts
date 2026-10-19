@@ -52,6 +52,7 @@ export const useItemStore = defineStore("items", () => {
 	}
 
 	const showItemDetail = ref(false);
+	const resolveLineUid = ref<string | null>(null);
 	const selectedItemDetail = ref<ItemDetail | null>(null);
 	const selectedItemForDetail = ref<POSItem | null>(null);
 	const isLoadingDetail = ref(false);
@@ -399,14 +400,21 @@ export const useItemStore = defineStore("items", () => {
 		}
 	}
 
-	async function openItemDetail(item: POSItem, posProfile: string, warehouse?: string): Promise<void> {
+	async function openItemDetail(
+		item: POSItem,
+		posProfile: string,
+		warehouse?: string,
+		lineUid?: string,
+	): Promise<void> {
 		selectedItemForDetail.value = item;
+		resolveLineUid.value = lineUid || null;
 		showItemDetail.value = true;
 		await fetchItemDetail(item.item_code, posProfile, warehouse);
 	}
 
 	function closeItemDetail(): void {
 		showItemDetail.value = false;
+		resolveLineUid.value = null;
 		selectedItemDetail.value = null;
 		selectedItemForDetail.value = null;
 	}
@@ -534,6 +542,7 @@ export const useItemStore = defineStore("items", () => {
 		itemGroups,
 		parentGroups,
 		showItemDetail,
+		resolveLineUid,
 		selectedItemDetail,
 		selectedItemForDetail,
 		isLoadingDetail,

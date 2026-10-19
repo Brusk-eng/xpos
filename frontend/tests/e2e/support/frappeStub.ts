@@ -75,6 +75,13 @@ export function stubError(method: string, message: string, excType = "Validation
 	stub(method, { [ERROR_MARKER]: true, message, excType } as StubRoute);
 }
 
+const NETWORK_MARKER = "__xposStubNetworkDown";
+
+/** Drop the connection on `method`: the request never gets an answer, as when Wi-Fi dies mid-sale. */
+export function stubNetworkError(method: string): void {
+	stub(method, { [NETWORK_MARKER]: true } as StubRoute);
+}
+
 export function stubMany(table: Record<string, StubRoute>): void {
 	for (const [method, route] of Object.entries(table)) stub(method, route);
 }
@@ -139,6 +146,15 @@ export function installFrappeStub(): void {
 		state().calls.push({ method, args });
 		const delay = state().delays.get(method);
 		const resolved = resolve(method, args);
+
+		if (
+			resolved &&
+			typeof resolved === "object" &&
+			NETWORK_MARKER in (resolved as Record<string, unknown>)
+		) {
+			req.destroy();
+			return;
+		}
 
 		if (isStubbedError(resolved)) {
 			req.reply({

@@ -7,159 +7,199 @@
 			}
 		"
 	>
-		<DialogContent class="max-w-4xl h-[calc(100vh-2rem)] flex flex-col p-0 gap-0" :hide-close="true">
+		<DialogContent class="flex h-[calc(100dvh-2rem)] max-w-5xl flex-col gap-0 p-0" :hide-close="true">
 			<DialogHeader
-				class="shrink-0 flex-row items-center justify-between space-y-0 px-5 py-3 border-b border-border"
+				class="shrink-0 flex-row items-center justify-between gap-3 space-y-0 border-b border-border px-5 py-3"
 			>
-				<div class="flex items-center gap-3">
+				<div class="flex min-w-0 items-center gap-3">
 					<div
-						class="w-8 h-8 rounded-lg bg-linear-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm"
+						class="flex size-9 shrink-0 items-center justify-center rounded-xl text-primary-foreground shadow-raised"
+						:class="cartStore.isReturnMode ? 'bg-warning text-warning-foreground' : 'bg-primary'"
 					>
-						<Wallet class="w-4 h-4 text-white" />
+						<RotateCcw v-if="cartStore.isReturnMode" class="size-4.5" />
+						<Wallet v-else class="size-4.5" />
 					</div>
-					<div>
+					<div class="min-w-0">
 						<DialogTitle class="text-base">
 							{{ cartStore.isReturnMode ? __("Return Payment") : __("Payment") }}
 						</DialogTitle>
-						<DialogDescription class="text-xs">{{ cartStore.customerName }}</DialogDescription>
+						<DialogDescription class="truncate text-xs">{{
+							cartStore.customerName
+						}}</DialogDescription>
 					</div>
 				</div>
-				<div class="flex items-center gap-2">
+				<div class="flex shrink-0 items-center gap-2">
 					<div
 						v-if="customerBalance !== null && !cartStore.isReturnMode"
-						class="hidden sm:flex items-center gap-2 text-[10px]"
+						class="hidden items-center gap-1.5 sm:flex"
 					>
-						<span
-							v-if="customerBalance > 0"
-							class="px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600 font-medium"
-						>
+						<Badge v-if="customerBalance > 0" variant="warning" size="sm">
 							{{ __("Outstanding") }}: {{ money(customerBalance) }}
-						</span>
-						<span
-							v-if="customerCreditLimit > 0"
-							class="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 font-medium"
-						>
+						</Badge>
+						<Badge v-if="customerCreditLimit > 0" variant="info" size="sm">
 							{{ __("Credit Limit") }}: {{ money(customerCreditLimit) }}
-						</span>
+						</Badge>
 					</div>
-					<Badge v-if="cartStore.isReturnMode" variant="warning" class="text-[10px]">
-						<RotateCcw class="w-3 h-3" /> {{ __("Return") }}
+					<Badge v-if="cartStore.isReturnMode" variant="warning" size="sm">
+						<RotateCcw class="size-3" /> {{ __("Return") }}
 					</Badge>
-					<kbd
-						class="hidden sm:inline-flex px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground bg-muted rounded border border-border"
-						>Esc</kbd
+					<Badge
+						v-if="!offlineStore.isOnline"
+						variant="warning"
+						size="sm"
+						data-testid="payment-offline"
 					>
-					<Button variant="ghost" size="icon-sm" @click="close" tabindex="-1">
-						<X class="w-5 h-5" />
+						<WifiOff class="size-3" /> {{ __("Offline") }}
+					</Badge>
+					<Button
+						variant="ghost"
+						size="icon-sm"
+						tabindex="-1"
+						:aria-label="__('Close')"
+						:disabled="isSubmitting"
+						@click="close"
+					>
+						<X class="size-5" />
 					</Button>
 				</div>
 			</DialogHeader>
 
-			<div class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
-				<div class="flex-1 flex flex-col p-4 gap-3 min-w-0 overflow-y-auto xpos-scrollbar">
-					<div
-						class="rounded-xl border"
+			<div class="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+				<div class="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto p-4 xpos-scrollbar">
+					<section
+						class="rounded-2xl border px-4 py-3"
 						:class="
 							cartStore.isReturnMode
-								? 'bg-amber-500/5 border-amber-500/10'
-								: 'bg-primary/5 border-primary/10'
+								? 'border-warning/30 bg-warning-soft'
+								: 'border-primary/20 bg-surface-selected'
 						"
+						data-testid="amount-due"
 					>
-						<div class="text-center py-3">
-							<p
-								class="text-xs font-medium mb-0.5"
-								:class="cartStore.isReturnMode ? 'text-amber-600' : 'text-primary/70'"
+						<div class="flex items-end justify-between gap-3">
+							<div class="min-w-0">
+								<p
+									class="text-xs font-semibold uppercase tracking-wider"
+									:class="
+										cartStore.isReturnMode
+											? 'text-warning-soft-foreground'
+											: 'text-primary'
+									"
+								>
+									{{ cartStore.isReturnMode ? __("Refund Amount") : __("Amount Due") }}
+								</p>
+								<p
+									class="text-4xl font-extrabold tracking-tight tabular-nums"
+									:class="
+										cartStore.isReturnMode
+											? 'text-warning-soft-foreground'
+											: 'text-primary dark:text-focus'
+									"
+								>
+									{{ money(Math.abs(cartStore.grandTotal)) }}
+								</p>
+							</div>
+							<Button
+								variant="ghost"
+								size="sm"
+								class="shrink-0"
+								:aria-expanded="showBreakdown"
+								aria-controls="payment-breakdown"
+								@click="showBreakdown = !showBreakdown"
 							>
-								{{ cartStore.isReturnMode ? __("Refund Amount") : __("Amount Due") }}
-							</p>
-							<p
-								class="text-3xl font-extrabold tabular-nums"
-								:class="cartStore.isReturnMode ? 'text-amber-600' : 'text-primary'"
-							>
-								{{ money(Math.abs(cartStore.grandTotal)) }}
-							</p>
+								{{ showBreakdown ? __("Hide details") : __("Details") }}
+								<ChevronDown
+									class="size-4 transition-transform"
+									:class="showBreakdown && 'rotate-180'"
+								/>
+							</Button>
 						</div>
-						<div
-							v-if="
-								cartStore.calculatedTaxes.length > 0 ||
-								cartStore.offerItemDiscountTotal > 0 ||
-								cartStore.offerGrandTotalDiscountPct > 0 ||
-								cartStore.appliedCoupon
-							"
-							class="px-4 pb-3 pt-1 border-t border-border/50"
+						<dl
+							v-show="showBreakdown"
+							id="payment-breakdown"
+							class="mt-2 space-y-0.5 border-t border-border/60 pt-2 text-xs text-muted-foreground"
 						>
-							<div class="flex items-center justify-between text-xs text-muted-foreground mb-1">
-								<span>{{ __("Subtotal") }}</span>
-								<span>{{ money(cartStore.subtotal) }}</span>
+							<div class="flex justify-between">
+								<dt>{{ __("Subtotal") }}</dt>
+								<dd class="tabular-nums">{{ money(cartStore.subtotal) }}</dd>
 							</div>
 							<div
 								v-for="(tax, idx) in cartStore.calculatedTaxes"
 								:key="idx"
-								class="flex items-center justify-between text-xs text-muted-foreground"
+								class="flex justify-between"
 							>
-								<span class="flex items-center gap-1">
+								<dt class="flex items-center gap-1">
 									{{ tax.description }}
-									<span class="text-[10px]">({{ percent(tax.rate) }})</span>
+									<span v-if="tax.rate">({{ percent(tax.rate) }})</span>
 									<span
 										v-if="tax.included_in_print_rate"
-										class="text-[9px] text-blue-500"
+										class="font-semibold uppercase text-info-soft-foreground"
 										>{{ __("incl.") }}</span
 									>
-								</span>
-								<span :class="tax.included_in_print_rate ? 'text-blue-500' : ''">
+								</dt>
+								<dd
+									class="tabular-nums"
+									:class="tax.included_in_print_rate && 'text-info-soft-foreground'"
+								>
 									{{ formatTaxAmount(tax.amount, tax.included_in_print_rate, money) }}
-								</span>
+								</dd>
 							</div>
 							<div
 								v-if="cartStore.offerItemDiscountTotal > 0"
-								class="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400"
+								class="flex justify-between text-success-soft-foreground"
 							>
-								<span>{{ __("Offer Discount") }}</span>
-								<span>-{{ money(cartStore.offerItemDiscountTotal) }}</span>
+								<dt>{{ __("Offer Discount") }}</dt>
+								<dd class="tabular-nums">-{{ money(cartStore.offerItemDiscountTotal) }}</dd>
 							</div>
 							<div
 								v-if="cartStore.offerGrandTotalDiscountPct > 0"
-								class="flex items-center justify-between text-xs text-emerald-600 dark:text-emerald-400"
+								class="flex justify-between text-success-soft-foreground"
 							>
-								<span
-									>{{ __("Offer") }} ({{
-										percent(cartStore.offerGrandTotalDiscountPct)
-									}})</span
-								>
-								<span>-{{ money(paymentOfferGrandDiscount) }}</span>
+								<dt>
+									{{ __("Offer") }} ({{ percent(cartStore.offerGrandTotalDiscountPct) }})
+								</dt>
+								<dd class="tabular-nums">-{{ money(paymentOfferGrandDiscount) }}</dd>
+							</div>
+							<div v-if="cartStore.appliedCoupon" class="flex justify-between">
+								<dt>
+									{{ __("Coupon") }}:
+									{{ cartStore.appliedCoupon.coupon_code || cartStore.appliedCoupon.name }}
+								</dt>
+								<dd>{{ __("Applied") }}</dd>
 							</div>
 							<div
-								v-if="cartStore.appliedCoupon"
-								class="flex items-center justify-between text-xs text-violet-600 dark:text-violet-400"
+								v-if="cartStore.redeemLoyaltyPoints && cartStore.loyaltyAmount > 0"
+								class="flex justify-between"
 							>
-								<span
-									>{{ __("Coupon") }}:
-									{{
-										cartStore.appliedCoupon.coupon_code || cartStore.appliedCoupon.name
-									}}</span
-								>
-								<span class="text-[10px]">{{ __("Applied") }}</span>
+								<dt>{{ __("Loyalty") }}</dt>
+								<dd class="tabular-nums">-{{ money(cartStore.loyaltyAmount) }}</dd>
 							</div>
-						</div>
-					</div>
+							<div
+								v-if="Math.abs(cartStore.roundingAdjustment) >= 0.005"
+								class="flex justify-between"
+							>
+								<dt>{{ __("Rounding") }}</dt>
+								<dd class="tabular-nums">
+									{{ cartStore.roundingAdjustment > 0 ? "+" : "-"
+									}}{{ money(Math.abs(cartStore.roundingAdjustment)) }}
+								</dd>
+							</div>
+						</dl>
+					</section>
 
-					<div>
-						<div class="flex items-center justify-between mb-2">
-							<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+					<section>
+						<div class="mb-2 flex items-center justify-between">
+							<h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
 								{{ __("Method") }}
 							</h3>
-							<div class="flex items-center gap-1">
-								<kbd
-									class="px-1 py-0.5 text-[9px] font-mono text-muted-foreground bg-muted rounded border border-border"
-									>&larr;</kbd
-								>
-								<kbd
-									class="px-1 py-0.5 text-[9px] font-mono text-muted-foreground bg-muted rounded border border-border"
-									>&rarr;</kbd
-								>
-							</div>
+							<span class="text-[0.6875rem] text-muted-foreground" aria-hidden="true"
+								>&larr; &rarr;</span
+							>
 						</div>
-						<div class="flex gap-2 flex-wrap">
+						<div
+							class="grid grid-cols-[repeat(auto-fill,minmax(7rem,1fr))] gap-2"
+							role="radiogroup"
+							:aria-label="__('Payment method')"
+						>
 							<button
 								v-for="(method, idx) in availableMethods"
 								:key="method.mode_of_payment"
@@ -168,128 +208,75 @@
 										if (el) methodRefs[idx] = el as HTMLButtonElement;
 									}
 								"
+								type="button"
+								role="radio"
+								:aria-checked="selectedMethod === method.mode_of_payment"
 								data-testid="payment-method"
 								:data-mode="method.mode_of_payment"
 								@click="selectMethod(method.mode_of_payment)"
 								@keydown.left.prevent="focusMethod(idx - 1)"
 								@keydown.right.prevent="focusMethod(idx + 1)"
 								@keydown.down.prevent="focusAmountInput"
-								class="flex-1 min-w-20 p-2.5 rounded-xl border-2 text-center transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-ring"
+								class="flex h-16 flex-col items-center justify-center gap-1 rounded-xl border-2 px-2 text-center transition-[border-color,background-color,box-shadow] duration-fast focus:outline-none focus-visible:ring-2 focus-visible:ring-focus active:shadow-pressed"
 								:class="
 									selectedMethod === method.mode_of_payment
-										? 'border-primary bg-primary/5 text-primary shadow-sm'
-										: 'border-border bg-card text-muted-foreground hover:border-muted-foreground/30'
+										? 'border-primary bg-surface-selected text-surface-selected-foreground shadow-raised'
+										: 'border-border bg-surface-raised text-muted-foreground shadow-raised hover:bg-surface-hover'
 								"
 							>
-								<div class="text-lg mb-0.5">
-									<component
-										:is="getMethodIcon(method.mode_of_payment)"
-										class="w-5 h-5 mx-auto"
-									/>
-								</div>
-								<p class="text-[11px] font-medium truncate">
-									{{ method.mode_of_payment }}
-								</p>
+								<component :is="getMethodIcon(method.mode_of_payment)" class="size-5" />
+								<span class="w-full truncate text-xs font-semibold">{{
+									method.mode_of_payment
+								}}</span>
 							</button>
 						</div>
+					</section>
 
-						<div v-if="canRedeemGiftCards" class="mt-2" data-testid="gift-card-tender">
-							<p v-if="!offlineStore.isOnline" class="text-xs text-muted-foreground">
-								{{ __("Gift cards need a live connection.") }}
-							</p>
-							<div v-else-if="showGiftInput" class="flex gap-2">
-								<input
-									ref="giftCodeRef"
-									v-model="giftCodeInput"
-									data-testid="gift-card-code"
-									autocomplete="off"
-									class="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm font-mono uppercase"
-									:placeholder="__('Gift card code')"
-									@keydown.enter.stop.prevent="applyGiftCard"
-									@keydown.esc.stop.prevent="showGiftInput = false"
-								/>
-								<Button
-									size="sm"
-									:disabled="checkingGift || !giftCodeInput.trim()"
-									@click="applyGiftCard"
-								>
-									<Loader2 v-if="checkingGift" class="w-4 h-4 animate-spin" />
-									{{ __("Apply") }}
-								</Button>
-							</div>
-							<Button v-else variant="outline" size="sm" class="w-full" @click="openGiftInput">
-								<Gift class="w-4 h-4" />
-								{{ __("Pay with Gift Card") }}
-							</Button>
-						</div>
-
-						<div
-							v-if="
-								cartStore.isReturnMode &&
-								posStore.giftCardMode &&
-								cartStore.returnGiftCards.length
-							"
-							class="mt-2 space-y-1"
-						>
-							<Button
-								v-for="card in cartStore.returnGiftCards"
-								:key="card.gift_card"
-								variant="outline"
-								size="sm"
-								class="w-full"
-								:disabled="
-									!offlineStore.isOnline ||
-									splitPayments.some((leg) => leg.gift_card === card.gift_card)
-								"
-								@click="refundToGiftCard(card)"
-							>
-								<Gift class="w-4 h-4" />
-								{{
-									__("Refund to gift card {0} (up to {1})", [
-										card.masked_code,
-										money(card.amount),
-									])
-								}}
-							</Button>
-						</div>
-					</div>
-
-					<div>
-						<div class="flex items-center justify-between mb-1.5">
+					<section class="space-y-2">
+						<div class="flex items-center justify-between">
 							<label
-								class="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+								class="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+								for="payment-tendered"
 							>
-								{{ __("Tendered") }}</label
-							>
+								{{ isSplitPayment ? __("Amount for {0}", [selectedMethod]) : __("Tendered") }}
+							</label>
 							<Button
 								v-if="!isSplitPayment"
 								variant="link"
 								size="sm"
-								class="text-xs h-auto p-0"
+								class="h-auto p-0 text-xs"
+								data-testid="split-payment"
 								@click="enableSplitPayment"
 							>
 								{{ __("Split Payment") }}
 							</Button>
 						</div>
 						<NumberInput
+							id="payment-tendered"
 							ref="amountInput"
 							v-model="tenderedAmount"
 							:min="0"
 							:precision="selectedPrecision"
-							class="text-center text-xl font-bold tracking-wider py-3"
+							class="h-14 text-center text-2xl font-bold tracking-wider"
 							:select-on-focus="true"
 							@keydown.enter.stop.prevent="handleAmountInputSubmit"
 							@keydown.up.prevent="focusMethodByIndex"
 							@keydown.down.prevent="focusFirstQuickAmount"
 						/>
 
-						<div v-if="selectedTakesReference" class="mt-2" data-testid="payment-reference">
+						<div v-if="selectedTakesReference" data-testid="payment-reference">
 							<input
 								ref="referenceRef"
 								v-model="referenceNo"
 								autocomplete="off"
 								maxlength="140"
-								class="w-full h-9 rounded-md border border-input bg-background px-3 text-sm font-mono"
+								:aria-label="__('Reference number')"
+								class="h-control w-full rounded-xl border bg-card px-3 font-mono text-sm shadow-inset focus:outline-none focus:ring-4 focus:ring-primary/12"
+								:class="
+									referenceMissing && tenderedAmount > 0
+										? 'border-warning'
+										: 'border-border'
+								"
 								:placeholder="
 									selectedNeedsReference
 										? __('Transfer / reference number (required)')
@@ -328,7 +315,7 @@
 								<p
 									:class="
 										selectedRateIsStale
-											? 'text-xs font-medium text-amber-600 dark:text-amber-500'
+											? 'text-xs font-medium text-warning-soft-foreground'
 											: 'text-xs text-muted-foreground'
 									"
 								>
@@ -342,30 +329,62 @@
 								</p>
 							</template>
 						</div>
-					</div>
 
-					<div v-if="isSplitPayment" class="space-y-2">
+						<div v-if="!isSplitPayment" class="grid grid-cols-4 gap-2">
+							<Button
+								v-for="(amount, idx) in quickAmounts"
+								:key="amount"
+								:ref="
+									(el) => {
+										if (el) quickAmountRefs[idx] = (el as any).$el || el;
+									}
+								"
+								variant="outline"
+								class="h-11 font-semibold tabular-nums"
+								@click="setQuickAmount(amount)"
+								@keydown.enter.prevent="setQuickAmount(amount)"
+								@keydown.up.prevent="focusAmountInput"
+								@keydown.down.prevent="focusSubmitBtn"
+								@keydown.left.prevent="focusQuickAmount(idx - 1)"
+								@keydown.right.prevent="focusQuickAmount(idx + 1)"
+							>
+								{{ money(amount) }}
+							</Button>
+						</div>
 						<Button
+							v-else
 							variant="outline"
-							size="sm"
 							class="w-full"
-							@click="addSplitPayment"
+							data-testid="add-tender-leg"
 							:disabled="!selectedMethod || tenderedAmount <= 0 || referenceMissing"
+							@click="addSplitPayment"
 						>
-							<Plus class="w-4 h-4" />
-							Add {{ selectedMethod }} &mdash;
+							<Plus class="size-4" />
+							{{ __("Add {0}", [selectedMethod]) }} &mdash;
 							{{ formatWithSymbol(selectedCurrency, tenderedAmount) }}
 						</Button>
+					</section>
 
-						<div v-if="splitPayments.length > 0" class="space-y-1">
-							<div
-								v-for="(sp, idx) in splitPayments"
-								:key="sp.id"
-								class="flex items-center justify-between bg-muted rounded-lg px-3 py-2 text-sm"
+					<section v-if="activeLegs.length" class="space-y-1.5" data-testid="tender-allocation">
+						<h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							{{ __("Payments") }}
+						</h3>
+						<ul class="divide-y divide-border rounded-xl border border-border bg-surface-raised">
+							<li
+								v-for="(sp, idx) in activeLegs"
+								:key="sp.id || idx"
+								class="flex items-center justify-between gap-2 px-3 py-2 text-sm"
+								data-testid="tender-leg"
+								:data-mode="sp.mode_of_payment"
 							>
-								<div class="flex items-center gap-2">
-									<component :is="getMethodIcon(sp.mode_of_payment)" class="w-5 h-5" />
-									<span class="font-medium text-foreground">{{ sp.mode_of_payment }}</span>
+								<div class="flex min-w-0 items-center gap-2">
+									<component
+										:is="getMethodIcon(sp.mode_of_payment)"
+										class="size-4.5 shrink-0 text-muted-foreground"
+									/>
+									<span class="truncate font-medium text-foreground">{{
+										sp.mode_of_payment
+									}}</span>
 									<span
 										v-if="sp.masked_code"
 										class="font-mono text-xs text-muted-foreground"
@@ -373,244 +392,354 @@
 									>
 									<span
 										v-if="sp.reference_no"
-										class="font-mono text-xs text-muted-foreground"
+										class="truncate font-mono text-xs text-muted-foreground"
 										>{{ sp.reference_no }}</span
 									>
 								</div>
-								<div class="flex items-center gap-2">
-									<div class="text-right">
-										<span class="font-bold text-foreground">
+								<div class="flex shrink-0 items-center gap-2">
+									<div class="text-end">
+										<span class="font-bold text-foreground tabular-nums">
 											{{ formatWithSymbol(sp.currency, sp.native_amount) }}
 										</span>
 										<span
 											v-if="sp.currency !== invoiceCurrency"
-											class="block text-xs text-muted-foreground"
+											class="block text-xs text-muted-foreground tabular-nums"
 										>
 											@ {{ formatFor(invoiceCurrency, sp.exchange_rate) }} =
 											{{ formatWithSymbol(invoiceCurrency, sp.base_amount) }}
 										</span>
 									</div>
 									<button
+										v-if="isSplitPayment"
+										type="button"
+										class="rounded-md p-1 text-muted-foreground hover:bg-surface-hover hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+										:aria-label="__('Remove {0} payment', [sp.mode_of_payment])"
 										@click="removeSplitPayment(idx)"
-										class="text-muted-foreground hover:text-destructive"
 									>
-										<X class="w-3.5 h-3.5" />
+										<X class="size-3.5" />
 									</button>
 								</div>
-							</div>
-
+							</li>
+						</ul>
+						<div v-if="hasForeignTender" class="space-y-0.5 px-3">
 							<div
-								v-if="hasForeignTender"
-								class="border-t border-border mt-1 pt-1 space-y-0.5 px-3"
+								v-for="group in tenderByCurrency"
+								:key="group.currency"
+								class="flex justify-between text-xs text-muted-foreground tabular-nums"
 							>
-								<div
-									v-for="group in tenderByCurrency"
-									:key="group.currency"
-									class="flex justify-between text-xs text-muted-foreground"
-								>
-									<span>{{ formatWithSymbol(group.currency, group.native) }}</span>
-									<span>{{ formatWithSymbol(invoiceCurrency, group.base) }}</span>
-								</div>
-							</div>
-
-							<div class="flex justify-between text-sm font-semibold px-3 pt-1">
-								<span class="text-muted-foreground">{{ __("Total Paid") }}</span>
-								<span class="text-primary">
-									{{ formatWithSymbol(invoiceCurrency, splitTotal) }}
-								</span>
+								<span>{{ formatWithSymbol(group.currency, group.native) }}</span>
+								<span>{{ formatWithSymbol(invoiceCurrency, group.base) }}</span>
 							</div>
 						</div>
-					</div>
+					</section>
 
-					<div v-if="!isSplitPayment" class="grid grid-cols-4 gap-1.5">
-						<Button
-							v-for="(amount, idx) in quickAmounts"
-							:key="amount"
-							:ref="
-								(el) => {
-									if (el) quickAmountRefs[idx] = (el as any).$el || el;
-								}
-							"
-							variant="outline"
-							size="sm"
-							class="active:scale-95"
-							@click="setQuickAmount(amount)"
-							@keydown.enter.prevent="setQuickAmount(amount)"
-							@keydown.up.prevent="focusAmountInput"
-							@keydown.down.prevent="focusSubmitBtn"
-							@keydown.left.prevent="focusQuickAmount(idx - 1)"
-							@keydown.right.prevent="focusQuickAmount(idx + 1)"
-						>
-							{{ money(amount) }}
-						</Button>
-					</div>
-
-					<div
-						v-if="showCustomerCredit"
-						class="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 space-y-2"
-						data-testid="customer-credit"
-					>
-						<div class="flex items-center justify-between">
-							<span class="text-sm font-medium text-foreground">{{
-								__("Customer Credit")
-							}}</span>
-							<Badge variant="secondary" class="text-[10px]">
-								{{ __("Available") }}: {{ money(availableCreditTotal) }}
-							</Badge>
-						</div>
-						<div
-							v-for="source in creditSources"
-							:key="creditKey(source)"
-							class="flex items-center justify-between gap-2 text-xs"
-						>
-							<span class="min-w-0 truncate">
-								{{
-									source.source_type === "Payment Entry"
-										? __("Advance payment")
-										: __("Credit note")
-								}}
-								{{ source.source_name }}
-								<span class="text-muted-foreground">({{ money(source.available) }})</span>
-							</span>
-							<NumberInput
-								v-model="creditAllocations[creditKey(source)]"
-								:min="0"
-								:max="source.available"
-								:precision="precisionFor(invoiceCurrency)"
-								class="w-24 text-end text-sm"
-								:aria-label="__('Credit to use from {0}', [source.source_name])"
-							/>
-						</div>
-						<p
-							v-if="creditApplied > 0"
-							class="text-xs font-medium text-emerald-700 dark:text-emerald-300"
-						>
-							{{ __("Using {0} of customer credit", [money(creditApplied)]) }}
-						</p>
-					</div>
-
-					<div
-						v-if="cartStore.customer && !cartStore.isReturnMode && customerLoyaltyPoints > 0"
-						class="bg-violet-500/5 border border-violet-500/20 rounded-xl p-3 space-y-2"
-					>
-						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-2">
-								<Gift class="w-4 h-4 text-violet-500" />
-								<span class="text-sm font-medium text-foreground">{{
-									__("Loyalty Points")
-								}}</span>
-							</div>
-							<Badge variant="secondary" class="text-[10px]">
-								{{ customerLoyaltyPoints }} {{ __("pts") }} ({{
-									money(customerLoyaltyAmount)
-								}})
-							</Badge>
-						</div>
-
-						<template v-if="cartStore.redeemLoyaltyPoints">
-							<div class="flex items-center justify-between text-xs">
-								<span class="text-violet-700 dark:text-violet-300 font-medium">
-									{{ __("Redeeming") }}: {{ cartStore.loyaltyPoints }} {{ __("pts") }} =
-									{{ money(cartStore.loyaltyAmount) }}
-								</span>
+					<section v-if="hasOtherTenders" class="space-y-3" data-testid="other-tenders">
+						<h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							{{ __("Other tenders") }}
+						</h3>
+						<div v-if="canRedeemGiftCards" data-testid="gift-card-tender">
+							<p v-if="!offlineStore.isOnline" class="text-xs text-muted-foreground">
+								{{ __("Gift cards need a live connection.") }}
+							</p>
+							<div v-else-if="showGiftInput" class="flex gap-2">
+								<input
+									ref="giftCodeRef"
+									v-model="giftCodeInput"
+									data-testid="gift-card-code"
+									autocomplete="off"
+									class="h-control min-w-0 flex-1 rounded-xl border border-border bg-card px-3 font-mono text-sm uppercase shadow-inset focus:outline-none focus:ring-4 focus:ring-primary/12"
+									:placeholder="__('Gift card code')"
+									@keydown.enter.stop.prevent="applyGiftCard"
+									@keydown.esc.stop.prevent="showGiftInput = false"
+								/>
 								<Button
-									variant="ghost"
 									size="sm"
-									class="h-6 px-2 text-[10px] text-destructive"
-									@click="
-										cartStore.clearLoyalty();
-										showLoyaltyInput = false;
-									"
+									:disabled="checkingGift || !giftCodeInput.trim()"
+									@click="applyGiftCard"
 								>
-									{{ __("Remove") }}
+									<Loader2 v-if="checkingGift" class="w-4 h-4 animate-spin" />
+									{{ __("Apply") }}
 								</Button>
 							</div>
-						</template>
-
-						<template v-else-if="showLoyaltyInput">
-							<div class="space-y-1.5">
-								<div class="flex items-center gap-1.5">
-									<NumberInput
-										v-model="redeemPointsInput"
-										:min="1"
-										:max="maxRedeemablePoints"
-										:precision="0"
-										class="flex-1 text-sm"
-									/>
-									<span class="text-xs text-muted-foreground shrink-0"
-										>/ {{ maxRedeemablePoints }} {{ __("pts") }}</span
-									>
-								</div>
-								<p class="text-[11px] text-violet-600 dark:text-violet-400">
-									{{ __("Discount") }}: {{ money(redeemInputAmount) }}
-								</p>
-								<div class="flex gap-1.5">
-									<Button
-										variant="default"
-										size="sm"
-										class="flex-1 bg-violet-600 hover:bg-violet-700 text-white text-xs"
-										:disabled="redeemPointsInput < 1"
-										@click="applyLoyalty"
-									>
-										{{ __("Apply") }}
-									</Button>
-									<Button
-										variant="outline"
-										size="sm"
-										class="flex-1 text-xs"
-										@click="cancelLoyaltyInput"
-									>
-										{{ __("Cancel") }}
-									</Button>
-								</div>
-							</div>
-						</template>
-
-						<template v-else>
+							<Button v-else variant="outline" size="sm" class="w-full" @click="openGiftInput">
+								<Gift class="w-4 h-4" />
+								{{ __("Pay with Gift Card") }}
+							</Button>
+						</div>
+						<div
+							v-if="
+								cartStore.isReturnMode &&
+								posStore.giftCardMode &&
+								cartStore.returnGiftCards.length
+							"
+							class="space-y-1"
+						>
 							<Button
+								v-for="card in cartStore.returnGiftCards"
+								:key="card.gift_card"
 								variant="outline"
 								size="sm"
-								class="w-full text-violet-600 dark:hover:bg-violet-950 text-xs"
-								@click="openLoyaltyInput"
+								class="w-full"
+								:disabled="
+									!offlineStore.isOnline ||
+									splitPayments.some((leg) => leg.gift_card === card.gift_card)
+								"
+								@click="refundToGiftCard(card)"
 							>
-								<Gift class="w-3 h-3" />
-								{{ __("Redeem Points") }}
+								<Gift class="w-4 h-4" />
+								{{
+									__("Refund to gift card {0} (up to {1})", [
+										card.masked_code,
+										money(card.amount),
+									])
+								}}
 							</Button>
-						</template>
-					</div>
+						</div>
+						<div
+							v-if="showCustomerCredit"
+							class="space-y-2 rounded-xl border border-border bg-surface-raised p-3"
+							data-testid="customer-credit"
+						>
+							<div class="flex items-center justify-between">
+								<span class="text-sm font-medium text-foreground">{{
+									__("Customer Credit")
+								}}</span>
+								<Badge variant="neutral" size="sm">
+									{{ __("Available") }}: {{ money(availableCreditTotal) }}
+								</Badge>
+							</div>
+							<div
+								v-for="source in creditSources"
+								:key="creditKey(source)"
+								class="flex items-center justify-between gap-2 text-xs"
+							>
+								<span class="min-w-0 truncate">
+									{{
+										source.source_type === "Payment Entry"
+											? __("Advance payment")
+											: __("Credit note")
+									}}
+									{{ source.source_name }}
+									<span class="text-muted-foreground">({{ money(source.available) }})</span>
+								</span>
+								<NumberInput
+									v-model="creditAllocations[creditKey(source)]"
+									:min="0"
+									:max="source.available"
+									:precision="precisionFor(invoiceCurrency)"
+									class="w-24 text-end text-sm"
+									:aria-label="__('Credit to use from {0}', [source.source_name])"
+								/>
+							</div>
+							<p
+								v-if="creditApplied > 0"
+								class="text-xs font-medium text-success-soft-foreground"
+							>
+								{{ __("Using {0} of customer credit", [money(creditApplied)]) }}
+							</p>
+						</div>
+						<div
+							v-if="cartStore.customer && !cartStore.isReturnMode && customerLoyaltyPoints > 0"
+							class="space-y-2 rounded-xl border border-border bg-surface-raised p-3"
+						>
+							<div class="flex items-center justify-between">
+								<div class="flex items-center gap-2">
+									<Gift class="size-4 text-primary" />
+									<span class="text-sm font-medium text-foreground">{{
+										__("Loyalty Points")
+									}}</span>
+								</div>
+								<Badge variant="neutral" size="sm">
+									{{ customerLoyaltyPoints }} {{ __("pts") }} ({{
+										money(customerLoyaltyAmount)
+									}})
+								</Badge>
+							</div>
 
-					<div v-if="posStore.allowWriteOffChange && !cartStore.isReturnMode" class="space-y-1">
+							<template v-if="cartStore.redeemLoyaltyPoints">
+								<div class="flex items-center justify-between text-xs">
+									<span class="font-medium text-foreground">
+										{{ __("Redeeming") }}: {{ cartStore.loyaltyPoints }} {{ __("pts") }} =
+										{{ money(cartStore.loyaltyAmount) }}
+									</span>
+									<Button
+										variant="ghost"
+										size="sm"
+										class="h-7 px-2 text-xs text-destructive-soft-foreground"
+										@click="
+											cartStore.clearLoyalty();
+											showLoyaltyInput = false;
+										"
+									>
+										{{ __("Remove") }}
+									</Button>
+								</div>
+							</template>
+
+							<template v-else-if="showLoyaltyInput">
+								<div class="space-y-1.5">
+									<div class="flex items-center gap-1.5">
+										<NumberInput
+											v-model="redeemPointsInput"
+											:min="1"
+											:max="maxRedeemablePoints"
+											:precision="0"
+											class="flex-1 text-sm"
+										/>
+										<span class="text-xs text-muted-foreground shrink-0"
+											>/ {{ maxRedeemablePoints }} {{ __("pts") }}</span
+										>
+									</div>
+									<p class="text-xs text-muted-foreground">
+										{{ __("Discount") }}: {{ money(redeemInputAmount) }}
+									</p>
+									<div class="flex gap-1.5">
+										<Button
+											variant="default"
+											size="sm"
+											class="flex-1"
+											:disabled="redeemPointsInput < 1"
+											@click="applyLoyalty"
+										>
+											{{ __("Apply") }}
+										</Button>
+										<Button
+											variant="outline"
+											size="sm"
+											class="flex-1 text-xs"
+											@click="cancelLoyaltyInput"
+										>
+											{{ __("Cancel") }}
+										</Button>
+									</div>
+								</div>
+							</template>
+
+							<template v-else>
+								<Button variant="outline" size="sm" class="w-full" @click="openLoyaltyInput">
+									<Gift class="w-3 h-3" />
+									{{ __("Redeem Points") }}
+								</Button>
+							</template>
+						</div>
+						<div v-if="posStore.allowWriteOffChange && !cartStore.isReturnMode" class="space-y-1">
+							<div class="flex items-center justify-between">
+								<label
+									class="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+								>
+									{{ __("Write Off") }}
+								</label>
+								<span class="text-xs text-muted-foreground">{{
+									__("Small remaining amounts")
+								}}</span>
+							</div>
+							<NumberInput
+								v-model="writeOffInput"
+								:min="0"
+								:precision="moneyPrecision"
+								placeholder="0.00"
+								class="text-sm"
+								@change="cartStore.writeOffAmount = writeOffInput || 0"
+							/>
+						</div>
+					</section>
+
+					<div class="space-y-1">
 						<div class="flex items-center justify-between">
 							<label
 								class="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
 							>
-								{{ __("Write Off") }}
+								{{ __("Posting Date") }}
 							</label>
-							<span class="text-xs text-muted-foreground">{{
-								__("Small remaining amounts")
-							}}</span>
+							<span
+								v-if="!posStore.allowChangePostingDate"
+								class="text-xs text-muted-foreground"
+							>
+								{{ __("Locked by POS Profile") }}
+							</span>
 						</div>
-						<NumberInput
-							v-model="writeOffInput"
-							:min="0"
-							:precision="moneyPrecision"
-							placeholder="0.00"
+						<DateTimePicker
+							v-model="cartStore.postingDate"
+							mode="date"
+							:disabled="!posStore.allowChangePostingDate"
+							:clearable="false"
+							placeholder="Posting date"
 							class="text-sm"
-							@change="cartStore.writeOffAmount = writeOffInput || 0"
 						/>
+					</div>
+				</div>
+
+				<aside
+					class="flex shrink-0 flex-col gap-3 border-t border-border p-4 lg:w-80 lg:border-s lg:border-t-0"
+				>
+					<div
+						class="rounded-2xl border border-border bg-surface-raised p-3 shadow-raised"
+						data-testid="payment-balance"
+					>
+						<dl class="space-y-1 text-sm">
+							<div class="flex justify-between">
+								<dt class="text-muted-foreground">
+									{{ cartStore.isReturnMode ? __("Refund") : __("Due") }}
+								</dt>
+								<dd class="font-semibold tabular-nums">
+									{{ money(Math.abs(cartStore.grandTotal)) }}
+								</dd>
+							</div>
+							<div v-if="creditApplied > 0" class="flex justify-between">
+								<dt class="text-muted-foreground">{{ __("Customer credit") }}</dt>
+								<dd class="font-semibold tabular-nums">-{{ money(creditApplied) }}</dd>
+							</div>
+							<div class="flex justify-between">
+								<dt class="text-muted-foreground">
+									{{ cartStore.isReturnMode ? __("Refunding") : __("Tendered") }}
+								</dt>
+								<dd class="font-semibold tabular-nums" data-testid="payment-tendered-total">
+									{{ formatWithSymbol(invoiceCurrency, effectiveTendered) }}
+								</dd>
+							</div>
+						</dl>
+						<div
+							class="mt-2 rounded-xl px-3 py-2"
+							:class="
+								remainingAmount > 0
+									? 'bg-warning-soft text-warning-soft-foreground'
+									: changeAmount > 0
+										? 'bg-success-soft text-success-soft-foreground'
+										: 'bg-surface-sunken text-foreground'
+							"
+							data-testid="payment-remaining"
+						>
+							<p class="text-xs font-semibold">
+								{{
+									remainingAmount > 0
+										? remainingLabel
+										: changeAmount > 0
+											? __("Change")
+											: __("Balance")
+								}}
+							</p>
+							<p class="text-2xl font-extrabold tabular-nums">
+								<template v-if="remainingAmount > 0">{{ money(remainingAmount) }}</template>
+								<template v-else-if="changeAmount > 0">{{
+									formatWithSymbol(invoiceCurrency, changeAmount)
+								}}</template>
+								<template v-else>{{ money(0) }}</template>
+							</p>
+							<p v-if="outstandingSubmissionHint" class="mt-0.5 text-xs font-medium">
+								{{ outstandingSubmissionHint }}
+							</p>
+						</div>
 					</div>
 
 					<div
 						v-if="showChangeAllocator"
-						class="mt-auto rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-2"
+						class="space-y-2 rounded-xl border border-success/25 bg-success-soft p-3"
 					>
 						<div class="flex items-center justify-between">
-							<p class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+							<p class="text-xs font-semibold text-success-soft-foreground">
 								{{ __("Change") }}
 							</p>
-							<p
-								class="text-lg font-extrabold text-emerald-700 dark:text-emerald-300 tabular-nums"
-							>
+							<p class="text-lg font-extrabold text-success-soft-foreground tabular-nums">
 								{{ formatWithSymbol(invoiceCurrency, changeAmount) }}
 							</p>
 						</div>
@@ -648,7 +777,7 @@
 							</div>
 							<p
 								v-if="leg.currency !== invoiceCurrency"
-								class="pl-6 text-[10px] text-muted-foreground"
+								class="ps-6 text-[0.6875rem] text-muted-foreground"
 							>
 								@ {{ formatFor(invoiceCurrency, leg.exchange_rate) }} =
 								{{ formatWithSymbol(invoiceCurrency, leg.base_amount) }}
@@ -692,134 +821,115 @@
 						</p>
 					</div>
 
-					<div class="flex gap-2" :class="showChangeAllocator ? 'mt-2' : 'mt-auto'">
-						<div
-							v-if="changeAmount > 0 && !showChangeAllocator"
-							class="flex-1 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 text-center"
-						>
-							<p class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-0.5">
-								{{ __("Change") }}
-							</p>
-							<p
-								class="text-lg font-extrabold text-emerald-700 dark:text-emerald-300 tabular-nums"
+					<div class="hidden flex-1 flex-col gap-2 lg:flex">
+						<h3 class="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+							{{ __("Numpad") }}
+						</h3>
+						<div class="grid grid-cols-3 gap-2">
+							<Button
+								v-for="(key, idx) in numpadKeys"
+								:key="key"
+								:ref="
+									(el) => {
+										if (el) numpadRefs[idx] = (el as any).$el || el;
+									}
+								"
+								:variant="key === '⌫' || key === 'C' ? 'secondary' : 'outline'"
+								class="h-12 text-lg font-semibold tabular-nums data-[pressed=true]:translate-y-px data-[pressed=true]:border-primary data-[pressed=true]:bg-surface-pressed data-[pressed=true]:shadow-pressed"
+								:data-pressed="pressedKey === key || undefined"
+								data-testid="numpad-key"
+								:data-key="key"
+								:aria-label="
+									key === '⌫'
+										? __('Backspace')
+										: key === 'C'
+											? __('Clear amount')
+											: undefined
+								"
+								@click="handleNumpad(key)"
+								@keydown.enter.prevent="handleNumpad(key)"
 							>
-								{{ formatWithSymbol(invoiceCurrency, changeAmount) }}
-							</p>
-						</div>
-						<div
-							v-if="remainingAmount > 0"
-							class="flex-1 bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 text-center"
-						>
-							<p class="text-[10px] font-medium text-amber-600 dark:text-amber-400 mb-0.5">
-								{{ remainingLabel }}
-							</p>
-							<p class="text-lg font-extrabold text-amber-700 dark:text-amber-300 tabular-nums">
-								{{ money(remainingAmount) }}
-							</p>
-							<p
-								v-if="outstandingSubmissionHint"
-								class="mt-1 text-[10px] font-medium text-amber-600 dark:text-amber-400"
-							>
-								{{ outstandingSubmissionHint }}
-							</p>
+								<Delete v-if="key === '⌫'" class="size-5" />
+								<template v-else>{{ key }}</template>
+							</Button>
 						</div>
 					</div>
-
-					<div class="space-y-1">
-						<div class="flex items-center justify-between">
-							<label
-								class="text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-							>
-								{{ __("Posting Date") }}
-							</label>
-							<span
-								v-if="!posStore.allowChangePostingDate"
-								class="text-xs text-muted-foreground"
-							>
-								{{ __("Locked by POS Profile") }}
-							</span>
-						</div>
-						<DateTimePicker
-							v-model="cartStore.postingDate"
-							mode="date"
-							:disabled="!posStore.allowChangePostingDate"
-							:clearable="false"
-							placeholder="Posting date"
-							class="text-sm"
-						/>
-					</div>
-				</div>
-
-				<div class="hidden lg:flex flex-col w-64 border-s border-border p-4 gap-3">
-					<h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-						{{ __("Numpad") }}
-					</h3>
-					<div class="grid grid-cols-3 gap-1.5 flex-1">
-						<Button
-							v-for="(key, idx) in numpadKeys"
-							:key="key"
-							:ref="
-								(el) => {
-									if (el) numpadRefs[idx] = (el as any).$el || el;
-								}
-							"
-							:variant="key === '⌫' ? 'destructive' : key === 'C' ? 'secondary' : 'outline'"
-							class="text-base h-12"
-							@click="handleNumpad(key)"
-							@keydown.enter.prevent="handleNumpad(key)"
-						>
-							<Delete v-if="key === '⌫'" class="w-5 h-5" />
-							<template v-else>{{ key }}</template>
-						</Button>
-					</div>
-				</div>
+				</aside>
 			</div>
 
 			<DialogFooter
-				class="shrink-0 border-t border-border px-5 py-3 bg-muted/30 justify-between sm:justify-between"
+				class="shrink-0 items-center justify-between gap-3 rounded-b-[calc(1.5rem-1px)] border-t border-border bg-surface-sunken px-5 py-3 sm:justify-between"
 			>
-				<div class="hidden sm:flex items-center gap-2 text-[10px] text-muted-foreground">
-					<kbd class="px-1.5 py-0.5 font-mono bg-muted rounded border border-border">Enter</kbd>
-					<span>{{ __("Save & Print") }}</span>
-					<span class="mx-1">|</span>
-					<kbd class="px-1.5 py-0.5 font-mono bg-muted rounded border border-border"
-						>Ctrl+Enter</kbd
+				<div
+					class="min-w-0 flex-1"
+					aria-live="polite"
+					data-testid="payment-status"
+					:data-state="submitState"
+				>
+					<p
+						v-if="submitState !== 'idle'"
+						class="flex items-center gap-2 text-sm font-medium"
+						:class="
+							submitState === 'failed' || submitState === 'retry'
+								? 'text-destructive-soft-foreground'
+								: 'text-foreground'
+						"
 					>
-					<span>{{ __("Save Only") }}</span>
-					<span class="mx-1">|</span>
-					<kbd class="px-1.5 py-0.5 font-mono bg-muted rounded border border-border">Esc</kbd>
-					<span>{{ __("Cancel") }}</span>
+						<Loader2
+							v-if="submitState === 'checking' || submitState === 'saving'"
+							class="size-4 shrink-0 animate-spin"
+						/>
+						<AlertTriangle v-else class="size-4 shrink-0" />
+						<span class="min-w-0">{{ submitMessage }}</span>
+					</p>
+					<div
+						v-else
+						class="hidden items-center gap-2 text-[0.6875rem] text-muted-foreground sm:flex"
+					>
+						<kbd class="rounded border border-border bg-muted px-1.5 py-0.5 font-mono">Enter</kbd>
+						<span>{{ __("Save & Print") }}</span>
+						<kbd class="ms-2 rounded border border-border bg-muted px-1.5 py-0.5 font-mono"
+							>Ctrl+Enter</kbd
+						>
+						<span>{{ __("Save Only") }}</span>
+						<kbd class="ms-2 rounded border border-border bg-muted px-1.5 py-0.5 font-mono"
+							>Esc</kbd
+						>
+						<span>{{ __("Cancel") }}</span>
+					</div>
 				</div>
-				<div class="flex items-center gap-2">
-					<Button variant="outline" @click="close" tabindex="-1">{{ __("Cancel") }}</Button>
+				<div class="flex shrink-0 items-center gap-2">
+					<Button variant="outline" tabindex="-1" :disabled="isSubmitting" @click="close">{{
+						__("Cancel")
+					}}</Button>
 					<Button
 						variant="outline"
-						class="font-medium"
+						class="font-semibold"
 						data-testid="save-payment"
 						:disabled="isSubmitting || !canSubmit"
 						@click="submitPayment(false)"
 					>
-						<template v-if="isSubmitting && !printAfterSave">
-							<Loader2 class="w-4 h-4 animate-spin" />
-						</template>
-						<template v-else>
-							<Save class="w-4 h-4" />
-						</template>
+						<Loader2 v-if="isSubmitting && !printAfterSave" class="size-4 animate-spin" />
+						<Save v-else class="size-4" />
 						{{ __("Save Only") }}
 					</Button>
 					<Button
 						ref="submitBtn"
-						:variant="cartStore.isReturnMode ? 'destructive' : 'success'"
-						class="font-bold px-4 shadow-md"
+						class="h-12 min-w-44 rounded-xl px-5 text-base font-bold shadow-primary transition-[transform,box-shadow,background-color] duration-fast active:translate-y-px active:shadow-pressed"
+						:class="
+							cartStore.isReturnMode &&
+							'border-warning bg-warning text-warning-foreground shadow-raised hover:bg-warning/90'
+						"
+						data-testid="save-print-payment"
 						:disabled="isSubmitting || !canSubmit"
 						@click="submitPayment(true)"
 					>
 						<template v-if="isSubmitting && printAfterSave">
-							<Loader2 class="w-4 h-4 animate-spin" />
-							{{ __("Processing...") }}
+							<Loader2 class="size-4 animate-spin" />
+							{{ __("Saving...") }}
 						</template>
 						<template v-else>
-							<Printer class="w-4 h-4" />
+							<Printer class="size-4" />
 							{{ cartStore.isReturnMode ? __("Return & Print") : __("Save & Print") }}
 						</template>
 					</Button>
@@ -881,6 +991,9 @@ import {
 	Smartphone,
 	FileText,
 	DollarSign,
+	ChevronDown,
+	WifiOff,
+	AlertTriangle,
 } from "lucide-vue-next";
 
 import {
@@ -976,6 +1089,26 @@ watch(creditApplied, (credit) => {
 	nextTick(() => amountInput.value?.setValue(due));
 });
 const isSubmitting = ref(false);
+const showBreakdown = ref(false);
+
+/**
+ * What the till is doing with this sale, shown in the footer. There is no "done" state here:
+ * the dialog closes only once the server, or the local queue, has the sale.
+ */
+type SubmitState = "idle" | "checking" | "saving" | "retry" | "failed";
+const submitState = ref<SubmitState>("idle");
+const submitMessage = ref("");
+
+function setSubmitState(state: SubmitState, message = "") {
+	submitState.value = state;
+	submitMessage.value = message;
+}
+
+/** Report a refusal both in the footer and as a toast, as before. */
+function failSubmit(message: string, state: SubmitState = "failed") {
+	setSubmitState(state, message);
+	showError(message);
+}
 const writeOffInput = ref(0);
 const printAfterSave = ref(false);
 
@@ -1020,6 +1153,15 @@ const canRedeemGiftCards = computed(
 );
 const hasGiftCardLegs = computed(() => splitPayments.value.some((leg) => leg.gift_card));
 const isGiftCardSale = computed(() => cartStore.isGiftCardSale || hasGiftCardLegs.value);
+
+const hasOtherTenders = computed(
+	() =>
+		canRedeemGiftCards.value ||
+		(cartStore.isReturnMode && !!posStore.giftCardMode && cartStore.returnGiftCards.length > 0) ||
+		showCustomerCredit.value ||
+		(!!cartStore.customer && !cartStore.isReturnMode && customerLoyaltyPoints.value > 0) ||
+		(posStore.allowWriteOffChange && !cartStore.isReturnMode),
+);
 
 const quickAmounts = computed(() => {
 	const total = Math.abs(cartStore.grandTotal);
@@ -1225,6 +1367,9 @@ const canSubmit = computed(() => {
 });
 
 onMounted(async () => {
+	// before any awaits, so Enter / Ctrl+Enter / numpad echo work as soon as the dialog shows
+	document.addEventListener("keydown", handleGlobalKeydown);
+
 	if (!posStore.allowChangePostingDate || !cartStore.postingDate) {
 		cartStore.postingDate = nowDate();
 	}
@@ -1271,8 +1416,6 @@ onMounted(async () => {
 			/* non-critical */
 		}
 	}
-
-	document.addEventListener("keydown", handleGlobalKeydown);
 });
 
 watch(
@@ -1289,6 +1432,7 @@ watch(
 );
 
 onUnmounted(() => {
+	clearTimeout(pressedTimer);
 	document.removeEventListener("keydown", handleGlobalKeydown);
 });
 
@@ -1317,8 +1461,29 @@ function handleAmountInputSubmit(event: KeyboardEvent) {
 	}
 }
 
+/** The on-screen key echoing the physical one, so typed digits visibly land on the numpad. */
+const pressedKey = ref("");
+let pressedTimer: ReturnType<typeof setTimeout> | undefined;
+
+function numpadKeyFor(e: KeyboardEvent): string {
+	if (e.ctrlKey || e.metaKey || e.altKey) return "";
+	if (/^[0-9]$/.test(e.key)) return e.key;
+	if (e.key === "Backspace") return "⌫";
+	if (e.key === "Delete") return "C";
+	return "";
+}
+
+function flashNumpadKey(e: KeyboardEvent) {
+	const key = numpadKeyFor(e);
+	if (!key) return;
+	pressedKey.value = key;
+	clearTimeout(pressedTimer);
+	pressedTimer = setTimeout(() => (pressedKey.value = ""), 160);
+}
+
 function handleGlobalKeydown(e: KeyboardEvent) {
 	if (!cartStore.showPaymentDialog || isSubmitting.value) return;
+	flashNumpadKey(e);
 
 	if (isPaymentDialogSaveOnlyShortcut(e) && canSubmit.value) {
 		e.preventDefault();
@@ -1657,23 +1822,26 @@ async function submitPayment(withPrint: boolean = true) {
 
 	const validation = validateForSubmission();
 	if (!validation.valid) {
-		showError(validation.message || "Validation failed");
+		failSubmit(validation.message || __("Validation failed"));
 		return;
 	}
 
-	if (cartStore.pricingIssues.length) {
-		showError(cartStore.pricingIssues.join("\n"));
-		return;
-	}
-
-	const stockCheck = await cartStore.revalidateStock();
-	if (!stockCheck.valid) {
-		showError(stockCheck.messages.join("\n"));
+	if (cartStore.checkoutBlockers.length) {
+		failSubmit(cartStore.checkoutBlockers.join("\n"));
 		return;
 	}
 
 	isSubmitting.value = true;
+	setSubmitState("checking", __("Checking stock..."));
+	const stockCheck = await cartStore.revalidateStock();
+	if (!stockCheck.valid) {
+		isSubmitting.value = false;
+		failSubmit(stockCheck.messages.join("\n"));
+		return;
+	}
+
 	printAfterSave.value = withPrint;
+	setSubmitState("saving", __("Saving the sale. Keep this window open."));
 
 	const invoiceData = buildInvoicePayload();
 	const giftCardSale = hasGiftCardActivity(invoiceData);
@@ -1724,7 +1892,7 @@ async function submitPayment(withPrint: boolean = true) {
 				withPrint,
 				cashier: authStore.userFullName,
 			});
-			if (!saved) showError(__("Failed to save invoice offline"));
+			if (!saved) failSubmit(__("Failed to save invoice offline"));
 			return;
 		}
 		const result = await submitDurableInvoice(
@@ -1760,7 +1928,7 @@ async function submitPayment(withPrint: boolean = true) {
 			await holdForFiscalCheck(error, invoiceData, true);
 		} else if (isTabConflictError(error)) {
 			showError(__("This tab was changed on another terminal. Reload it and try again."));
-			close();
+			cartStore.closePaymentDialog();
 			cartStore.openDraftDialog();
 		} else if (isNetworkError(error)) {
 			const saved = await completeOfflineSale(invoiceData, {
@@ -1768,14 +1936,15 @@ async function submitPayment(withPrint: boolean = true) {
 				cashier: authStore.userFullName,
 			});
 			if (saved) return;
-			showError(__("You are offline. Invoice could not be saved locally."));
+			failSubmit(__("You are offline. Invoice could not be saved locally."));
 		} else {
-			showError(__("Payment failed: {0}", [extractErrorMessage(error)]));
+			failSubmit(__("Payment failed: {0}", [extractErrorMessage(error)]));
 		}
 		console.error("Payment error:", error);
 	} finally {
 		isSubmitting.value = false;
 		printAfterSave.value = false;
+		if (submitState.value === "checking" || submitState.value === "saving") setSubmitState("idle");
 	}
 }
 
@@ -1786,7 +1955,7 @@ async function submitPayment(withPrint: boolean = true) {
  */
 async function submitGiftCardSale(invoiceData: InvoiceData, withPrint: boolean) {
 	if (isElectron() || !isOnline()) {
-		showError(
+		failSubmit(
 			invoiceData.customer_credit?.length
 				? __("Customer credit needs a live connection. This sale cannot be saved offline.")
 				: __("Gift cards need a live connection. This sale cannot be saved offline."),
@@ -1803,13 +1972,14 @@ async function submitGiftCardSale(invoiceData: InvoiceData, withPrint: boolean) 
 		if (error instanceof FiscalUncertainError) {
 			await holdForFiscalCheck(error, invoiceData, false);
 		} else if (isNetworkError(error)) {
-			showError(
+			failSubmit(
 				__(
 					"The connection dropped before the server answered. Press Pay again to finish this sale; it will not be charged twice.",
 				),
+				"retry",
 			);
 		} else {
-			showError(__("Payment failed: {0}", [extractErrorMessage(error)]));
+			failSubmit(__("Payment failed: {0}", [extractErrorMessage(error)]));
 		}
 		return;
 	}
@@ -1832,7 +2002,7 @@ function handleRepricing(result: CreateInvoiceResult): boolean {
 	if (result.status !== "reprice_required") return false;
 	cartStore.applyServerRepricing(result as unknown as RepriceResponse);
 	showError((result as unknown as RepriceResponse).message);
-	close();
+	cartStore.closePaymentDialog();
 	return true;
 }
 
@@ -1880,7 +2050,7 @@ async function holdForFiscalCheck(error: FiscalUncertainError, invoiceData: Invo
 		});
 	}
 	cartStore.clearAll();
-	close();
+	cartStore.closePaymentDialog();
 	showError(
 		__("FBR did not confirm invoice {0}. Check it under Pending invoices before selling it again.", [
 			error.invoice,
@@ -1890,6 +2060,8 @@ async function holdForFiscalCheck(error: FiscalUncertainError, invoiceData: Invo
 }
 
 function close() {
+	// a sale on its way to the server must not lose its window
+	if (isSubmitting.value) return;
 	cartStore.closePaymentDialog();
 }
 

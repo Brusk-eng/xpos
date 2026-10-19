@@ -188,8 +188,9 @@ describe("pricing rules in the cart", () => {
 			cy.bootPos({ routes: { [RECONCILE]: reconcileWith({}) } });
 
 			cy.addItemToCart("Espresso Beans");
-			cy.cartRow("Espresso Beans").find("button").contains("Disc").click();
-			cy.cartRow("Espresso Beans").find("input[type=number]").last().clear().type("25{enter}");
+			cy.cartRow("Espresso Beans").find("[aria-label='Line options']").click();
+			cy.contains("[role='menuitem']", "Add discount").click();
+			cy.cartRow("Espresso Beans").find("input[aria-label='Discount']").clear().type("25{enter}");
 
 			cy.cartRow("Espresso Beans").should("contain", "-$25");
 			cy.cartRow("Espresso Beans").should("not.contain", "Auto");
@@ -225,7 +226,10 @@ describe("pricing rules in the cart", () => {
 			cy.addItemToCart("Espresso Beans");
 
 			cy.contains("Additional Discount").should("be.visible");
-			cy.contains("Additional Discount").parent().should("contain", "15%");
+			cy.contains("Additional Discount")
+				.parent()
+				.invoke("text")
+				.should("match", /15(\.0+)?%/);
 			// 100 less 15% = 85.
 			cy.contains("Total").parent().should("contain", "85");
 		});

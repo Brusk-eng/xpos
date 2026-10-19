@@ -22,5 +22,19 @@ export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
 }
 
+export function initials(name: string | undefined | null): string {
+	const words = String(name || "")
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean);
+	return (
+		words
+			.slice(0, 2)
+			.map((w) => w[0])
+			.join("")
+			.toUpperCase() || "?"
+	);
+}
+
 // Re-export translate function for convenience
 export { __, _lt, format, hasTranslation } from "./translate";

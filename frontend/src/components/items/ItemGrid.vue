@@ -67,9 +67,9 @@
 			/>
 		</div>
 
-		<div v-else class="overflow-hidden rounded-xl border border-border bg-card">
+		<div v-else class="overflow-clip rounded-xl border border-border bg-card">
 			<div
-				class="sticky top-0 z-1 flex items-center gap-1 border-b border-border bg-surface-sunken/95 pe-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm"
+				class="sticky top-0 z-1 flex items-center gap-1 rounded-t-[calc(var(--radius)+3px)] border-b border-border bg-surface-sunken/95 pe-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm"
 				aria-hidden="true"
 			>
 				<div class="flex min-w-0 flex-1 items-center gap-3 py-1.5 ps-2 pe-1">

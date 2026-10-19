@@ -98,19 +98,18 @@
 		<Popover>
 			<PopoverTrigger as-child>
 				<Button variant="outline" size="icon" class="size-10 rounded-lg" :aria-label="__('Account')">
-					<Avatar v-if="authStore.user?.image" size="sm">
-						<img :src="authStore.user.image" alt="" />
+					<Avatar size="sm" data-testid="user-avatar">
+						<AvatarImage v-if="authStore.user?.image" :src="authStore.user.image" alt="" />
+						<AvatarFallback>{{ userInitials }}</AvatarFallback>
 					</Avatar>
-					<User v-else class="size-5!" />
 				</Button>
 			</PopoverTrigger>
 			<PopoverContentStyled class="w-72 p-2" align="end" role="menu">
 				<div class="mb-2 flex items-center gap-3 rounded-xl bg-surface-sunken px-3 py-2.5">
-					<span
-						class="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground"
-					>
-						<User class="size-4.5" />
-					</span>
+					<Avatar class="size-9">
+						<AvatarImage v-if="authStore.user?.image" :src="authStore.user.image" alt="" />
+						<AvatarFallback class="bg-card text-sm">{{ userInitials }}</AvatarFallback>
+					</Avatar>
 					<div class="min-w-0">
 						<p class="truncate text-sm font-semibold">
 							{{ authStore.userFullName || __("User") }}
@@ -179,16 +178,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onMounted, onUnmounted, ref, nextTick, type Ref } from "vue";
+import { computed, inject, onMounted, onUnmounted, ref, type Ref } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { usePaymentStore } from "@/stores/paymentStore";
 import { useAuthStore } from "@/stores/authStore";
 import { __ } from "@/lib/translate";
+import { initials } from "@/lib/utils";
+import { openCommandSearchOnPos } from "@/composables/useKeyboardShortcuts";
 import { hasPermission } from "@/services/userRights";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { XposLogo } from "@/components/ui/brand";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Popover, PopoverContentStyled, PopoverMenuItem, PopoverTrigger } from "@/components/ui/popover";
 import ReturnDialog from "@/components/dialogs/ReturnDialog.vue";
 import RepeatInvoiceDialog from "@/components/dialogs/RepeatInvoiceDialog.vue";
@@ -197,7 +198,6 @@ import {
 	Sun,
 	Moon,
 	Monitor,
-	User,
 	LogOut,
 	ArrowDownCircle,
 	ArrowUpCircle,
@@ -228,6 +228,7 @@ const posStore = usePosStore();
 const { openInvoicePrintView } = usePrintInvoice();
 const paymentStore = usePaymentStore();
 const authStore = useAuthStore();
+const userInitials = computed(() => initials(authStore.userFullName || authStore.userName));
 
 const isDark = inject<Ref<boolean>>("isDark")!;
 const theme = inject<Ref<"light" | "dark" | "system">>("theme")!;
@@ -261,8 +262,7 @@ function toggleSidebar() {
 }
 
 function openSearch() {
-	router.push("/pos");
-	nextTick(() => window.dispatchEvent(new CustomEvent("xpos:open-command-search")));
+	void openCommandSearchOnPos(router);
 }
 
 function handleShowRepeatDialog() {

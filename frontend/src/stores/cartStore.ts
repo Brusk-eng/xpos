@@ -21,6 +21,7 @@ import type {
 	GiftCardRefund,
 	IssuedGiftCard,
 	RepriceResponse,
+	BatchInfo,
 } from "@/types/pos.types";
 import __ from "@/lib/translate";
 import {
@@ -292,8 +293,7 @@ export const useCartStore = defineStore("cart", () => {
 		return calculatedTaxes.value.reduce((sum, t) => sum + t.amount, 0);
 	});
 
-	const grandTotal = computed(() => {
-		const posStore = usePosStore();
+	const unroundedTotal = computed(() => {
 		let total = subtotal.value + taxAmount.value;
 
 		// Apply offer item-level discounts
@@ -321,13 +321,21 @@ export const useCartStore = defineStore("cart", () => {
 		if (!isReturnMode.value && selectedDeliveryCharge.value) {
 			total += selectedDeliveryCharge.value.rate || 0;
 		}
-		total = isReturnMode.value ? total : Math.max(0, total);
+		return isReturnMode.value ? total : Math.max(0, total);
+	});
+
+	const grandTotal = computed(() => {
+		const posStore = usePosStore();
+		let total = unroundedTotal.value;
 		// card value is exact money, so a sale that sells or spends one is never rounded
 		if (!posStore.disableRoundedTotal && total !== 0 && !isGiftCardSale.value && !giftCardTender.value) {
 			total = Math.round(total);
 		}
 		return total;
 	});
+
+	/** What rounding added to (or took off) the total, for display only. */
+	const roundingAdjustment = computed(() => grandTotal.value - unroundedTotal.value);
 
 	const isEmpty = computed(() => items.value.length === 0);
 
@@ -1364,6 +1372,104 @@ export const useCartStore = defineStore("cart", () => {
 		return issues;
 	});
 
+	/**
+	 * Tracked lines still missing their serial or batch. A missing serial blocks checkout (the
+	 * server always rejects it); a missing batch only warns, since ERPNext can pick one itself.
+	 */
+	const pendingRequirements = computed(() => {
+		if (isReturnMode.value) return [];
+		const pending: {
+			index: number;
+			uid?: string;
+			kind: "serial" | "batch";
+			blocking: boolean;
+			message: string;
+		}[] = [];
+		items.value.forEach((item, index) => {
+			if (item.pos_is_free_item || item.gift_card_issue) return;
+			const name = item.item_name || item.item_code;
+			if (item.has_serial_no && !item.serial_no) {
+				pending.push({
+					index,
+					uid: item.uid,
+					kind: "serial",
+					blocking: true,
+					message: __("{0}: choose a serial number", [name]),
+				});
+			} else if (item.has_batch_no && !item.batch_no) {
+				pending.push({
+					index,
+					uid: item.uid,
+					kind: "batch",
+					blocking: false,
+					message: __("{0}: no batch chosen", [name]),
+				});
+			}
+		});
+		return pending;
+	});
+
+	/** Everything that stops this sale being paid: pricing issues plus missing serial numbers. */
+	const checkoutBlockers = computed<string[]>(() => [
+		...pricingIssues.value,
+		...pendingRequirements.value.filter((r) => r.blocking).map((r) => r.message),
+	]);
+
+	/** Fill in a tracked line's missing serial numbers / batch, keeping its price and discounts. */
+	function resolveLineTracking(
+		index: number,
+		tracking: { serials?: string[]; batch?: string; batches?: BatchInfo[] },
+	): { success: boolean; message?: string } {
+		const line = items.value[index];
+		if (!line) return { success: false, message: __("Item not found") };
+		const serials = tracking.serials || [];
+		const lineQty = Math.abs(line.qty);
+		const needsSerials = !!line.has_serial_no && !line.serial_no;
+		if (needsSerials && serials.length !== lineQty) {
+			return {
+				success: false,
+				message: __("Choose {0} serial numbers for {1}", [String(lineQty), line.item_name]),
+			};
+		}
+		if (needsSerials && lineQty > 1 && line.discount_amount) {
+			return {
+				success: false,
+				message: __(
+					"Remove the line discount on {0}, choose the serials, then add the discount again.",
+					[line.item_name],
+				),
+			};
+		}
+
+		const batch = tracking.batch ?? line.batch_no ?? "";
+		const previousBatch = line.batch_no;
+		line.batch_no = batch;
+		if (batch && batch !== previousBatch && !isReturnMode.value) {
+			const check = checkAvailability(
+				{ ...line, batches: tracking.batches ?? line.batches },
+				line.qty,
+				line.conversion_factor || 1,
+				batch,
+				stockQtyOf(line),
+			);
+			if (!check.allowed) {
+				line.batch_no = previousBatch;
+				return { success: false, message: check.message };
+			}
+		}
+
+		if (needsSerials) {
+			const sign = line.qty < 0 ? -1 : 1;
+			const copies = serials
+				.slice(1)
+				.map((serial) => ({ ...line, uid: nextRowId(), qty: sign, serial_no: serial }));
+			line.qty = sign;
+			line.serial_no = serials[0];
+			items.value.splice(index + 1, 0, ...copies);
+		}
+		return { success: true };
+	}
+
 	function clearAllDiscounts(): void {
 		discountPercentage.value = 0;
 		discountAmount.value = 0;
@@ -1466,8 +1572,13 @@ export const useCartStore = defineStore("cart", () => {
 		}
 	}
 
-	function openPaymentDialog(): void {
+	function openPaymentDialog(): { success: boolean; message: string } {
+		if (isEmpty.value) return { success: false, message: __("Add items to pay") };
+		if (!customer.value) return { success: false, message: __("Select a customer first") };
+		const blocking = pendingRequirements.value.filter((r) => r.blocking);
+		if (blocking.length) return { success: false, message: blocking.map((r) => r.message).join("\n") };
 		showPaymentDialog.value = true;
+		return { success: true, message: "" };
 	}
 
 	function closePaymentDialog(): void {
@@ -1929,6 +2040,8 @@ export const useCartStore = defineStore("cart", () => {
 		includedTaxAmount,
 		totalTaxAmount,
 		grandTotal,
+		unroundedTotal,
+		roundingAdjustment,
 		isEmpty,
 		customerName,
 		totalPayments,
@@ -1937,6 +2050,9 @@ export const useCartStore = defineStore("cart", () => {
 		canAddItem,
 		revalidateStock,
 		pricingIssues,
+		pendingRequirements,
+		checkoutBlockers,
+		resolveLineTracking,
 		cartPriceList,
 		repriceReview,
 		offerConflict,

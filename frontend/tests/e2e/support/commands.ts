@@ -31,6 +31,8 @@ export interface BootOptions {
 	 * currency has to supply it or every figure comes out at two.
 	 */
 	currencies?: Array<Record<string, unknown>>;
+	/** The signed-in user's `user_image`. */
+	userImage?: string;
 }
 
 /**
@@ -61,10 +63,12 @@ Cypress.Commands.add("bootPos", (options: BootOptions = {}) => {
 				csrf_token: "cypress-csrf-token",
 				boot: {
 					user_info: {
+						// the shape frappe.utils.add_user_info builds
 						"cashier@example.com": {
-							user_email: "cashier@example.com",
-							user_fullname: "Test Cashier",
-							image: "",
+							name: "cashier@example.com",
+							email: "cashier@example.com",
+							fullname: "Test Cashier",
+							image: options.userImage || "",
 						},
 					},
 					currencies: options.currencies || [

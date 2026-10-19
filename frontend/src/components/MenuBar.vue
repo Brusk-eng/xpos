@@ -447,11 +447,7 @@ const menus = computed<Menu[]>(() => [
 				icon: CreditCard,
 				shortcut: "F4",
 				disabled: () => cartStore.items.length === 0 || !posStore.isShiftOpen,
-				action: () => {
-					if (cartStore.items.length > 0 && posStore.isShiftOpen) {
-						cartStore.showPaymentDialog = true;
-					}
-				},
+				action: () => window.dispatchEvent(new CustomEvent("xpos:process-payment")),
 			},
 			{
 				id: "select-customer",

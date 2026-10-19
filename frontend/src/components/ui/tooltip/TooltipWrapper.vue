@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { TooltipProvider, TooltipTrigger } from "radix-vue";
-import Tooltip from "./Tooltip.vue";
+import { computed, ref } from "vue";
+import { TooltipProvider, TooltipRoot, TooltipTrigger } from "radix-vue";
 import TooltipContent from "./TooltipContent.vue";
 
 const props = withDefaults(
@@ -20,6 +19,18 @@ const props = withDefaults(
 	},
 );
 
+const hovered = ref(false);
+const open = ref(false);
+
+function onOpenChange(value: boolean) {
+	open.value = value && hovered.value;
+}
+
+function onPointerLeave() {
+	hovered.value = false;
+	open.value = false;
+}
+
 const SHORTCUT_SUFFIX = /^(.*\S)\s*\(((?:Ctrl|Alt|Shift|Cmd|Esc|Enter|F\d{1,2}|\/)[^()]*)\)$/;
 
 const parts = computed(() => {
@@ -32,8 +43,12 @@ const parts = computed(() => {
 
 <template>
 	<TooltipProvider :delay-duration="delayDuration" :skip-delay-duration="skipDelayDuration">
-		<Tooltip>
-			<TooltipTrigger as-child>
+		<TooltipRoot :open="open" @update:open="onOpenChange">
+			<TooltipTrigger
+				as-child
+				@pointerenter="hovered = $event.pointerType === 'mouse' || $event.pointerType === 'pen'"
+				@pointerleave="onPointerLeave"
+			>
 				<slot />
 			</TooltipTrigger>
 			<TooltipContent :side="side">
@@ -47,6 +62,6 @@ const parts = computed(() => {
 					>
 				</span>
 			</TooltipContent>
-		</Tooltip>
+		</TooltipRoot>
 	</TooltipProvider>
 </template>

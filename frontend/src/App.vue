@@ -243,8 +243,10 @@ async function doClearCart() {
 }
 
 function handleProcessPayment() {
+	if (!window.dispatchEvent(new CustomEvent("xpos:checkout", { cancelable: true }))) return;
 	if (cartStore.items.length > 0 && posStore.isShiftOpen) {
-		cartStore.showPaymentDialog = true;
+		const opened = cartStore.openPaymentDialog();
+		if (!opened.success) showError(opened.message);
 	}
 }
 
@@ -257,6 +259,7 @@ function handleShowDrafts() {
 }
 
 function handleHoldInvoice() {
+	if (!window.dispatchEvent(new CustomEvent("xpos:hold-sale", { cancelable: true }))) return;
 	if (cartStore.items.length > 0) {
 		cartStore.openDraftDialog();
 	}

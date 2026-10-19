@@ -207,6 +207,7 @@
 </template>
 
 <script setup lang="ts">
+import { commandSearchRequested } from "@/composables/useKeyboardShortcuts";
 import { ref, computed, nextTick, onMounted, onUnmounted, type Component } from "vue";
 import { useRouter } from "vue-router";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -796,23 +797,21 @@ function executeResult(item: CommandResult) {
 	close();
 }
 
-function handleGlobalKeydown(e: KeyboardEvent) {
-	if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-		e.preventDefault();
-		if (isOpen.value) {
-			close();
-		} else {
-			open();
-		}
-	}
+function toggle() {
+	if (isOpen.value) close();
+	else open();
 }
 
 onMounted(() => {
-	document.addEventListener("keydown", handleGlobalKeydown);
+	window.addEventListener("xpos:toggle-command-search", toggle);
+	if (commandSearchRequested.value) {
+		commandSearchRequested.value = false;
+		open();
+	}
 });
 
 onUnmounted(() => {
-	document.removeEventListener("keydown", handleGlobalKeydown);
+	window.removeEventListener("xpos:toggle-command-search", toggle);
 });
 
 defineExpose({ open, close });

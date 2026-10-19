@@ -1,43 +1,166 @@
 <template>
-	<div class="flex flex-col h-full">
+	<div class="flex h-full flex-col">
 		<div
 			v-if="cartStore.isReturnMode"
-			class="shrink-0 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between"
+			class="flex shrink-0 items-center justify-between gap-2 border-b border-warning/30 bg-warning-soft px-4 py-2 text-warning-soft-foreground"
+			role="status"
+			data-testid="return-banner"
 		>
-			<div class="flex items-center gap-2">
-				<RotateCcw class="w-4 h-4 text-amber-600" />
-				<span class="text-sm font-semibold text-amber-700 dark:text-amber-400">{{
-					__("Return Mode")
-				}}</span>
-				<span
-					v-if="cartStore.returnAgainst"
-					class="text-xs text-amber-600/70 dark:text-amber-400/70 font-mono"
-				>
-					{{ cartStore.returnAgainst }}
+			<div class="flex min-w-0 items-center gap-2">
+				<RotateCcw class="size-4 shrink-0" aria-hidden="true" />
+				<span class="text-sm font-semibold">{{ __("Return Mode") }}</span>
+				<span v-if="cartStore.returnAgainst" class="truncate font-mono text-xs opacity-80">
+					{{ __("against {0}", [cartStore.returnAgainst]) }}
 				</span>
 			</div>
 			<Button
 				variant="ghost"
-				size="icon-sm"
-				class="text-amber-600 hover:text-amber-700"
+				size="sm"
+				class="shrink-0 text-warning-soft-foreground"
+				data-testid="exit-return"
 				@click="cartStore.exitReturnMode()"
 			>
-				<X class="w-4 h-4" />
+				<X class="size-4" />
+				{{ __("Exit") }}
 			</Button>
 		</div>
 
-		<div class="shrink-0 space-y-2.5 px-4 pt-3 pb-2">
+		<div class="shrink-0 space-y-2 px-4 pt-3 pb-2">
 			<div class="flex items-center justify-between gap-3">
-				<h2 class="flex shrink-0 items-center gap-2.5 text-lg font-bold text-foreground">
-					<ShoppingCart class="size-6 text-primary" />
-					{{ __("Current sale") }}
-					<span
-						class="rounded-lg border border-border bg-surface-sunken px-2.5 py-1 text-xs font-semibold text-muted-foreground tabular-nums"
-						data-testid="cart-item-count"
-					>
-						{{ unitsLabel }} &middot; {{ productsLabel }}
-					</span>
+				<h2 class="flex min-w-0 items-center gap-2 text-lg font-bold text-foreground">
+					<ShoppingCart class="size-5 shrink-0 text-primary" aria-hidden="true" />
+					<span class="truncate">{{ __("Current sale") }}</span>
 				</h2>
+				<span
+					class="shrink-0 rounded-lg border border-border bg-surface-sunken px-2 py-0.5 text-xs font-semibold text-muted-foreground tabular-nums"
+					data-testid="cart-item-count"
+				>
+					{{ unitsLabel }} &middot; {{ productsLabel }}
+				</span>
+			</div>
+
+			<div
+				class="rounded-2xl border border-border bg-surface-raised p-2 shadow-raised"
+				:class="cartStore.isReturnMode && 'bg-surface-sunken'"
+				data-testid="cart-customer"
+			>
+				<div class="flex items-center gap-2">
+					<button
+						type="button"
+						class="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl p-0.5 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed"
+						:disabled="cartStore.isReturnMode"
+						:aria-label="cartStore.customer ? __('Change customer') : __('Select customer')"
+						@click="handleCustomerClick"
+					>
+						<Avatar class="size-9">
+							<AvatarImage
+								v-if="cartStore.customer?.image"
+								:src="cartStore.customer.image as string"
+								:alt="cartStore.customer.customer_name"
+							/>
+							<AvatarFallback class="bg-primary/10 text-sm text-primary">
+								<User v-if="!cartStore.customer" class="size-4.5" aria-hidden="true" />
+								<template v-else>{{ customerInitials }}</template>
+							</AvatarFallback>
+						</Avatar>
+						<span class="min-w-0 flex-1">
+							<span
+								class="block truncate text-[0.9375rem] font-semibold leading-tight text-foreground"
+							>
+								{{ cartStore.customerName }}
+							</span>
+							<span class="block truncate text-xs text-muted-foreground">
+								<template v-if="cartStore.isReturnMode">{{
+									__("Customer locked for return")
+								}}</template>
+								<template v-else-if="!cartStore.customer">{{
+									__("Click to select customer")
+								}}</template>
+								<template
+									v-else-if="cartStore.customer.mobile_no || cartStore.customer.email_id"
+								>
+									{{ cartStore.customer.mobile_no || cartStore.customer.email_id }}
+								</template>
+								<template v-else>{{ __("Customer") }}</template>
+							</span>
+						</span>
+					</button>
+					<Lock
+						v-if="cartStore.isReturnMode"
+						class="me-2 size-4.5 shrink-0 text-muted-foreground"
+					/>
+					<template v-else>
+						<Button
+							variant="outline"
+							size="sm"
+							class="shrink-0 font-semibold"
+							data-testid="customer-change"
+							@click="handleCustomerClick"
+						>
+							{{ cartStore.customer ? __("Change") : __("Select") }}
+						</Button>
+						<Popover v-if="cartStore.customer" v-model:open="customerMenuOpen">
+							<PopoverTrigger as-child>
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									class="shrink-0"
+									:aria-label="__('Customer actions')"
+									data-testid="customer-more"
+								>
+									<MoreHorizontal class="size-4.5!" />
+								</Button>
+							</PopoverTrigger>
+							<PopoverContentStyled class="w-56 p-1.5" align="end" role="menu">
+								<PopoverMenuItem @click="runCustomerAction(handleEditCustomer)">
+									<template #icon><Pencil /></template>
+									{{ __("Edit Customer") }}
+								</PopoverMenuItem>
+								<PopoverMenuItem
+									@click="runCustomerAction(() => (customerStore.showLoyaltyDialog = true))"
+								>
+									<template #icon><Gift /></template>
+									{{ __("Loyalty Program") }}
+								</PopoverMenuItem>
+							</PopoverContentStyled>
+						</Popover>
+					</template>
+				</div>
+
+				<div
+					v-if="showCreditInfo"
+					class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border px-2.5 py-1.5 text-xs"
+					:class="
+						isOverCreditLimit
+							? 'border-destructive/30 bg-destructive-soft text-destructive-soft-foreground'
+							: 'border-border bg-surface-sunken'
+					"
+					data-testid="customer-credit-info"
+				>
+					<span>
+						<span class="text-muted-foreground">{{ __("Balance") }}</span>
+						<span class="ms-1 font-bold tabular-nums">{{ money(customerBalance ?? 0) }}</span>
+					</span>
+					<span>
+						<span class="text-muted-foreground">{{ __("Credit Limit") }}</span>
+						<span class="ms-1 font-bold tabular-nums">
+							{{ customerCreditLimit > 0 ? money(customerCreditLimit) : __("No Limit") }}
+						</span>
+					</span>
+					<p
+						v-if="isOverCreditLimit"
+						class="flex w-full items-center gap-1.5 font-semibold"
+						role="alert"
+					>
+						<AlertTriangle class="size-3.5 shrink-0" />
+						{{
+							__("This sale exceeds the credit limit by {0}", [
+								money(projectedBalance - customerCreditLimit),
+							])
+						}}
+					</p>
+				</div>
+
 				<Autocomplete
 					v-if="posStore.salesPersonEnabled && !cartStore.isReturnMode"
 					v-model="cartStore.salesPerson"
@@ -48,109 +171,8 @@
 					:open-on-focus="true"
 					:clearable="true"
 					:min-chars="0"
-					class="min-w-0 max-w-52 flex-1"
+					class="mt-2"
 				/>
-			</div>
-
-			<div
-				class="flex items-center gap-3 rounded-2xl border border-border bg-surface-raised p-2.5 shadow-raised"
-				:class="cartStore.isReturnMode && 'bg-muted'"
-			>
-				<button
-					type="button"
-					class="group flex min-w-0 flex-1 items-center gap-3 rounded-xl text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:cursor-not-allowed"
-					:disabled="cartStore.isReturnMode"
-					@click="handleCustomerClick"
-				>
-					<Avatar class="size-10">
-						<img
-							v-if="cartStore.customer && cartStore.customer.image"
-							:src="cartStore.customer.image as string"
-							:alt="cartStore.customer.customer_name"
-							class="h-full w-full object-cover"
-							loading="lazy"
-						/>
-						<AvatarFallback>
-							<User class="size-5" />
-						</AvatarFallback>
-					</Avatar>
-					<div class="min-w-0 flex-1">
-						<p class="truncate text-base font-semibold text-foreground">
-							{{ cartStore.customerName }}
-						</p>
-						<p class="truncate text-sm text-muted-foreground">
-							<template v-if="cartStore.isReturnMode">{{
-								__("Customer locked for return")
-							}}</template>
-							<template v-else-if="!cartStore.customer">{{
-								__("Click to select customer")
-							}}</template>
-							<template v-else-if="cartStore.customer.mobile_no || cartStore.customer.email_id">
-								{{ cartStore.customer.mobile_no || cartStore.customer.email_id }}
-							</template>
-							<template v-else>{{ __("Customer") }}</template>
-						</p>
-					</div>
-				</button>
-				<Lock v-if="cartStore.isReturnMode" class="size-5 shrink-0 text-muted-foreground" />
-				<template v-else>
-					<TooltipWrapper v-if="cartStore.customer" :content="__('Loyalty Program')">
-						<Button
-							variant="ghost"
-							size="icon"
-							:aria-label="__('Loyalty Program')"
-							@click="customerStore.showLoyaltyDialog = true"
-						>
-							<Gift class="size-5!" />
-						</Button>
-					</TooltipWrapper>
-					<TooltipWrapper v-if="cartStore.customer" :content="__('Edit Customer')">
-						<Button
-							variant="ghost"
-							size="icon"
-							:aria-label="__('Edit Customer')"
-							@click="handleEditCustomer"
-						>
-							<Pencil class="size-5!" />
-						</Button>
-					</TooltipWrapper>
-					<Button
-						variant="secondary"
-						class="h-10 shrink-0 rounded-xl border-transparent bg-accent px-4 font-semibold text-accent-foreground hover:bg-accent/80"
-						@click="handleCustomerClick"
-					>
-						{{ cartStore.customer ? __("Change") : __("Select") }}
-					</Button>
-				</template>
-			</div>
-
-			<div
-				v-if="showCreditInfo"
-				class="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-xl border px-3 py-2 text-sm"
-				:class="
-					isOverCreditLimit
-						? 'border-destructive/30 bg-destructive-soft text-destructive-soft-foreground'
-						: 'border-border bg-surface-sunken'
-				"
-			>
-				<span>
-					<span class="text-muted-foreground">{{ __("Balance") }}</span>
-					<span class="ms-1.5 font-bold tabular-nums">{{ money(customerBalance ?? 0) }}</span>
-				</span>
-				<span>
-					<span class="text-muted-foreground">{{ __("Credit Limit") }}</span>
-					<span class="ms-1.5 font-bold tabular-nums">
-						{{ customerCreditLimit > 0 ? money(customerCreditLimit) : __("No Limit") }}
-					</span>
-				</span>
-				<p v-if="isOverCreditLimit" class="flex w-full items-center gap-1.5 text-xs font-semibold">
-					<AlertTriangle class="w-3.5 h-3.5 shrink-0" />
-					{{
-						__("This sale exceeds the credit limit by {0}", [
-							money(projectedBalance - customerCreditLimit),
-						])
-					}}
-				</p>
 			</div>
 		</div>
 
@@ -163,7 +185,7 @@
 				class="h-full"
 			/>
 
-			<div v-else class="space-y-3 py-1">
+			<div v-else class="space-y-2 py-1">
 				<CartItem
 					v-for="(item, index) in cartStore.items"
 					:key="
@@ -188,48 +210,53 @@
 		</div>
 
 		<div
-			v-if="posStore.displayAdditionalNotes && !cartStore.isEmpty"
-			class="shrink-0 px-4 py-2 border-t border-border"
+			v-if="(cartStore.hasOffers || posStore.displayAdditionalNotes) && !cartStore.isEmpty"
+			class="shrink-0 space-y-2 border-t border-border px-4 py-2"
 		>
+			<div v-if="cartStore.hasOffers" class="flex flex-wrap gap-1.5" data-testid="cart-offers">
+				<span
+					v-for="offer in cartStore.appliedOffers"
+					:key="offer.name"
+					class="inline-flex max-w-full items-center gap-1 rounded-lg border border-success/30 bg-success-soft py-0.5 ps-2 pe-0.5 text-xs font-medium text-success-soft-foreground"
+				>
+					<Ticket class="size-3.5 shrink-0" aria-hidden="true" />
+					<span class="truncate">{{ offer.offer_name || offer.name }}</span>
+					<button
+						type="button"
+						class="rounded-md p-0.5 hover:bg-success/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+						:aria-label="__('Remove offer {0}', [String(offer.offer_name || offer.name)])"
+						@click="cartStore.removeOffer(offer.name)"
+					>
+						<X class="size-3.5" />
+					</button>
+				</span>
+				<span
+					v-if="cartStore.appliedCoupon"
+					class="inline-flex max-w-full items-center gap-1 rounded-lg border border-info/30 bg-info-soft py-0.5 ps-2 pe-0.5 text-xs font-medium text-info-soft-foreground"
+				>
+					<Ticket class="size-3.5 shrink-0" aria-hidden="true" />
+					<span class="truncate">
+						{{ __("Coupon") }}:
+						{{ cartStore.appliedCoupon.coupon_code || cartStore.appliedCoupon.name }}
+					</span>
+					<button
+						type="button"
+						class="rounded-md p-0.5 hover:bg-info/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+						:aria-label="__('Remove coupon')"
+						@click="cartStore.removeCoupon()"
+					>
+						<X class="size-3.5" />
+					</button>
+				</span>
+			</div>
 			<textarea
+				v-if="posStore.displayAdditionalNotes"
 				v-model="cartStore.orderNotes"
-				rows="2"
-				placeholder="Add order notes..."
-				class="w-full text-xs rounded-md border border-input bg-background px-3 py-1.5 ring-offset-background focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+				rows="1"
+				:placeholder="__('Add order notes...')"
+				:aria-label="__('Order notes')"
+				class="block w-full resize-none rounded-xl border border-border bg-card px-3 py-1.5 text-sm shadow-inset focus:outline-none focus:ring-4 focus:ring-primary/12"
 			/>
-		</div>
-
-		<div v-if="cartStore.hasOffers && !cartStore.isEmpty" class="shrink-0 px-4 pb-2 space-y-1">
-			<div
-				v-for="offer in cartStore.appliedOffers"
-				:key="offer.name"
-				class="flex items-center justify-between bg-emerald-500/5 border border-emerald-500/20 rounded-lg px-3 py-1.5 text-xs"
-			>
-				<span class="text-emerald-700 dark:text-emerald-400 font-medium">
-					{{ offer.offer_name || offer.name }}
-				</span>
-				<button
-					@click="cartStore.removeOffer(offer.name)"
-					class="text-muted-foreground hover:text-destructive"
-				>
-					<X class="w-3.5 h-3.5" />
-				</button>
-			</div>
-			<div
-				v-if="cartStore.appliedCoupon"
-				class="flex items-center justify-between bg-violet-500/5 border border-violet-500/20 rounded-lg px-3 py-1.5 text-xs"
-			>
-				<span class="text-violet-700 dark:text-violet-400 font-medium">
-					{{ __("Coupon") }}:
-					{{ cartStore.appliedCoupon.coupon_code || cartStore.appliedCoupon.name }}
-				</span>
-				<button
-					@click="cartStore.removeCoupon()"
-					class="text-muted-foreground hover:text-destructive"
-				>
-					<X class="w-3.5 h-3.5" />
-				</button>
-			</div>
 		</div>
 
 		<CartSummary />
@@ -248,10 +275,22 @@ import CartItem from "./CartItem.vue";
 import CartSummary from "./CartSummary.vue";
 import { Button } from "@/components/ui/button";
 import { Autocomplete } from "@/components/ui/autocomplete";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Popover, PopoverContentStyled, PopoverMenuItem, PopoverTrigger } from "@/components/ui/popover";
 import { EmptyState } from "@/components/ui/state";
-import { TooltipWrapper } from "@/components/ui/tooltip";
-import { ShoppingCart, User, RotateCcw, X, Lock, Gift, Pencil, AlertTriangle } from "lucide-vue-next";
+import {
+	ShoppingCart,
+	User,
+	RotateCcw,
+	X,
+	Lock,
+	Gift,
+	Pencil,
+	AlertTriangle,
+	MoreHorizontal,
+	Ticket,
+} from "lucide-vue-next";
+import { initials } from "@/lib/utils";
 import __ from "@/lib/translate";
 import CustomerEditDialog from "@/components/dialogs/CustomerEditDialog.vue";
 
@@ -261,6 +300,13 @@ const customerStore = useCustomerStore();
 const { money, qty } = useMoney();
 
 const cartScrollContainer = ref<HTMLElement | null>(null);
+const customerMenuOpen = ref(false);
+const customerInitials = computed(() => initials(cartStore.customerName));
+
+function runCustomerAction(action: () => unknown) {
+	customerMenuOpen.value = false;
+	action();
+}
 
 onMounted(() => {
 	window.addEventListener("xpos:focus-cart-item", handleFocusCartItem);

@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, type Router } from "vue-router";
 import { isElectron } from "@/services/electronBridge";
 import { clearCachedData } from "@/services/dbBridge";
 import { isOnline } from "@/utils";
@@ -7,6 +7,17 @@ import { showError, showSuccess } from "@/services/api";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePosStore } from "@/stores/posStore";
 import { hasPermission } from "@/services/userRights";
+
+export const commandSearchRequested = ref(false);
+
+export async function openCommandSearchOnPos(router: Router): Promise<void> {
+	if (router.currentRoute.value.path === "/pos") {
+		window.dispatchEvent(new CustomEvent("xpos:open-command-search"));
+		return;
+	}
+	commandSearchRequested.value = true;
+	await router.push("/pos");
+}
 
 export interface Shortcut {
 	id: string;
@@ -59,6 +70,20 @@ export function useKeyboardShortcuts() {
 			action: () => {
 				window.dispatchEvent(new CustomEvent("xpos:clear-cart"));
 				router.push("/pos");
+			},
+		},
+		{
+			id: "command-search",
+			keys: ["ctrl", "k"],
+			description: "Search Items, Pages and Actions",
+			category: "General",
+			global: true,
+			action: () => {
+				if (router.currentRoute.value.path === "/pos") {
+					window.dispatchEvent(new CustomEvent("xpos:toggle-command-search"));
+					return;
+				}
+				void openCommandSearchOnPos(router);
 			},
 		},
 		{

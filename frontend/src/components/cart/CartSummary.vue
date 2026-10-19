@@ -1,17 +1,37 @@
 <template>
-	<div class="shrink-0 space-y-2.5 border-t border-border px-4 pt-3 pb-3">
+	<div class="shrink-0 space-y-2.5 border-t border-border px-4 pt-2.5 pb-3" data-testid="cart-summary">
 		<div
-			v-if="cartStore.pricingSource === 'offline'"
-			class="flex items-center gap-1.5 text-[11px] text-amber-700 dark:text-amber-400"
+			v-if="!offlineStore.isOnline"
+			class="flex items-start gap-2 rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning-soft-foreground"
+			role="status"
+			data-testid="offline-strip"
 		>
-			<WifiOff class="w-3 h-3 shrink-0" />
+			<WifiOff class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+			<div class="min-w-0">
+				<p class="font-semibold">
+					{{ __("Offline: this sale is saved on this till and synced later.") }}
+				</p>
+				<p v-if="offlineRestrictions.length">
+					{{ __("Needs a connection: {0}.", [offlineRestrictions.join(", ")]) }}
+				</p>
+				<p v-if="cartStore.pricingSource === 'offline'">
+					{{ __("Prices calculated offline, will be confirmed when the invoice syncs") }}
+				</p>
+			</div>
+		</div>
+		<div
+			v-else-if="cartStore.pricingSource === 'offline'"
+			class="flex items-center gap-1.5 text-xs text-warning-soft-foreground"
+			role="status"
+		>
+			<WifiOff class="size-3.5 shrink-0" aria-hidden="true" />
 			{{ __("Prices calculated offline, will be confirmed when the invoice syncs") }}
 		</div>
 
 		<div
 			v-if="cartStore.repriceReview"
 			role="alert"
-			class="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-[11px] text-sky-900 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-200 space-y-1.5"
+			class="space-y-1.5 rounded-xl border border-info/30 bg-info-soft px-3 py-2 text-xs text-info-soft-foreground"
 		>
 			<p class="font-semibold">{{ __("Prices changed - nothing was charged or saved") }}</p>
 			<p>
@@ -22,161 +42,180 @@
 					)
 				}}
 			</p>
-			<Button
-				size="sm"
-				variant="outline"
-				class="h-7 text-[11px]"
-				@click="cartStore.acknowledgeRepricing()"
-			>
+			<Button size="sm" variant="outline" @click="cartStore.acknowledgeRepricing()">
 				{{ __("I have reviewed the new prices") }}
 			</Button>
 		</div>
 
-		<div class="space-y-1 px-1 text-sm">
+		<div
+			v-if="pendingList.length"
+			class="rounded-xl border px-3 py-2 text-xs"
+			:class="
+				hasBlockers
+					? 'border-warning/30 bg-warning-soft text-warning-soft-foreground'
+					: 'border-info/25 bg-info-soft text-info-soft-foreground'
+			"
+			:role="hasBlockers ? 'alert' : 'status'"
+			data-testid="checkout-requirements"
+		>
+			<p id="checkout-requirements-title" class="mb-1 flex items-center gap-1.5 text-sm font-semibold">
+				<AlertTriangle class="size-4 shrink-0" aria-hidden="true" />
+				{{ hasBlockers ? __("Before payment") : __("Check before payment") }}
+			</p>
+			<ul class="space-y-0.5">
+				<li v-for="(entry, i) in pendingList" :key="i">
+					<button
+						v-if="entry.index !== undefined"
+						type="button"
+						class="text-start underline decoration-current/40 underline-offset-2 hover:decoration-current focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+						@click="focusLine(entry.index)"
+					>
+						{{ entry.message }}
+					</button>
+					<span v-else>{{ entry.message }}</span>
+				</li>
+			</ul>
+		</div>
+
+		<dl class="space-y-1 px-1 text-sm" data-testid="cart-totals">
 			<div class="flex items-center justify-between">
-				<span class="text-foreground">
+				<dt class="text-foreground">
 					{{ __("Subtotal") }}
 					<span class="text-muted-foreground">({{ itemsLabel }})</span>
-				</span>
-				<span class="font-semibold text-foreground tabular-nums">
-					{{ money(cartStore.subtotal) }}
-				</span>
+				</dt>
+				<dd class="font-semibold text-foreground tabular-nums">{{ money(cartStore.subtotal) }}</dd>
 			</div>
 
 			<div v-if="!hasAnyDiscount" class="flex items-center justify-between">
-				<span class="text-muted-foreground">{{ __("Discount") }}</span>
-				<span class="font-medium text-foreground tabular-nums">{{ money(0) }}</span>
+				<dt class="text-muted-foreground">{{ __("Discount") }}</dt>
+				<dd class="font-medium text-foreground tabular-nums">{{ money(0) }}</dd>
 			</div>
-
-			<div v-if="cartStore.calculatedTaxes.length === 0" class="flex items-center justify-between">
-				<span class="text-muted-foreground">{{ __("Tax") }}</span>
-				<span class="font-medium text-foreground tabular-nums">{{ money(0) }}</span>
-			</div>
-
-			<div v-if="itemDiscountTotal > 0" class="flex items-center justify-between text-sm">
-				<span class="text-muted-foreground flex items-center gap-1">
-					<Percent class="w-3 h-3" /> {{ __("Item Discounts") }}
-				</span>
-				<span class="font-medium text-emerald-600 dark:text-emerald-400">
+			<div v-if="itemDiscountTotal > 0" class="flex items-center justify-between">
+				<dt class="flex items-center gap-1 text-muted-foreground">
+					<Percent class="size-3" aria-hidden="true" /> {{ __("Item Discounts") }}
+				</dt>
+				<dd class="font-medium text-success-soft-foreground tabular-nums">
 					-{{ money(itemDiscountTotal) }}
-				</span>
+				</dd>
 			</div>
-
-			<template v-if="cartStore.calculatedTaxes.length > 0">
-				<div
-					v-for="(tax, idx) in cartStore.calculatedTaxes"
-					:key="idx"
-					class="flex items-center justify-between text-sm"
-				>
-					<span class="text-muted-foreground flex items-center gap-1">
-						{{ tax.description }}
-						<span v-if="tax.rate" class="text-xs text-muted-foreground/70"
-							>({{ percent(tax.rate) }})</span
-						>
-						<span v-if="tax.included_in_print_rate" class="text-[10px] text-blue-500">{{
-							__("incl.")
-						}}</span>
-					</span>
-					<span
-						class="font-medium"
-						:class="
-							tax.included_in_print_rate
-								? 'text-blue-600 dark:text-blue-400'
-								: 'text-foreground'
-						"
-					>
-						{{ formatTaxAmount(tax.amount, tax.included_in_print_rate, money) }}
-					</span>
-				</div>
-			</template>
-
-			<div
-				v-if="cartStore.offerItemDiscountTotal > 0"
-				class="flex items-center justify-between text-sm"
-			>
-				<span class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-					<Ticket class="w-3 h-3" /> {{ __("Offer Discount") }}
-				</span>
-				<span class="font-medium text-emerald-600 dark:text-emerald-400">
+			<div v-if="cartStore.offerItemDiscountTotal > 0" class="flex items-center justify-between">
+				<dt class="flex items-center gap-1 text-success-soft-foreground">
+					<Ticket class="size-3" aria-hidden="true" /> {{ __("Offer Discount") }}
+				</dt>
+				<dd class="font-medium text-success-soft-foreground tabular-nums">
 					-{{ money(cartStore.offerItemDiscountTotal) }}
-				</span>
+				</dd>
 			</div>
-
-			<div
-				v-if="cartStore.offerGrandTotalDiscountPct > 0"
-				class="flex items-center justify-between text-sm"
-			>
-				<span class="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-					<Ticket class="w-3 h-3" /> {{ __("Offer") }}
+			<div v-if="cartStore.offerGrandTotalDiscountPct > 0" class="flex items-center justify-between">
+				<dt class="flex items-center gap-1 text-success-soft-foreground">
+					<Ticket class="size-3" aria-hidden="true" /> {{ __("Offer") }}
 					<span class="text-xs">({{ percent(cartStore.offerGrandTotalDiscountPct) }})</span>
-				</span>
-				<span class="font-medium text-emerald-600 dark:text-emerald-400">
+				</dt>
+				<dd class="font-medium text-success-soft-foreground tabular-nums">
 					-{{ money(grandTotalOfferDiscount) }}
-				</span>
+				</dd>
 			</div>
-
 			<div
 				v-if="cartStore.discountPercentage > 0 || cartStore.discountAmount > 0"
-				class="flex items-center justify-between text-sm"
+				class="flex items-center justify-between"
 			>
-				<span class="text-muted-foreground flex items-center gap-1">
-					<Tag class="w-3 h-3" />
+				<dt class="flex items-center gap-1 text-muted-foreground">
+					<Tag class="size-3" aria-hidden="true" />
 					{{ __("Additional Discount") }}
 					<span
 						v-if="cartStore.discountPercentage > 0"
-						class="text-xs text-emerald-600 dark:text-emerald-400"
+						class="text-xs text-success-soft-foreground"
 					>
 						({{ percent(cartStore.discountPercentage) }})
 					</span>
-				</span>
-				<span class="font-medium text-emerald-600 dark:text-emerald-400">
+				</dt>
+				<dd class="font-medium text-success-soft-foreground tabular-nums">
 					-{{ money(discountValue) }}
-				</span>
+				</dd>
+			</div>
+
+			<div v-if="cartStore.calculatedTaxes.length === 0" class="flex items-center justify-between">
+				<dt class="text-muted-foreground">{{ __("Tax") }}</dt>
+				<dd class="font-medium text-foreground tabular-nums">{{ money(0) }}</dd>
+			</div>
+			<div
+				v-for="(tax, idx) in cartStore.calculatedTaxes"
+				:key="idx"
+				class="flex items-center justify-between"
+				data-testid="cart-tax-row"
+			>
+				<dt class="flex items-center gap-1 text-muted-foreground">
+					{{ tax.description }}
+					<span v-if="tax.rate" class="text-xs text-muted-foreground/70"
+						>({{ percent(tax.rate) }})</span
+					>
+					<span
+						v-if="tax.included_in_print_rate"
+						class="text-[0.625rem] font-semibold uppercase text-info-soft-foreground"
+					>
+						{{ __("incl.") }}
+					</span>
+				</dt>
+				<dd
+					class="font-medium tabular-nums"
+					:class="tax.included_in_print_rate ? 'text-info-soft-foreground' : 'text-foreground'"
+				>
+					{{ formatTaxAmount(tax.amount, tax.included_in_print_rate, money) }}
+				</dd>
 			</div>
 
 			<div
 				v-if="cartStore.redeemLoyaltyPoints && cartStore.loyaltyAmount > 0"
-				class="flex items-center justify-between text-sm"
+				class="flex items-center justify-between"
 			>
-				<span class="text-violet-600 dark:text-violet-400 flex items-center gap-1">
-					<Gift class="w-3.5 h-3.5" /> {{ __("Loyalty") }}
-				</span>
-				<span class="font-medium text-violet-600 dark:text-violet-400">
+				<dt class="flex items-center gap-1 text-muted-foreground">
+					<Gift class="size-3.5" aria-hidden="true" /> {{ __("Loyalty") }}
+				</dt>
+				<dd class="font-medium text-success-soft-foreground tabular-nums">
 					-{{ money(cartStore.loyaltyAmount) }}
-				</span>
+				</dd>
 			</div>
-
-			<div v-if="cartStore.writeOffAmount > 0" class="flex items-center justify-between text-sm">
-				<span class="text-muted-foreground">{{ __("Write Off") }}</span>
-				<span class="font-medium text-amber-600 dark:text-amber-400">
+			<div v-if="cartStore.writeOffAmount > 0" class="flex items-center justify-between">
+				<dt class="text-muted-foreground">{{ __("Write Off") }}</dt>
+				<dd class="font-medium text-warning-soft-foreground tabular-nums">
 					-{{ money(cartStore.writeOffAmount) }}
-				</span>
+				</dd>
 			</div>
-
-			<div v-if="cartStore.selectedDeliveryCharge" class="flex items-center justify-between text-sm">
-				<span class="text-muted-foreground flex items-center gap-1">
-					<Truck class="w-3 h-3" /> {{ cartStore.selectedDeliveryCharge.label }}
-				</span>
-				<span class="font-medium text-foreground">
+			<div v-if="cartStore.selectedDeliveryCharge" class="flex items-center justify-between">
+				<dt class="flex items-center gap-1 text-muted-foreground">
+					<Truck class="size-3" aria-hidden="true" /> {{ cartStore.selectedDeliveryCharge.label }}
+				</dt>
+				<dd class="font-medium text-foreground tabular-nums">
 					+{{ money(cartStore.selectedDeliveryCharge.rate) }}
-				</span>
+				</dd>
+			</div>
+			<div v-if="hasRounding" class="flex items-center justify-between" data-testid="cart-rounding">
+				<dt class="text-muted-foreground">{{ __("Rounding") }}</dt>
+				<dd class="font-medium text-foreground tabular-nums">
+					{{ cartStore.roundingAdjustment > 0 ? "+" : "-"
+					}}{{ money(Math.abs(cartStore.roundingAdjustment)) }}
+				</dd>
 			</div>
 
-			<Separator class="my-2!" />
-
-			<div class="flex items-center justify-between">
-				<span class="text-lg font-bold text-foreground">{{ __("Total") }}</span>
-				<span
+			<div class="mt-1.5 flex items-baseline justify-between border-t border-border pt-2">
+				<dt class="text-lg font-bold text-foreground">
+					{{ cartStore.isReturnMode ? __("Refund") : __("Total") }}
+				</dt>
+				<dd
 					class="text-2xl font-extrabold tracking-tight tabular-nums"
-					:class="cartStore.isReturnMode ? 'text-warning' : 'text-primary dark:text-focus'"
+					:class="
+						cartStore.isReturnMode
+							? 'text-warning-soft-foreground'
+							: 'text-primary dark:text-focus'
+					"
 					data-testid="cart-grand-total"
 				>
 					{{ cartStore.isReturnMode ? "-" : "" }}{{ money(Math.abs(cartStore.grandTotal)) }}
-				</span>
+				</dd>
 			</div>
-		</div>
+		</dl>
 
-		<div class="grid auto-cols-fr grid-flow-col gap-2.5">
+		<div class="grid auto-cols-fr grid-flow-col gap-2">
 			<TooltipWrapper :content="__('Hold sale')" shortcut="Ctrl+H">
 				<Button
 					variant="outline"
@@ -228,6 +267,7 @@
 							</Button>
 						</div>
 						<NumberInput
+							ref="discountInputRef"
 							v-model="discountInput"
 							:min="0"
 							:max="discountType === 'percentage' ? 100 : undefined"
@@ -402,12 +442,13 @@
 		</div>
 
 		<Button
-			class="relative h-14 w-full gap-3 rounded-2xl text-lg font-bold"
+			class="relative h-14 w-full gap-3 rounded-2xl text-lg font-bold shadow-primary transition-[transform,box-shadow,background-color] duration-fast active:translate-y-px active:shadow-pressed"
 			:class="
 				cartStore.isReturnMode &&
 				'border-warning bg-warning text-warning-foreground shadow-raised hover:bg-warning/90'
 			"
-			:disabled="cartStore.isEmpty || !cartStore.customer"
+			:disabled="payDisabled"
+			:aria-describedby="hasBlockers ? 'checkout-requirements-title' : undefined"
 			data-testid="pay-button"
 			@click="handleCheckout()"
 		>
@@ -423,7 +464,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { hasPermission } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
@@ -456,6 +497,7 @@ import {
 	WifiOff,
 	X,
 	MoreHorizontal,
+	AlertTriangle,
 } from "lucide-vue-next";
 import type { DeliveryCharge } from "@/types/pos.types";
 import { useMoney } from "@/composables/useMoney";
@@ -569,21 +611,112 @@ const discountValue = computed(() => {
 	return cartStore.discountAmount;
 });
 
+const blockingCount = computed(() => cartStore.pendingRequirements.filter((r) => r.blocking).length);
+const hasBlockers = computed(() => blockingCount.value > 0);
+
+/** Serial/batch notes point at their line; pricing issues are listed as text. */
+const pendingList = computed(() => {
+	const entries: { message: string; index?: number }[] = cartStore.pricingIssues.map((message) => ({
+		message,
+	}));
+	// one line per kind; the rows carry the detail, this only points at the first one
+	const serials = cartStore.pendingRequirements.filter((r) => r.kind === "serial");
+	const batches = cartStore.pendingRequirements.filter((r) => r.kind === "batch");
+	if (serials.length) {
+		entries.push({
+			index: serials[0].index,
+			message:
+				serials.length === 1
+					? serials[0].message
+					: __("Choose serial numbers on {0} lines", [serials.length]),
+		});
+	}
+	if (batches.length) {
+		entries.push({
+			index: batches[0].index,
+			message:
+				batches.length === 1 ? batches[0].message : __("{0} lines have no batch", [batches.length]),
+		});
+	}
+	return entries;
+});
+
+const payDisabled = computed(() => cartStore.isEmpty || !cartStore.customer || hasBlockers.value);
+
+const hasRounding = computed(() => Math.abs(cartStore.roundingAdjustment) >= 0.005);
+
+/** What a dropped connection takes away on this profile, named so the cashier is not surprised. */
+const offlineRestrictions = computed(() => {
+	const needs: string[] = [];
+	if (posStore.giftCardMode || canSellGiftCards.value) needs.push(__("gift cards"));
+	if (posStore.useCustomerCredit) needs.push(__("customer credit"));
+	if (posStore.allowCouponEntry) needs.push(__("coupons"));
+	return needs;
+});
+
+function focusLine(index: number) {
+	const row = document.querySelector<HTMLElement>(`[data-cart-index="${index}"]`);
+	row?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+	row?.focus();
+}
+
 const payButtonLabel = computed(() => {
 	if (cartStore.isEmpty) return __("Add items to pay");
 	if (!cartStore.customer) return __("Select customer first");
+	if (hasBlockers.value) {
+		return blockingCount.value === 1
+			? __("Choose serial for 1 line")
+			: __("Choose serials for {0} lines", [blockingCount.value]);
+	}
 	if (posStore.enableCashierSettlement && !cartStore.isReturnMode) return __("Send to Cashier");
 	const amt = `${money(Math.abs(cartStore.grandTotal))}`;
 	return cartStore.isReturnMode ? __("Process Return {0}", [amt]) : __("Pay {0}", [amt]);
 });
 
 function handleCheckout() {
+	if (cartStore.isEmpty) return;
 	if (posStore.enableCashierSettlement && !cartStore.isReturnMode) {
+		if (hasBlockers.value) {
+			showError(cartStore.checkoutBlockers.join("\n"));
+			return;
+		}
 		sendToCashier();
 		return;
 	}
-	cartStore.openPaymentDialog();
+	const opened = cartStore.openPaymentDialog();
+	if (!opened.success) showError(opened.message);
 }
+
+const discountInputRef = ref<InstanceType<typeof NumberInput> | null>(null);
+
+function openDiscount() {
+	if (!hasPermission("apply_additional_discount") || cartStore.isEmpty) return;
+	showDiscount.value = true;
+	nextTick(() => setTimeout(() => discountInputRef.value?.focus()));
+}
+
+// F4 / menu "Process Payment" and Ctrl+H come here, so they behave exactly like the buttons.
+function onCheckoutRequest(event: Event) {
+	event.preventDefault();
+	handleCheckout();
+}
+
+function onHoldRequest(event: Event) {
+	event.preventDefault();
+	void holdOrder();
+}
+
+onMounted(() => {
+	window.addEventListener("xpos:checkout", onCheckoutRequest);
+	window.addEventListener("xpos:hold-sale", onHoldRequest);
+	window.addEventListener("xpos:focus-discount", openDiscount);
+});
+
+onUnmounted(() => {
+	window.removeEventListener("xpos:checkout", onCheckoutRequest);
+	window.removeEventListener("xpos:hold-sale", onHoldRequest);
+	window.removeEventListener("xpos:focus-discount", openDiscount);
+});
 
 function applyDiscount() {
 	cartStore.setDiscount(discountType.value as "percentage" | "amount", discountInput.value || 0);
