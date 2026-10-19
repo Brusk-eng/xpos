@@ -30,7 +30,6 @@ vi.mock("@/services/api", () => ({
 	showError: vi.fn(),
 	showInfo: vi.fn(),
 }));
-vi.mock("@/services/electronBridge", () => ({ isElectron: () => false }));
 vi.mock("@/utils", () => ({
 	isOnline: () => online.value,
 	isNetworkError: () => false,

@@ -80,52 +80,6 @@ jobs:
             echo "No new release was created."
           fi
 
-  build-windows:
-    name: Build & Publish Windows Installer
-    needs: release
-    if: needs.release.outputs.released == 'true'
-    runs-on: windows-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
-    env:
-      RELEASE_AUTH_TOKEN: ${{ secrets.RELEASE_TOKEN != '' && secrets.RELEASE_TOKEN || github.token }}
-      APP_VERSION: ${{ needs.release.outputs.version }}
-    steps:
-      - name: Checkout release commit
-        uses: actions/checkout@v7
-        with:
-          ref: version-16
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: 20
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: yarn install --frozen-lockfile
-
-      - name: Build Electron bundle
-        working-directory: frontend
-        run: yarn build:electron
-
-      - name: Build & publish Windows installer
-        working-directory: frontend
-        env:
-          GH_TOKEN: ${{ env.RELEASE_AUTH_TOKEN }}
-        run: >-
-          npx electron-builder --win --publish always
-          --config.extraMetadata.version=${{ env.APP_VERSION }}
-
-      - name: Summary
-        run: |
-          echo "Published X POS ${{ env.APP_VERSION }} Windows installer to the v${{ env.APP_VERSION }} release." >> "$GITHUB_STEP_SUMMARY"
-
   release-notes:
     name: Release Notes
     needs: release

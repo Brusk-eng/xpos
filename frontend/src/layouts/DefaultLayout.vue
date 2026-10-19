@@ -1,7 +1,6 @@
 <template>
 	<div class="flex flex-col h-dvh overflow-hidden">
-		<MenuBar v-if="isElectron()" />
-		<Navbar v-else />
+		<Navbar />
 		<div class="flex-1 relative overflow-hidden">
 			<Sidebar />
 			<main class="h-full overflow-hidden">
@@ -10,7 +9,6 @@
 		</div>
 
 		<nav
-			v-if="!isElectron()"
 			class="safe-bottom z-40 shrink-0 border-t border-border bg-card/95 backdrop-blur-md md:hidden"
 			:aria-label="__('Main')"
 		>
@@ -46,8 +44,6 @@
 <script setup lang="ts">
 import Navbar from "@/components/Navbar.vue";
 import Sidebar from "@/components/Sidebar.vue";
-import MenuBar from "@/components/MenuBar.vue";
-import { isElectron } from "@/services/electronBridge";
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { LayoutGrid, FileText, BarChart3, AlignJustify, ScrollText } from "lucide-vue-next";

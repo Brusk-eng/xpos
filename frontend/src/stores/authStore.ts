@@ -1,5 +1,4 @@
 import { call } from "@/services/api";
-import { isElectron } from "@/services/electronBridge";
 import { loadPermissions, resetPermissions } from "@/services/userRights";
 import { UserSession } from "@/types/pos.types";
 import { defineStore } from "pinia";
@@ -19,7 +18,6 @@ export const useAuthStore = defineStore("auth", () => {
 	const user = ref<UserSession | null>(null);
 	const error = ref("");
 	const resetEmailSent = ref(false);
-	const isOfflineAuth = ref(false);
 
 	const userName = computed(() => user.value?.user || "Guest");
 	const userEmail = computed(() => user.value?.user_email || "");
@@ -37,10 +35,6 @@ export const useAuthStore = defineStore("auth", () => {
 			isLoading.value = true;
 			error.value = "";
 
-			if (isElectron()) {
-				return await checkOfflineAuth();
-			}
-
 			const response = await call("frappe.auth.get_logged_user");
 
 			if (!response) {
@@ -52,7 +46,6 @@ export const useAuthStore = defineStore("auth", () => {
 
 			if (loggedUser && loggedUser !== "Guest") {
 				isAuthenticated.value = true;
-				isOfflineAuth.value = false;
 				if (window.xpos) {
 					const bootUserInfo = xpos?.boot?.user_info[loggedUser] as any;
 					user.value = {
@@ -82,47 +75,10 @@ export const useAuthStore = defineStore("auth", () => {
 		}
 	}
 
-	async function checkOfflineAuth(): Promise<boolean> {
-		try {
-			const lastUser = await window.electronAPI!.db.getSetting("last_logged_user");
-			if (!lastUser) return false;
-
-			const posUser = (await window.electronAPI!.db.getPosUser(lastUser)) as Record<
-				string,
-				unknown
-			> | null;
-			if (!posUser || posUser.enabled === 0 || posUser.enabled === false) {
-				return false;
-			}
-
-			isAuthenticated.value = true;
-			isOfflineAuth.value = true;
-			user.value = {
-				user: lastUser,
-				user_email: (posUser.email as string) || lastUser,
-				user_fullname: (posUser.full_name as string) || lastUser,
-			};
-
-			window
-				.electronAPI!.startSyncEngine()
-				.catch((err) => console.warn("[XPOS] startSyncEngine error:", err));
-
-			await loadPermissions(lastUser);
-			return true;
-		} catch (err) {
-			console.error("Offline auth check failed:", err);
-			return false;
-		}
-	}
-
 	async function login(username: string, password: string): Promise<boolean> {
 		try {
 			isLoading.value = true;
 			error.value = "";
-
-			if (isElectron()) {
-				return await loginOffline(username, password);
-			}
 
 			await call("login", {
 				usr: username,
@@ -130,7 +86,6 @@ export const useAuthStore = defineStore("auth", () => {
 			});
 
 			isAuthenticated.value = true;
-			isOfflineAuth.value = false;
 			user.value = {
 				user: username,
 				user_email: username,
@@ -144,55 +99,6 @@ export const useAuthStore = defineStore("auth", () => {
 			return false;
 		} finally {
 			isLoading.value = false;
-		}
-	}
-
-	async function loginOffline(username: string, password: string): Promise<boolean> {
-		try {
-			const posUser = await window.electronAPI!.db.getPosUser(username);
-			if (!posUser) {
-				error.value = "User not found. Check your username.";
-				return false;
-			}
-
-			const userData = posUser as Record<string, unknown>;
-			if (!userData.password_hash) {
-				error.value = "No password configured for this user.";
-				return false;
-			}
-
-			const valid = await window.electronAPI!.db.verifyPassword(username, password);
-			if (!valid) {
-				error.value = "Invalid password";
-				return false;
-			}
-
-			isAuthenticated.value = true;
-			isOfflineAuth.value = true;
-			user.value = {
-				user: username,
-				user_email: (userData.email as string) || username,
-				user_fullname: (userData.full_name as string) || username,
-			};
-
-			await window.electronAPI!.db.setSetting("last_logged_user", username, "auth");
-			window
-				.electronAPI!.startSyncEngine()
-				.then((result) => {
-					if (!result.success) {
-						console.warn("[XPOS] Sync engine start failed:", result.error);
-					}
-				})
-				.catch((err) => {
-					console.warn("[XPOS] startSyncEngine error:", err);
-				});
-
-			await loadPermissions(username);
-			return true;
-		} catch (err) {
-			console.error("Login failed:", err);
-			error.value = friendlyMessage(err, "Could not sign in. Please try again.");
-			return false;
 		}
 	}
 
@@ -219,26 +125,13 @@ export const useAuthStore = defineStore("auth", () => {
 		try {
 			isLoading.value = true;
 
-			if (!isOfflineAuth.value) {
-				await call("logout");
-			}
+			await call("logout");
 
 			isAuthenticated.value = false;
-			isOfflineAuth.value = false;
 			user.value = null;
 			resetPermissions();
 
-			if (isElectron()) {
-				try {
-					await window.electronAPI!.db.setSetting("last_logged_user", "", "auth");
-				} catch {
-					/* ignore */
-				}
-				window.location.hash = "#/login";
-				window.location.reload();
-			} else {
-				window.location.href = "/xpos/login";
-			}
+			window.location.href = "/xpos/login";
 		} catch (err) {
 			console.error("Logout failed:", err);
 		} finally {
@@ -253,7 +146,6 @@ export const useAuthStore = defineStore("auth", () => {
 	function $reset(): void {
 		isLoading.value = false;
 		isAuthenticated.value = false;
-		isOfflineAuth.value = false;
 		user.value = null;
 		error.value = "";
 		resetEmailSent.value = false;
@@ -263,7 +155,6 @@ export const useAuthStore = defineStore("auth", () => {
 	return {
 		isLoading,
 		isAuthenticated,
-		isOfflineAuth,
 		user,
 		error,
 		resetEmailSent,

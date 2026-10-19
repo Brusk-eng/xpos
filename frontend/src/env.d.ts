@@ -60,7 +60,6 @@ declare global {
 		__: (txt: string, args?: (string | number)[]) => string;
 		__xposBundlePromise?: Promise<unknown>;
 		xpos?: XPosGlobal;
-		electronAPI?: import("@/services/electronBridge").ElectronAPI;
 		locals?: Locals;
 	}
 }

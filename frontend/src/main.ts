@@ -5,13 +5,12 @@ import App from "./App.vue";
 import { router } from "./router";
 import { showError } from "@/services/api";
 import { captureError } from "@/services/errorLog";
-import { isElectron, getApiBaseUrl, warmApiCredentials } from "@/services/electronBridge";
 import { usePosStore } from "./stores/posStore";
 import { initializeNamespaces } from "./utils";
 import { dayjs } from "@/utils/datetime";
 import translate from "./lib/translate";
 
-if (!isElectron() && import.meta.env.PROD) {
+if (import.meta.env.PROD) {
 	if ("serviceWorker" in navigator) {
 		navigator.serviceWorker
 			.register("/xpos/sw.js", { scope: "/xpos/" })
@@ -42,25 +41,9 @@ if (!isElectron() && import.meta.env.PROD) {
 				console.error("[XPOS PWA] Service worker registration failed:", error);
 			});
 	}
-} else {
-	getApiBaseUrl().then((url) => {
-		console.log("[XPOS Electron] Server URL:", url);
-	});
-	warmApiCredentials().then(() => {
-		console.log("[XPOS Electron] API credentials cache warmed");
-	});
-	window.electronAPI?.onMainError?.((err) => {
-		captureError({
-			source: "main",
-			title: `Main process: ${err.message}`,
-			message: err.message,
-			traceback: err.stack,
-		});
-	});
 }
 
 async function initializeBrowserStorage(): Promise<void> {
-	if (isElectron()) return;
 	if (!usePosStore().useOfflineMode) return;
 
 	try {

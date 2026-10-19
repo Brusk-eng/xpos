@@ -11,7 +11,7 @@
 			"
 		>
 			<Search
-				class="pointer-events-none absolute start-3.5 size-5 text-muted-foreground"
+				class="pointer-events-none absolute inset-s-3.5 size-5 text-muted-foreground"
 				aria-hidden="true"
 			/>
 			<input
@@ -28,7 +28,7 @@
 				@keydown.down.prevent="emit('navigate', 'down')"
 				@keydown.up.prevent="emit('navigate', 'up')"
 			/>
-			<div class="absolute end-1.5 flex items-center gap-1">
+			<div class="absolute inset-e-1.5 flex items-center gap-1">
 				<Loader2
 					v-if="isScanning"
 					class="me-1 size-5 animate-spin text-muted-foreground"

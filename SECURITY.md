@@ -31,7 +31,7 @@ Instead, please email **ar.frappe.dev@gmail.com** with:
 
 The following are in scope:
 
-- The X POS application code (Python backend, Vue.js frontend, Electron desktop)
+- The X POS application code (Python backend and Vue.js frontend; the Electron desktop app only on the v16 line, since v3 removes it)
 - Authentication and authorization logic
 - Data handling and storage
 - API endpoints exposed by the app

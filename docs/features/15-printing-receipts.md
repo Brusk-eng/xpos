@@ -8,7 +8,8 @@ X POS supports configurable receipt printing with thermal printer compatibility,
 
 ### Print After Payment
 - When completing a payment, click **Save & Print** to create the invoice and immediately open a print preview
-- The print preview opens in a new browser window/tab
+- The print preview opens in a new browser window/tab, so allow pop-ups for the POS site
+- Printing goes through the browser's print dialog. X POS does not print silently to a fixed printer; that needs a browser kiosk setup (for example Chrome's `--kiosk-printing` flag) on the till
 - Uses the configured print format from the POS Profile's print settings
 
 ### Print Last Invoice

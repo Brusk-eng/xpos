@@ -15,10 +15,6 @@ vi.mock("@/services/dbBridge", () => ({
 	getCachedPOSData: vi.fn(),
 }));
 
-vi.mock("@/services/electronBridge", () => ({
-	isElectron: vi.fn(() => false),
-}));
-
 vi.mock("@/utils", () => ({
 	isOnline: vi.fn(() => true),
 	isNetworkError: vi.fn(() => false),

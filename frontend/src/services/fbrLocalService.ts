@@ -7,13 +7,11 @@
  * never from the server - so the client posts the payload to it, obtains the fiscal
  * invoice number, and finalizes the sale.
  *
- * Electron routes the request through the main process (no mixed-content/CORS limits).
- * The browser build calls the service directly with fetch; that requires the POS page
- * to be served over http (or the local service exposed over https with a permissive
- * CORS policy), otherwise the browser blocks the http://localhost request.
+ * The browser calls the service directly with fetch, so the local service must answer CORS
+ * (and, in Chrome, local-network-access) preflights for the POS origin; otherwise the browser
+ * blocks the http://localhost request. See docs/v3-browser-only.md.
  */
 
-import { isElectron } from "./electronBridge";
 import { call } from "./api";
 
 const LOCAL_SERVICE_PATH = "/api/IMSFiscal/GetInvoiceNumberByModel";
@@ -130,14 +128,6 @@ export async function fiscalizeViaLocalService(
 	payload: Record<string, unknown>,
 	baseUrl: string,
 ): Promise<LocalFiscalResult> {
-	if (isElectron() && window.electronAPI?.fbr?.fiscalizeLocal) {
-		const res = await window.electronAPI.fbr.fiscalizeLocal(buildUrl(baseUrl), payload);
-		if (!res.success) {
-			throw new Error(res.error || "Local FBR service request failed.");
-		}
-		return parseResult((res.data || {}) as LocalFiscalResponse);
-	}
-
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 	try {

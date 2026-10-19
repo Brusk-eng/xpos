@@ -18,7 +18,7 @@
 			<div class="space-y-4">
 				<div class="text-center py-4">
 					<p class="text-lg font-semibold text-foreground">
-						{{ isElectronEnv ? __("X POS Desktop") : __("X POS") }}
+						{{ __("X POS") }}
 					</p>
 					<p class="text-sm text-muted-foreground">
 						{{ __("Point of Sale Application for ERPNext") }}
@@ -50,21 +50,9 @@
 						<span class="text-muted-foreground">{{ __("ERPNext") }}</span>
 						<span class="font-medium">{{ erpnextVersion }}</span>
 					</div>
-					<div v-if="platformInfo" class="flex justify-between mr-2 py-2 border-b border-border">
-						<span class="text-muted-foreground">{{ __("Platform") }}</span>
-						<span class="font-medium">{{ platformInfo.platform }} ({{ platformInfo.arch }})</span>
-					</div>
 					<div class="flex justify-between mr-2 py-2 border-b border-border">
 						<span class="text-muted-foreground">{{ __("Mode") }}</span>
-						<span class="font-medium">{{
-							isElectronEnv ? __("Desktop App") : __("Web Browser")
-						}}</span>
-					</div>
-					<div v-if="nodeRole" class="flex justify-between mr-2 py-2 border-b border-border">
-						<span class="text-muted-foreground">{{ __("Node Role") }}</span>
-						<Badge :variant="nodeRole === 'hub' ? 'default' : 'secondary'">
-							{{ nodeRole === "hub" ? __("Hub") : __("Till") }}
-						</Badge>
+						<span class="font-medium">{{ __("Web Browser") }}</span>
 					</div>
 					<div class="flex justify-between mr-2 py-2 border-b border-border">
 						<span class="text-muted-foreground">{{ __("Company") }}</span>
@@ -131,8 +119,6 @@
 import { ref, inject, watch, type Ref } from "vue";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { isElectron } from "@/services/electronBridge";
 import { usePosStore } from "@/stores/posStore";
 import { call } from "@/services/api";
 import { __ } from "@/lib/translate";
@@ -157,15 +143,12 @@ defineEmits<{
 
 const isDark = inject<Ref<boolean>>("isDark")!;
 const posStore = usePosStore();
-const isElectronEnv = isElectron();
 
 const version = ref("0.0.1");
 const gitBranch = ref("");
 const gitHash = ref("");
 const frappeVersion = ref("");
 const erpnextVersion = ref("");
-const platformInfo = ref<{ platform: string; arch: string } | null>(null);
-const nodeRole = ref<string | null>(null);
 const isLoadingInfo = ref(false);
 const currentYear = new Date().getFullYear();
 
@@ -192,20 +175,6 @@ async function fetchVersionInfo() {
 		}
 	} catch (e) {
 		console.warn("Could not fetch version info:", e);
-	}
-
-	if (isElectronEnv && window.electronAPI) {
-		try {
-			const info = await window.electronAPI.getPlatformInfo();
-			version.value = info.version || version.value;
-			platformInfo.value = { platform: info.platform, arch: info.arch };
-
-			if (window.electronAPI.node?.getRole) {
-				nodeRole.value = await window.electronAPI.node.getRole();
-			}
-		} catch (e) {
-			console.warn("Could not get platform info:", e);
-		}
 	}
 
 	isLoadingInfo.value = false;

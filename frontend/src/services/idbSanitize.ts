@@ -1,5 +1,5 @@
 /**
- * Deep-copy a value into plain data IndexedDB (and Electron IPC) can store: Vue proxies become
+ * Deep-copy a value into plain data IndexedDB can store: Vue proxies become
  * plain objects and arrays, Dates become ISO strings, functions and symbols are dropped.
  * Kept free of Dexie so it can be imported anywhere.
  */

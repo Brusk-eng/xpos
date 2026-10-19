@@ -55,7 +55,7 @@ You only need to do this once per company.
    - Manager and Administrator get both. Cashier gets neither until you enable them.
    - Only users listed on the POS Profile can use them.
 
-Gift cards need a live connection to the server, so they are not offered in the desktop (Electron) app or while the till is offline. See [Limitations](#limitations).
+Gift cards need a live connection to the server, so they are not offered while the till is offline. See [Limitations](#limitations).
 
 ---
 
@@ -144,7 +144,7 @@ Every movement is a **Gift Card Transaction**:
 ## Limitations
 
 - **Online only.**
-  - Selling or spending a card needs a live connection. Gift cards are hidden in the desktop (Electron) app, which saves every sale locally first.
+  - Selling or spending a card needs a live connection.
   - Sales with gift cards never enter the offline queue. A sale queued some other way is refused when it syncs, because its token has expired.
   - If the connection drops after you press Pay, press Pay again: the same sale is recognised and never charged twice.
 - **One currency:** cards are in the company currency and can be spent only on invoices in that currency.

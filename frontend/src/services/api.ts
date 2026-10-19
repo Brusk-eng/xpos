@@ -4,7 +4,6 @@ import {
 	showInfo as toastInfo,
 } from "@/composables/useToast";
 import { isOnline, isNetworkError } from "@/utils";
-import { isElectron, getApiBaseUrlSync, getApiCredentialsSync } from "@/services/electronBridge";
 import { captureError } from "@/services/errorLog";
 import { getMeta } from "./idbService";
 import { formatWithSymbol } from "@/composables/useCurrency";
@@ -107,10 +106,10 @@ function stripHtml(value: string): string {
  */
 export async function refreshCsrfToken(): Promise<string | null> {
 	try {
-		const response = await fetch(`${getApiBaseUrlSync()}/api/method/xpos.api.auth.get_csrf_token`, {
+		const response = await fetch("/api/method/xpos.api.auth.get_csrf_token", {
 			method: "GET",
 			headers: { Accept: "application/json" },
-			credentials: isElectron() ? "include" : "same-origin",
+			credentials: "same-origin",
 			cache: "no-store",
 		});
 		if (!response.ok) return null;
@@ -149,15 +148,7 @@ async function postMethod(
 		"X-Frappe-CSRF-Token": csrfToken,
 	};
 
-	if (isElectron()) {
-		const { apiKey, apiSecret } = getApiCredentialsSync();
-		if (apiKey && apiSecret) {
-			(headers as Record<string, string>)["Authorization"] = `token ${apiKey}:${apiSecret}`;
-		}
-	}
-
-	const baseUrl = getApiBaseUrlSync();
-	const url = `${baseUrl}/api/method/${method}`;
+	const url = `/api/method/${method}`;
 
 	let response: Response;
 	try {
@@ -165,7 +156,7 @@ async function postMethod(
 			method: "POST",
 			headers,
 			body: JSON.stringify(args),
-			credentials: isElectron() ? "include" : "same-origin",
+			credentials: "same-origin",
 		});
 	} catch (fetchError) {
 		throw new Error("__offline__");

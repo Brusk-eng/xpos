@@ -10,7 +10,6 @@ vi.mock("@/services/api", () => ({
 	call: (...args: unknown[]) => call(...args),
 	isNetworkError: () => false,
 }));
-vi.mock("@/services/electronBridge", () => ({ isElectron: () => false }));
 vi.mock("@/utils", () => ({ isOnline: () => true }));
 vi.mock("@/stores/posStore", () => ({ usePosStore: () => ({ useOfflineMode: false }) }));
 vi.mock("@/stores/settingsStore", () => ({ useSettingsStore: () => ({}) }));

@@ -95,63 +95,6 @@
 				<span>{{ errorCount }}</span>
 			</button>
 		</Transition>
-
-		<Transition name="fade">
-			<TooltipWrapper
-				v-if="!isAuthPage && isElectronEnv"
-				:content="
-					offlineStore.deadLetterCount > 0
-						? offlineStore.deadLetterCount + ' invoice(s) failed to sync. Click to review'
-						: syncStatus.lastError.value ||
-							(syncStatus.lastSyncTime.value
-								? 'Last sync: ' + syncStatus.lastSyncTime.value
-								: 'Not synced yet')
-				"
-				side="right"
-			>
-				<button
-					type="button"
-					class="fixed bottom-3 inset-s-3 z-50 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shadow-md select-none cursor-pointer"
-					:class="
-						syncStatus.isSyncing.value
-							? 'bg-blue-600 text-white'
-							: offlineStore.deadLetterCount > 0 || syncStatus.lastError.value
-								? 'bg-destructive text-destructive-foreground'
-								: 'bg-muted text-muted-foreground'
-					"
-					@click="handleOpenOfflinePanel"
-				>
-					<span
-						v-if="syncStatus.isSyncing.value"
-						class="w-2 h-2 rounded-full bg-white animate-ping"
-					/>
-					<span
-						v-else
-						class="w-2 h-2 rounded-full"
-						:class="
-							offlineStore.deadLetterCount > 0 || syncStatus.lastError.value
-								? 'bg-white'
-								: 'bg-green-400'
-						"
-					/>
-					<span>
-						<template v-if="syncStatus.isSyncing.value">
-							Syncing{{
-								syncStatus.syncTable.value ? ": " + syncStatus.syncTable.value : "..."
-							}}
-						</template>
-						<template v-else-if="offlineStore.deadLetterCount > 0"
-							>{{ offlineStore.deadLetterCount }} need attention</template
-						>
-						<template v-else-if="syncStatus.lastError.value">Sync error</template>
-						<template v-else-if="syncStatus.lastSyncTime.value"
-							>Synced {{ syncStatus.lastSyncTime.value }}</template
-						>
-						<template v-else>Sync pending</template>
-					</span>
-				</button>
-			</TooltipWrapper>
-		</Transition>
 	</div>
 </template>
 
@@ -179,15 +122,11 @@ import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialo
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";
-import { TooltipWrapper } from "@/components/ui/tooltip";
 import { AlertTriangle, Trash2 } from "lucide-vue-next";
 import { useOfflineStore } from "@/stores/offlineStore";
-import { initSyncListeners } from "@/services/syncIpcHandler";
 import { showError } from "@/services/api";
 import __ from "@/lib/translate";
-import { useSyncStatus } from "@/composables/useSyncStatus";
 import { useKeyboardShortcuts } from "@/composables/useKeyboardShortcuts";
-import { isElectron } from "@/services/electronBridge";
 import ErrorInspector from "@/components/errors/ErrorInspector.vue";
 import { unseenCount as errorUnseenCount } from "@/services/errorLog";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
@@ -202,8 +141,6 @@ const itemStore = useItemStore();
 const paymentStore = usePaymentStore();
 const authStore = useAuthStore();
 const offlineStore = useOfflineStore();
-const syncStatus = useSyncStatus();
-const isElectronEnv = isElectron();
 const showErrorInspector = ref(false);
 const errorCount = errorUnseenCount;
 const isRtl = computed(() => document.documentElement.dir === "rtl");
@@ -216,7 +153,7 @@ const {
 	destroy: destroyKeyboardShortcuts,
 } = keyboardShortcuts;
 
-const isAuthPage = computed(() => route.meta.isAuthPage === true || route.meta.isSetupPage === true);
+const isAuthPage = computed(() => route.meta.isAuthPage === true);
 const isFullScreen = computed(() => route.meta.fullScreen === true);
 
 const showClearCartConfirm = ref(false);
@@ -376,7 +313,6 @@ provide("toggleDarkMode", toggleDarkMode);
 const showSplash = ref(false);
 
 let mediaQuery: MediaQueryList | null = null;
-let cleanupSyncListeners: (() => void) | null = null;
 function handleSystemThemeChange(e: MediaQueryListEvent) {
 	systemPrefersDark.value = e.matches;
 }
@@ -410,7 +346,6 @@ onMounted(() => {
 	}
 
 	offlineStore.init();
-	cleanupSyncListeners = initSyncListeners();
 	initKeyboardShortcuts();
 
 	window.addEventListener("xpos:clear-cart", handleClearCart as EventListener);
@@ -427,26 +362,6 @@ onMounted(() => {
 	window.addEventListener("xpos:show-about-dialog", handleShowAboutDialog as EventListener);
 	window.addEventListener("xpos:toggle-error-inspector", handleToggleErrorInspector as EventListener);
 });
-
-watch(
-	() => syncStatus.deadLetters.value.length,
-	(count, prev) => {
-		if (count > (prev ?? 0)) {
-			offlineStore.refreshDeadLetterCount();
-			const latest = syncStatus.deadLetters.value[0];
-			showError(
-				__(
-					"Invoice {0} failed to sync and needs attention. Open the offline invoices panel to review.",
-					[latest?.localId ?? ""],
-				),
-			);
-		}
-	},
-);
-
-function handleOpenOfflinePanel() {
-	window.dispatchEvent(new CustomEvent("xpos:open-offline-panel"));
-}
 
 watch(isAuthPage, (isAuth, wasAuth) => {
 	if (wasAuth && !isAuth && authStore.isAuthenticated) {
@@ -472,9 +387,6 @@ watch(
 onUnmounted(() => {
 	if (mediaQuery) {
 		mediaQuery.removeEventListener("change", handleSystemThemeChange);
-	}
-	if (cleanupSyncListeners) {
-		cleanupSyncListeners();
 	}
 	offlineStore.destroy();
 	destroyKeyboardShortcuts();

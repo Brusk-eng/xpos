@@ -1,5 +1,4 @@
 import { ref, computed } from "vue";
-import { isElectron } from "./electronBridge";
 import { call } from "./api";
 
 export interface PosPermissions {
@@ -61,38 +60,19 @@ function mergePermissions(source: unknown): PosPermissions {
 }
 
 export async function loadPermissions(userEmail: string, posProfile?: string): Promise<void> {
-	if (!isElectron()) {
-		const boot =
-			(typeof window !== "undefined" ? (window.xpos?.boot as Record<string, unknown>) : undefined) ??
-			{};
-		currentRole.value = (boot.xpos_role as string) || "";
-		try {
-			const res = await call(
-				"xpos.api.auth.get_my_pos_permissions",
-				posProfile ? { pos_profile: posProfile } : {},
-			);
-			permissions.value = mergePermissions(res);
-		} catch (err) {
-			console.error("[UserRights] Failed to load permissions, using boot fallback:", err);
-			permissions.value = mergePermissions(boot.xpos_permissions);
-		}
-		isLoaded.value = true;
-		return;
-	}
-
+	const boot =
+		(typeof window !== "undefined" ? (window.xpos?.boot as Record<string, unknown>) : undefined) ?? {};
+	currentRole.value = (boot.xpos_role as string) || "";
 	try {
-		const posUser = await window.electronAPI!.db.getPosUser(userEmail);
-		if (posUser) {
-			currentRole.value = ((posUser as Record<string, unknown>).role as string) || "";
-			permissions.value = mergePermissions(posUser);
-		} else {
-			permissions.value = { ...DEFAULT_PERMISSIONS };
-		}
+		const res = await call(
+			"xpos.api.auth.get_my_pos_permissions",
+			posProfile ? { pos_profile: posProfile } : {},
+		);
+		permissions.value = mergePermissions(res);
 	} catch (err) {
-		console.error("[UserRights] Failed to load permissions:", err);
-		permissions.value = { ...DEFAULT_PERMISSIONS };
+		console.error("[UserRights] Failed to load permissions, using boot fallback:", err);
+		permissions.value = mergePermissions(boot.xpos_permissions);
 	}
-
 	isLoaded.value = true;
 }
 

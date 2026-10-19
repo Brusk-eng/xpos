@@ -39,7 +39,7 @@
 				</span>
 				<span
 					v-if="isTemplate"
-					class="absolute start-1.5 top-1.5 inline-flex items-center gap-1 rounded-md border border-info/30 bg-info-soft px-1.5 py-0.5 text-[0.6875rem] font-semibold text-info-soft-foreground"
+					class="absolute inset-s-1.5 top-1.5 inline-flex items-center gap-1 rounded-md border border-info/30 bg-info-soft px-1.5 py-0.5 text-[0.6875rem] font-semibold text-info-soft-foreground"
 				>
 					<Layers class="size-3" aria-hidden="true" />
 					{{ __("Variants") }}
@@ -99,7 +99,7 @@
 
 		<button
 			type="button"
-			class="absolute end-3.5 top-3.5 inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-raised backdrop-blur-sm transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+			class="absolute inset-e-3.5 top-3.5 inline-flex size-8 items-center justify-center rounded-full border border-border bg-card/90 text-foreground shadow-raised backdrop-blur-sm transition-colors duration-fast hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
 			:aria-label="__('Details for {0}', [item.item_name])"
 			data-testid="item-details"
 			@click="$emit('showDetail', item)"
