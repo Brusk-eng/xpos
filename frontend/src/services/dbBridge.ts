@@ -373,6 +373,35 @@ export async function searchCachedItems(
 	return idb.searchCachedItems(term, group, searchFields);
 }
 
+export async function searchCachedItemsPage(
+	term: string,
+	group: string,
+	searchFields: string[] | undefined,
+	offset: number,
+	limit: number,
+): Promise<{ items: POSItem[]; hasMore: boolean; total: number }> {
+	const idb = await import("./idbService");
+	return idb.searchCachedItemsPage(term, group, searchFields, offset, limit);
+}
+
+export async function findCachedItem(value: string): Promise<POSItem | undefined> {
+	const idb = await import("./idbService");
+	return idb.findCachedItem(value);
+}
+
+export async function warmCatalogIndex(searchFields?: string[]): Promise<void> {
+	const idb = await import("./idbService");
+	await idb.warmCatalogIndex(searchFields);
+}
+
+export async function getCachedStockForItems(
+	warehouse: string,
+	itemCodes: string[],
+): Promise<Map<string, number>> {
+	const idb = await import("./idbService");
+	return idb.getCachedStockForItems(warehouse, itemCodes);
+}
+
 export async function cacheItemGroups(groups: ItemGroup[], parentGroups: ItemGroup[]): Promise<void> {
 	const idb = await import("./idbService");
 	await idb.cacheItemGroups(groups, parentGroups);

@@ -125,8 +125,13 @@
 					/>
 				</div>
 
-				<div class="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1 xpos-scrollbar">
+				<div
+					ref="itemsScrollRef"
+					class="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1 xpos-scrollbar"
+				>
 					<ItemGrid
+						ref="itemGridRef"
+						:scroll-element="itemsScrollRef"
 						:items="itemStore.items"
 						:is-loading="itemStore.isLoading"
 						:load-error="itemStore.loadError"
@@ -193,6 +198,7 @@
 			</section>
 
 			<CameraBarcodeDialog
+				v-if="cameraSeen"
 				:open="showCameraScanner"
 				@close="showCameraScanner = false"
 				@scanned="onCameraScan"
@@ -209,7 +215,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useItemStore } from "@/stores/itemStore";
@@ -227,9 +233,13 @@ import { TooltipWrapper } from "@/components/ui/tooltip";
 import { ALL_GROUPS } from "@/composables/useCategoryTree";
 import { ChevronRight, LayoutGrid, List, ShoppingCart, Package } from "lucide-vue-next";
 
-import CameraBarcodeDialog from "@/components/dialogs/CameraBarcodeDialog.vue";
+import { useEverTrue } from "@/composables/useEverTrue";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
+
+const CameraBarcodeDialog = defineAsyncComponent(
+	() => import("@/components/dialogs/CameraBarcodeDialog.vue"),
+);
 
 const posStore = usePosStore();
 const { money } = useMoney();
@@ -240,6 +250,7 @@ const offerStore = useOfferStore();
 const viewMode = ref<"grid" | "list">("grid");
 const activeTab = ref<"items" | "cart">("items");
 const showCameraScanner = ref(false);
+const cameraSeen = useEverTrue(showCameraScanner);
 const mobileCartTotal = computed(() => money(Math.abs(cartStore.grandTotal)));
 
 watch(
@@ -255,6 +266,8 @@ watch(
 const searchBarRef = ref<InstanceType<typeof SearchBar> | null>(null);
 const commandSearchRef = ref<InstanceType<typeof CommandSearch> | null>(null);
 const itemsPanelRef = ref<HTMLElement | null>(null);
+const itemsScrollRef = ref<HTMLElement | null>(null);
+const itemGridRef = ref<InstanceType<typeof ItemGrid> | null>(null);
 const cartPanelRef = ref<HTMLElement | null>(null);
 const rowRef = ref<HTMLElement | null>(null);
 const activeZone = ref<"items" | "cart">("items");
@@ -319,10 +332,7 @@ function setViewMode(mode: "grid" | "list") {
 
 function scrollHighlightedIntoView() {
 	if (highlightedIndex.value < 0) return;
-	nextTick(() => {
-		const el = document.querySelector(`[data-item-index="${highlightedIndex.value}"]`);
-		el?.scrollIntoView({ block: "nearest" });
-	});
+	nextTick(() => itemGridRef.value?.scrollToIndex(highlightedIndex.value));
 }
 
 function reloadItems() {
@@ -397,8 +407,13 @@ watch(
 
 watch(
 	() => itemStore.items,
-	() => {
-		highlightedIndex.value = -1;
+	(items, previous) => {
+		const appended =
+			previous?.length > 0 &&
+			items.length >= previous.length &&
+			items[0] === previous[0] &&
+			items[previous.length - 1] === previous[previous.length - 1];
+		if (!appended) highlightedIndex.value = -1;
 	},
 );
 
@@ -521,10 +536,7 @@ function onNavigate(direction: "up" | "down") {
 		}
 	}
 
-	nextTick(() => {
-		const el = document.querySelector(`[data-item-index="${highlightedIndex.value}"]`);
-		el?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-	});
+	nextTick(() => itemGridRef.value?.scrollToIndex(highlightedIndex.value));
 }
 
 function handleGlobalKeydown(e: KeyboardEvent) {

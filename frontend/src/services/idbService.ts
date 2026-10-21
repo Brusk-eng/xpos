@@ -1,6 +1,7 @@
 import Dexie, { type Table } from "dexie";
 import type { POSItem, ItemGroup, Customer } from "@/types/pos.types";
 import { sanitizeForIdb } from "./idbSanitize";
+import { buildCatalogIndex, type CatalogIndex } from "./catalogIndex";
 
 export { sanitizeForIdb };
 
@@ -200,6 +201,7 @@ export async function cacheItems(allItems: POSItem[]): Promise<void> {
 		await db.items.clear();
 		await db.items.bulkAdd(safeItems);
 	});
+	invalidateCatalogIndex();
 	await setMeta("items_cached_at", new Date().toISOString());
 }
 
@@ -244,8 +246,64 @@ export async function searchCachedItems(
 	return results;
 }
 
+interface CatalogIndexSlot {
+	fields: string;
+	ready: Promise<CatalogIndex>;
+}
+
+let catalogIndex: CatalogIndexSlot | null = null;
+
+/** Forget the index; the next search rebuilds it from what is stored. Call after writing `items`. */
+function invalidateCatalogIndex(): void {
+	catalogIndex = null;
+}
+
+/** The index for these search fields; without fields, whichever index exists (lookups ignore fields). */
+function ensureCatalogIndex(searchFields?: string[]): Promise<CatalogIndex> {
+	const fields = searchFields?.length ? searchFields : DEFAULT_CACHED_SEARCH_FIELDS;
+	const key = fields.join("\u0000");
+	if (catalogIndex && (!searchFields || catalogIndex.fields === key)) return catalogIndex.ready;
+
+	const slot: CatalogIndexSlot = {
+		fields: key,
+		ready: db.items.toArray().then((rows) => buildCatalogIndex(rows, fields)),
+	};
+	catalogIndex = slot;
+	slot.ready.catch(() => {
+		if (catalogIndex === slot) catalogIndex = null;
+	});
+	return slot.ready;
+}
+
+/** Build the index ahead of the first search so that search does not pay for it. */
+export async function warmCatalogIndex(searchFields?: string[]): Promise<void> {
+	await ensureCatalogIndex(searchFields);
+}
+
+/** One page of cached items, found through the index and read by key instead of scanning the table. */
+export async function searchCachedItemsPage(
+	term: string,
+	group: string,
+	searchFields: string[] | undefined,
+	offset: number,
+	limit: number,
+): Promise<{ items: POSItem[]; hasMore: boolean; total: number }> {
+	const index = await ensureCatalogIndex(searchFields);
+	const { codes, hasMore } = index.search({ term, group, offset, limit });
+	const rows = await db.items.bulkGet(codes);
+	return { items: rows.filter((row): row is POSItem => !!row), hasMore, total: index.size };
+}
+
+/** The item whose code or barcode is exactly `value`, ignoring case. */
+export async function findCachedItem(value: string): Promise<POSItem | undefined> {
+	const index = await ensureCatalogIndex();
+	const code = index.lookup(value);
+	return code === undefined ? undefined : db.items.get(code);
+}
+
 export async function updateCachedItem(item: POSItem): Promise<void> {
 	await db.items.put(sanitizeForIdb(item));
+	invalidateCatalogIndex();
 }
 
 export async function cacheItemGroups(groups: ItemGroup[], parentGroups: ItemGroup[]): Promise<void> {
@@ -368,6 +426,17 @@ export async function cacheStockForWarehouse(
 
 export async function getCachedStock(warehouse: string): Promise<StockEntry[]> {
 	return db.stockCache.where("warehouse").equals(warehouse).toArray();
+}
+
+/** Cached quantities for just these items in one warehouse. */
+export async function getCachedStockForItems(
+	warehouse: string,
+	itemCodes: string[],
+): Promise<Map<string, number>> {
+	const rows = await db.stockCache.bulkGet(itemCodes.map((code) => `${warehouse}::${code}`));
+	const quantities = new Map<string, number>();
+	for (const row of rows) if (row) quantities.set(row.item_code, row.actual_qty);
+	return quantities;
 }
 
 export async function getCachedStockForItem(
@@ -580,6 +649,7 @@ export async function clearAllData(): Promise<void> {
 		[db.items, db.itemGroups, db.customers, db.suppliers, db.stockCache, db.meta, db.syncIdMap],
 		async () => {
 			await db.items.clear();
+			invalidateCatalogIndex();
 			await db.itemGroups.clear();
 			await db.customers.clear();
 			await db.suppliers.clear();
@@ -638,6 +708,7 @@ export async function upsertPullBatch(
 	if (store === "items") {
 		if (!isIncremental) await db.items.clear();
 		await db.items.bulkPut(safeRecords as unknown as POSItem[]);
+		invalidateCatalogIndex();
 	} else if (store === "customers") {
 		if (!isIncremental) await db.customers.clear();
 		await db.customers.bulkPut(safeRecords as unknown as Customer[]);

@@ -1,17 +1,20 @@
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, shallowRef } from "vue";
 import { call, isNetworkError } from "@/services/api";
 import { usePosStore } from "@/stores/posStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
 	cacheItems as idbCacheItems,
-	getCachedItems as idbGetCachedItems,
-	searchCachedItems as idbSearchCachedItems,
+	searchCachedItemsPage as idbSearchCachedItemsPage,
+	warmCatalogIndex,
+	getCachedStockForItems,
+	findCachedItem,
 	cacheItemGroups as idbCacheGroups,
 	getCachedItemGroups as idbGetCachedGroups,
 	cacheStockForWarehouse,
-	getCachedStock,
 	getCachedItemByCode,
+	getSyncMeta,
+	setSyncMeta,
 } from "@/services/dbBridge";
 import type {
 	POSItem,
@@ -23,6 +26,7 @@ import type {
 	BundleComponent,
 } from "@/types/pos.types";
 import { isOnline } from "@/utils";
+import { onIdle } from "@/utils/idle";
 
 interface ItemGroupsResult {
 	groups: ItemGroup[];
@@ -30,7 +34,7 @@ interface ItemGroupsResult {
 }
 
 export const useItemStore = defineStore("items", () => {
-	const items = ref<POSItem[]>([]);
+	const items = shallowRef<POSItem[]>([]);
 	const isLoading = ref(false);
 	/** Set when the last catalogue fetch failed and no offline cache stood in for it. */
 	const loadError = ref<string | null>(null);
@@ -43,11 +47,8 @@ export const useItemStore = defineStore("items", () => {
 	const itemGroups = ref<ItemGroup[]>([]);
 	const parentGroups = ref<ItemGroup[]>([]);
 
-	function offlineSearchConfig() {
-		const settings = useSettingsStore();
-		const limit = settings.itemSearchLimit;
-		const capped = searchTerm.value && limit > 0 ? Math.min(pageLength.value, limit) : pageLength.value;
-		return { fields: settings.itemSearchFields, limit: capped };
+	function offlineSearchFields(): string[] {
+		return useSettingsStore().itemSearchFields;
 	}
 
 	const showItemDetail = ref(false);
@@ -61,12 +62,46 @@ export const useItemStore = defineStore("items", () => {
 	const variantAttributes = ref<ItemAttribute[]>([]);
 	const isLoadingVariants = ref(false);
 
-	async function cacheAllItems(posProfile: string): Promise<void> {
-		if (!usePosStore().useOfflineMode) return;
+	let cacheRun: Promise<void> | null = null;
+	const CACHE_FRESH_MS = 4 * 60 * 1000;
+	const STOCK_CHUNK = 5000;
+
+	function cacheAllItems(posProfile: string): Promise<void> {
+		if (!usePosStore().useOfflineMode) return Promise.resolve();
+		if (cacheRun) return cacheRun;
+
+		const run = refreshCatalogue(posProfile).finally(() => {
+			if (cacheRun === run) cacheRun = null;
+		});
+		cacheRun = run;
+		return run;
+	}
+
+	async function refreshCatalogue(posProfile: string): Promise<void> {
+		const scope = `${posProfile}::${usePosStore().warehouse}`;
+		try {
+			const [cachedAt, cachedScope] = await Promise.all([
+				getSyncMeta("items_cached_at"),
+				getSyncMeta("items_cache_scope"),
+			]);
+			const age = Date.now() - Date.parse(String(cachedAt || ""));
+			if (cachedScope === scope && age >= 0 && age < CACHE_FRESH_MS) {
+				// Nothing to download, but the search index lives in memory: build it while idle.
+				onIdle(() => void warmCatalogIndex(offlineSearchFields()).catch(() => {}));
+				return;
+			}
+		} catch {
+			/* no readable cache: download */
+		}
+		if (await downloadCatalogue(posProfile))
+			await setSyncMeta("items_cache_scope", scope).catch(() => {});
+	}
+
+	async function downloadCatalogue(posProfile: string): Promise<boolean> {
 		try {
 			const batchSize = 200;
 			let start = 0;
-			let allItems: POSItem[] = [];
+			const allItems: POSItem[] = [];
 			let batch: POSItem[];
 
 			do {
@@ -77,7 +112,7 @@ export const useItemStore = defineStore("items", () => {
 					start,
 					page_length: batchSize,
 				});
-				allItems = [...allItems, ...batch];
+				for (const item of batch) allItems.push(item);
 				start += batchSize;
 			} while (batch.length === batchSize);
 
@@ -88,45 +123,38 @@ export const useItemStore = defineStore("items", () => {
 			if (warehouse && allItems.length > 0) {
 				await cacheAllStock(posProfile, warehouse, allItems);
 			}
+			warmCatalogIndex(offlineSearchFields()).catch(() => {});
+			return true;
 		} catch (error) {
 			console.warn("[XPOS Offline] Failed to cache items:", error);
+			return false;
 		}
 	}
 
-	async function cacheAllStock(posProfile: string, warehouse: string, allItems?: POSItem[]): Promise<void> {
+	async function cacheAllStock(posProfile: string, warehouse: string, allItems: POSItem[]): Promise<void> {
 		if (!isOnline()) {
 			console.warn("[XPOS Offline] Cannot cache stock - system is offline");
 			return;
 		}
 
 		try {
-			const itemsToCache = allItems || (await idbGetCachedItems());
-			if (itemsToCache.length === 0) return;
+			if (allItems.length === 0) return;
 
-			const itemCodes = itemsToCache.map((item) => item.item_code);
-
-			const stockResult = await call<StockAvailability[]>("xpos.api.items.get_stock_availability", {
-				items: JSON.stringify(itemCodes),
-				warehouse,
-				pos_profile: posProfile,
-			});
-
-			const stockEntries: { item_code: string; actual_qty: number }[] = [];
-
-			if (stockResult && stockResult.length > 0) {
-				const stockMap = new Map(stockResult.map((s) => [s.item_code, s.actual_qty || 0]));
-
-				for (const item of itemsToCache) {
-					stockEntries.push({
-						item_code: item.item_code,
-						actual_qty: stockMap.get(item.item_code) ?? 0,
-					});
-				}
-			} else {
-				for (const item of itemsToCache) {
-					stockEntries.push({ item_code: item.item_code, actual_qty: 0 });
-				}
+			const stockMap = new Map<string, number>();
+			for (let from = 0; from < allItems.length; from += STOCK_CHUNK) {
+				const itemCodes = allItems.slice(from, from + STOCK_CHUNK).map((item) => item.item_code);
+				const stockResult = await call<StockAvailability[]>("xpos.api.items.get_stock_availability", {
+					items: JSON.stringify(itemCodes),
+					warehouse,
+					pos_profile: posProfile,
+				});
+				for (const s of stockResult || []) stockMap.set(s.item_code, s.actual_qty || 0);
 			}
+
+			const stockEntries = allItems.map((item) => ({
+				item_code: item.item_code,
+				actual_qty: stockMap.get(item.item_code) ?? 0,
+			}));
 
 			await cacheStockForWarehouse(warehouse, stockEntries);
 		} catch (error) {
@@ -134,45 +162,61 @@ export const useItemStore = defineStore("items", () => {
 		}
 	}
 
-	/** A new search/category arrived mid-fetch: run it once the current fetch lands instead of dropping it. */
-	let refetchQueued = false;
+	let queryGeneration = 0;
+	let loadMoreQueued = false;
+
+	async function offlinePage(
+		start: number,
+	): Promise<{ rows: POSItem[]; hasMore: boolean; cached: boolean }> {
+		const page = await idbSearchCachedItemsPage(
+			searchTerm.value,
+			selectedGroup.value,
+			offlineSearchFields(),
+			start,
+			pageLength.value,
+		);
+		const warehouse = usePosStore().warehouse;
+		let rows = page.items;
+		if (warehouse && rows.length > 0) {
+			const stock = await getCachedStockForItems(
+				warehouse,
+				rows.map((item) => item.item_code),
+			);
+			rows = rows.map((item) => ({
+				...item,
+				actual_qty: stock.get(item.item_code) ?? item.actual_qty,
+			}));
+		}
+		return { rows, hasMore: page.hasMore, cached: page.total > 0 };
+	}
+
+	function showPage(rows: POSItem[], hasMoreRows: boolean, append: boolean): void {
+		items.value = append ? items.value.concat(rows) : rows;
+		if (!append) currentPage.value = 0;
+		hasMore.value = hasMoreRows;
+	}
 
 	async function fetchItems(posProfile: string, append = false): Promise<void> {
-		if (isLoading.value) {
-			if (!append) refetchQueued = true;
-			return;
+		if (append) {
+			if (isLoading.value) {
+				loadMoreQueued = true;
+				return;
+			}
+		} else {
+			queryGeneration++;
+			loadMoreQueued = false;
 		}
+		const generation = queryGeneration;
 		isLoading.value = true;
 		loadError.value = null;
 
 		try {
+			const start = append ? items.value.length : 0;
+
 			if (!isOnline() && usePosStore().useOfflineMode) {
-				const filtered = await idbSearchCachedItems(
-					searchTerm.value,
-					selectedGroup.value,
-					offlineSearchConfig().fields,
-				);
-
-				if (append) {
-					const sliced = filtered.slice(items.value.length, items.value.length + pageLength.value);
-					items.value = [...items.value, ...sliced];
-					hasMore.value = items.value.length < filtered.length;
-				} else {
-					items.value = filtered.slice(0, pageLength.value);
-					currentPage.value = 0;
-					hasMore.value = filtered.length > pageLength.value;
-				}
-
-				const posStoreRef = usePosStore();
-				if (posStoreRef.warehouse) {
-					const stockData = await getCachedStock(posStoreRef.warehouse);
-					const stockMap = new Map(stockData.map((s) => [s.item_code, s.actual_qty]));
-					items.value = items.value.map((item) => ({
-						...item,
-						actual_qty: stockMap.get(item.item_code) ?? item.actual_qty,
-					}));
-				}
-
+				const page = await offlinePage(start);
+				if (generation !== queryGeneration) return;
+				showPage(page.rows, page.hasMore, append);
 				return;
 			}
 
@@ -181,38 +225,27 @@ export const useItemStore = defineStore("items", () => {
 					pos_profile: posProfile,
 					search_term: searchTerm.value,
 					item_group: selectedGroup.value === "All Item Groups" ? "" : selectedGroup.value,
-					start: append ? items.value.length : 0,
+					start,
 					page_length: pageLength.value,
 				});
+				if (generation !== queryGeneration) return;
 
-				if (append) {
-					items.value = [...items.value, ...result];
-				} else {
-					items.value = result;
-					currentPage.value = 0;
-				}
-
-				hasMore.value = result.length === pageLength.value;
+				showPage(result, result.length === pageLength.value, append);
 
 				if (!searchTerm.value && !append && selectedGroup.value === "All Item Groups") {
-					const posStoreRef = usePosStore();
-					if (posStoreRef.useOfflineMode) {
+					if (usePosStore().useOfflineMode) {
 						cacheAllItems(posProfile).catch(() => {});
 					}
 				}
 			}
 		} catch (error) {
+			if (generation !== queryGeneration) return;
 			if (usePosStore().useOfflineMode) {
 				try {
-					const cached = await idbGetCachedItems();
-					if (cached.length > 0) {
-						const filtered = await idbSearchCachedItems(
-							searchTerm.value,
-							selectedGroup.value,
-							offlineSearchConfig().fields,
-						);
-						items.value = filtered.slice(0, pageLength.value);
-						hasMore.value = filtered.length > pageLength.value;
+					const page = await offlinePage(0);
+					if (generation !== queryGeneration) return;
+					if (page.cached) {
+						showPage(page.rows, page.hasMore, false);
 						console.log("[XPOS Offline] Serving items from idb cache after fetch failure");
 						return;
 					}
@@ -223,10 +256,12 @@ export const useItemStore = defineStore("items", () => {
 			console.error("Error fetching items:", error);
 			loadError.value = error instanceof Error ? error.message : String(error);
 		} finally {
-			isLoading.value = false;
-			if (refetchQueued) {
-				refetchQueued = false;
-				void fetchItems(posProfile);
+			if (generation === queryGeneration) {
+				isLoading.value = false;
+				if (loadMoreQueued) {
+					loadMoreQueued = false;
+					if (hasMore.value) void fetchItems(posProfile, true);
+				}
 			}
 		}
 	}
@@ -271,15 +306,7 @@ export const useItemStore = defineStore("items", () => {
 	async function searchByBarcode(barcode: string, _posProfile?: string): Promise<POSItem | null> {
 		try {
 			if (!isOnline()) {
-				const cached = await idbGetCachedItems();
-				const lower = barcode.toLowerCase();
-				return (
-					cached.find(
-						(i) =>
-							(i.barcode && i.barcode.toLowerCase() === lower) ||
-							i.item_code.toLowerCase() === lower,
-					) || null
-				);
+				return (await findCachedItem(barcode)) || null;
 			}
 
 			const result = await call<POSItem | null>("xpos.api.items.search_barcode", {
@@ -289,15 +316,7 @@ export const useItemStore = defineStore("items", () => {
 			return result;
 		} catch (error) {
 			try {
-				const cached = await idbGetCachedItems();
-				const lower = barcode.toLowerCase();
-				return (
-					cached.find(
-						(i) =>
-							(i.barcode && i.barcode.toLowerCase() === lower) ||
-							i.item_code.toLowerCase() === lower,
-					) || null
-				);
+				return (await findCachedItem(barcode)) || null;
 			} catch {
 				/* ignore */
 			}

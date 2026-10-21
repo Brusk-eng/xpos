@@ -53,23 +53,10 @@
 			data-testid="items-empty"
 		/>
 
-		<div v-else-if="viewMode === 'grid'" :class="gridClass" role="list" :aria-label="__('Products')">
-			<ItemCard
-				v-for="(item, index) in items"
-				:key="item.item_code"
-				role="listitem"
-				:item="item"
-				:currency-symbol="currencySymbol"
-				:highlighted="index === highlightedIndex"
-				:data-item-index="index"
-				@click="$emit('selectItem', item)"
-				@show-detail="$emit('showDetail', item)"
-			/>
-		</div>
-
-		<div v-else class="overflow-clip rounded-xl border border-border bg-card">
+		<template v-else>
 			<div
-				class="sticky top-0 z-1 flex items-center gap-1 rounded-t-[calc(var(--radius)+3px)] border-b border-border bg-surface-sunken/95 pe-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm"
+				v-if="viewMode === 'list'"
+				class="sticky top-0 z-1 flex items-center gap-1 rounded-t-[calc(var(--radius)+3px)] border border-b-0 border-border bg-surface-sunken/95 pe-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm"
 				aria-hidden="true"
 			>
 				<div class="flex min-w-0 flex-1 items-center gap-3 py-1.5 ps-2 pe-1">
@@ -84,20 +71,62 @@
 				</div>
 				<span class="w-8 shrink-0" />
 			</div>
-			<div role="list" :aria-label="__('Products')">
-				<ItemListRow
-					v-for="(item, index) in items"
-					:key="item.item_code"
-					role="listitem"
-					:item="item"
-					:currency-symbol="currencySymbol"
-					:highlighted="index === highlightedIndex"
-					:data-item-index="index"
-					@click="$emit('selectItem', item)"
-					@show-detail="$emit('showDetail', item)"
-				/>
+			<div
+				v-if="viewMode === 'grid'"
+				ref="probe"
+				:class="gridClass"
+				class="h-0 overflow-hidden"
+				aria-hidden="true"
+			>
+				<div />
 			</div>
-		</div>
+
+			<div
+				ref="listEl"
+				role="list"
+				:aria-label="__('Products')"
+				class="relative w-full"
+				:class="viewMode === 'list' && 'overflow-clip rounded-b-xl border border-border bg-card'"
+				:style="{ height: `${virtualizer.getTotalSize()}px` }"
+			>
+				<div
+					v-for="row in virtualizer.getVirtualItems()"
+					:key="`${viewMode}-${row.index}`"
+					:ref="measureRow"
+					:data-index="row.index"
+					class="absolute inset-x-0 top-0"
+					:class="viewMode === 'grid' && gridClass"
+					:style="{ transform: `translateY(${row.start - virtualizer.options.scrollMargin}px)` }"
+				>
+					<template v-for="index in rowIndexes(row.index)" :key="items[index].item_code">
+						<ItemCard
+							v-if="viewMode === 'grid'"
+							role="listitem"
+							:aria-setsize="items.length"
+							:aria-posinset="index + 1"
+							:item="items[index]"
+							:currency-symbol="currencySymbol"
+							:highlighted="index === highlightedIndex"
+							:data-item-index="index"
+							@click="$emit('selectItem', items[index])"
+							@show-detail="$emit('showDetail', items[index])"
+						/>
+						<ItemListRow
+							v-else
+							role="listitem"
+							:aria-setsize="items.length"
+							:aria-posinset="index + 1"
+							:item="items[index]"
+							:currency-symbol="currencySymbol"
+							:highlighted="index === highlightedIndex"
+							:data-item-index="index"
+							@click="$emit('selectItem', items[index])"
+							@show-detail="$emit('showDetail', items[index])"
+						/>
+					</template>
+				</div>
+			</div>
+		</template>
 
 		<div v-if="isLoading && items.length > 0" class="flex justify-center py-6" role="status">
 			<Loader2 class="size-6 animate-spin text-primary" aria-hidden="true" />
@@ -111,13 +140,12 @@
 			retryable
 			@retry="$emit('loadMore')"
 		/>
-
-		<div ref="sentinel" class="h-1"></div>
 	</div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
+import { useVirtualizer } from "@tanstack/vue-virtual";
 import ItemCard from "./ItemCard.vue";
 import ItemListRow from "./ItemListRow.vue";
 import { Loader2, PackageSearch, X } from "lucide-vue-next";
@@ -128,41 +156,119 @@ import { itemRowGrid } from "@/composables/useItemTileState";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 
-// Two columns on phones; from sm up as many 10.5rem cards as fit.
 const gridClass = "grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] sm:gap-3";
 
 const props = defineProps({
 	items: { type: Array as () => POSItem[], default: () => [] },
 	isLoading: { type: Boolean, default: false },
 	loadError: { type: String as () => string | null, default: null },
-	/** A search term or category is narrowing the list, so "nothing found" offers to clear it. */
 	hasFilters: { type: Boolean, default: false },
 	hideImages: { type: Boolean, default: false },
 	currencySymbol: { type: String, default: "$" },
 	viewMode: { type: String as () => "grid" | "list", default: "grid" },
 	highlightedIndex: { type: Number, default: -1 },
+	scrollElement: { type: Object as () => HTMLElement | null, default: null },
 });
 
 const emit = defineEmits(["selectItem", "showDetail", "loadMore", "retry", "clearFilters"]);
 
-const sentinel = ref<HTMLElement | null>(null);
-let observer: IntersectionObserver | null = null;
+const probe = ref<HTMLElement | null>(null);
+const listEl = ref<HTMLElement | null>(null);
+const columns = ref(4);
+const rowGap = ref(12);
+const scrollMargin = ref(0);
+
+const perRow = computed(() => (props.viewMode === "grid" ? columns.value : 1));
+const rowCount = computed(() => Math.ceil(props.items.length / perRow.value));
+
+const virtualizer = useVirtualizer(
+	computed(() => ({
+		count: rowCount.value,
+		getScrollElement: () => props.scrollElement,
+		estimateSize: () => (props.viewMode === "grid" ? 268 : 49),
+		gap: props.viewMode === "grid" ? rowGap.value : 0,
+		overscan: 3,
+		useAnimationFrameWithResizeObserver: true,
+		scrollMargin: scrollMargin.value,
+	})),
+);
+
+function rowIndexes(row: number): number[] {
+	const first = row * perRow.value;
+	const last = Math.min(props.items.length, first + perRow.value);
+	return Array.from({ length: Math.max(0, last - first) }, (_, i) => first + i);
+}
+
+function measureRow(el: unknown): void {
+	if (el instanceof HTMLElement) virtualizer.value.measureElement(el);
+}
+
+function measureLayout(): void {
+	if (probe.value) {
+		const style = getComputedStyle(probe.value);
+		columns.value = Math.max(1, style.gridTemplateColumns.split(" ").filter(Boolean).length);
+		rowGap.value = parseFloat(style.rowGap) || 12;
+	}
+	const scroller = props.scrollElement;
+	if (scroller && listEl.value) {
+		scrollMargin.value = Math.round(
+			listEl.value.getBoundingClientRect().top -
+				scroller.getBoundingClientRect().top +
+				scroller.scrollTop,
+		);
+	}
+}
+
+function scrollToIndex(index: number): void {
+	if (index < 0 || index >= props.items.length) return;
+	virtualizer.value.scrollToIndex(Math.floor(index / perRow.value), { align: "auto" });
+}
+
+defineExpose({ scrollToIndex });
+
+let layoutObserver: ResizeObserver | null = null;
+let layoutFrame = 0;
+
+function scheduleMeasure(): void {
+	if (layoutFrame) return;
+	layoutFrame = requestAnimationFrame(() => {
+		layoutFrame = 0;
+		measureLayout();
+	});
+}
 
 onMounted(() => {
-	observer = new IntersectionObserver(
-		(entries) => {
-			if (entries[0].isIntersecting && !props.isLoading && !props.loadError && props.items.length > 0) {
-				emit("loadMore");
-			}
-		},
-		{ threshold: 0.1 },
-	);
-	if (sentinel.value) {
-		observer.observe(sentinel.value);
+	measureLayout();
+	if (typeof ResizeObserver !== "undefined") {
+		layoutObserver = new ResizeObserver(scheduleMeasure);
+		if (probe.value) layoutObserver.observe(probe.value);
+		if (props.scrollElement) layoutObserver.observe(props.scrollElement);
 	}
 });
 
 onUnmounted(() => {
-	if (observer) observer.disconnect();
+	layoutObserver?.disconnect();
+	if (layoutFrame) cancelAnimationFrame(layoutFrame);
 });
+
+watch(
+	() => [props.viewMode, props.scrollElement, props.hideImages] as const,
+	async () => {
+		await nextTick();
+		measureLayout();
+		layoutObserver?.disconnect();
+		if (probe.value) layoutObserver?.observe(probe.value);
+		if (props.scrollElement) layoutObserver?.observe(props.scrollElement);
+		virtualizer.value.measure();
+	},
+);
+
+watch(
+	() => [virtualizer.value.getVirtualItems().at(-1)?.index ?? -1, rowCount.value, props.isLoading] as const,
+	([last, rows, loading]) => {
+		if (loading || props.loadError || props.items.length === 0) return;
+		if (last >= rows - 2) emit("loadMore");
+	},
+	{ flush: "post", immediate: true },
+);
 </script>
