@@ -106,6 +106,7 @@ after_install = "xpos.install.after_install"
 
 after_migrate = [
 	"xpos.patches.add_pos_query_indexes.execute",
+	"xpos.patches.v3.add_catalog_query_indexes.execute",
 	"xpos.x_pos.doctype.referral_code.referral_code.add_customer_company_unique",
 ]
 
