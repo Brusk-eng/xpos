@@ -11,19 +11,17 @@ import {
 	findCachedItem,
 	cacheItemGroups as idbCacheGroups,
 	getCachedItemGroups as idbGetCachedGroups,
-	cacheStockForWarehouse,
 	getCachedItemByCode,
-	getSyncMeta,
-	setSyncMeta,
 } from "@/services/dbBridge";
+import { getCatalogStatus, syncCatalog } from "@/services/catalogSync";
 import type {
 	POSItem,
 	ItemGroup,
 	ItemDetail,
 	ItemVariant,
 	ItemAttribute,
-	StockAvailability,
 	BundleComponent,
+	StockAvailability,
 } from "@/types/pos.types";
 import { isOnline } from "@/utils";
 import { onIdle } from "@/utils/idle";
@@ -63,8 +61,7 @@ export const useItemStore = defineStore("items", () => {
 	const isLoadingVariants = ref(false);
 
 	let cacheRun: Promise<void> | null = null;
-	const CACHE_FRESH_MS = 4 * 60 * 1000;
-	const STOCK_CHUNK = 5000;
+	const CACHE_FRESH_MS = 60 * 1000;
 
 	function cacheAllItems(posProfile: string): Promise<void> {
 		if (!usePosStore().useOfflineMode) return Promise.resolve();
@@ -78,87 +75,24 @@ export const useItemStore = defineStore("items", () => {
 	}
 
 	async function refreshCatalogue(posProfile: string): Promise<void> {
-		const scope = `${posProfile}::${usePosStore().warehouse}`;
 		try {
-			const [cachedAt, cachedScope] = await Promise.all([
-				getSyncMeta("items_cached_at"),
-				getSyncMeta("items_cache_scope"),
-			]);
-			const age = Date.now() - Date.parse(String(cachedAt || ""));
-			if (cachedScope === scope && age >= 0 && age < CACHE_FRESH_MS) {
-				// Nothing to download, but the search index lives in memory: build it while idle.
+			const status = await getCatalogStatus();
+			if (
+				status.status === "complete" &&
+				status.scopeMatches &&
+				(status.ageMs ?? Infinity) < CACHE_FRESH_MS
+			) {
 				onIdle(() => void warmCatalogIndex(offlineSearchFields()).catch(() => {}));
 				return;
 			}
 		} catch {
-			/* no readable cache: download */
+			/* no readable state: sync */
 		}
-		if (await downloadCatalogue(posProfile))
-			await setSyncMeta("items_cache_scope", scope).catch(() => {});
-	}
-
-	async function downloadCatalogue(posProfile: string): Promise<boolean> {
 		try {
-			const batchSize = 200;
-			let start = 0;
-			const allItems: POSItem[] = [];
-			let batch: POSItem[];
-
-			do {
-				batch = await call<POSItem[]>("xpos.api.items.get_pos_items", {
-					pos_profile: posProfile,
-					search_term: "",
-					item_group: "",
-					start,
-					page_length: batchSize,
-				});
-				for (const item of batch) allItems.push(item);
-				start += batchSize;
-			} while (batch.length === batchSize);
-
-			await idbCacheItems(allItems);
-
-			const posStoreRef = usePosStore();
-			const warehouse = posStoreRef.warehouse;
-			if (warehouse && allItems.length > 0) {
-				await cacheAllStock(posProfile, warehouse, allItems);
-			}
+			await syncCatalog(posProfile);
 			warmCatalogIndex(offlineSearchFields()).catch(() => {});
-			return true;
 		} catch (error) {
-			console.warn("[XPOS Offline] Failed to cache items:", error);
-			return false;
-		}
-	}
-
-	async function cacheAllStock(posProfile: string, warehouse: string, allItems: POSItem[]): Promise<void> {
-		if (!isOnline()) {
-			console.warn("[XPOS Offline] Cannot cache stock - system is offline");
-			return;
-		}
-
-		try {
-			if (allItems.length === 0) return;
-
-			const stockMap = new Map<string, number>();
-			for (let from = 0; from < allItems.length; from += STOCK_CHUNK) {
-				const itemCodes = allItems.slice(from, from + STOCK_CHUNK).map((item) => item.item_code);
-				const stockResult = await call<StockAvailability[]>("xpos.api.items.get_stock_availability", {
-					items: JSON.stringify(itemCodes),
-					warehouse,
-					pos_profile: posProfile,
-				});
-				for (const s of stockResult || []) stockMap.set(s.item_code, s.actual_qty || 0);
-			}
-
-			const stockEntries = allItems.map((item) => ({
-				item_code: item.item_code,
-				actual_qty: stockMap.get(item.item_code) ?? 0,
-			}));
-
-			await cacheStockForWarehouse(warehouse, stockEntries);
-		} catch (error) {
-			console.warn("[XPOS Offline] Failed to cache stock:", error);
+			console.warn("[XPOS Offline] Failed to sync catalogue:", error);
 		}
 	}
 
@@ -533,7 +467,6 @@ export const useItemStore = defineStore("items", () => {
 		fetchPriceForUOM,
 		fetchBundleComponents,
 		cacheAllItems,
-		cacheAllStock,
 		setSearchTerm,
 		setSelectedGroup,
 		loadMore,

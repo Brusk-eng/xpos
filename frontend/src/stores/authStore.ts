@@ -1,5 +1,6 @@
 import { call } from "@/services/api";
 import { loadPermissions, resetPermissions } from "@/services/userRights";
+import { clearSessionData } from "@/services/sessionCleanup";
 import { UserSession } from "@/types/pos.types";
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
@@ -126,6 +127,7 @@ export const useAuthStore = defineStore("auth", () => {
 			isLoading.value = true;
 
 			await call("logout");
+			await clearSessionData();
 
 			isAuthenticated.value = false;
 			user.value = null;

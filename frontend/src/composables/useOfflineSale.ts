@@ -1,5 +1,6 @@
+import { ref } from "vue";
 import { useCartStore } from "@/stores/cartStore";
-import { useOfflineStore } from "@/stores/offlineStore";
+import { useOfflineStore, type SaveOfflineResult } from "@/stores/offlineStore";
 import { usePosStore } from "@/stores/posStore";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { showInfo } from "@/services/api";
@@ -9,6 +10,31 @@ import { __ } from "@/lib/translate";
 /** The number a sale carries on its receipt until it reaches the server. */
 export function offlineReceiptName(localId: number): string {
 	return `OFFLINE-${localId}`;
+}
+
+export function saveFailureMessage(result: Pick<SaveOfflineResult, "reason" | "blockers">): string {
+	if (result.blockers?.length) {
+		const reasons = result.blockers.map((blocker) => blocker.message).join("\n");
+		return result.reason === "held"
+			? `${__(
+					"The connection was lost while this sale was being sent. It is held in Pending Invoices and will not be sent until someone checks it. Do not ring it up again as a new sale.",
+				)}\n${reasons}`
+			: reasons;
+	}
+	switch (result.reason) {
+		case "quota":
+			return __(
+				"This device is out of storage, so the sale was NOT saved. Free some space and try again. Do not hand over the goods until it shows as saved.",
+			);
+		case "unavailable":
+			return __(
+				"This browser's offline storage is not available, so the sale was NOT saved. Reload the page, or connect and sell online.",
+			);
+		case "data":
+			return __("The sale could not be stored on this device, so it was NOT saved.");
+		default:
+			return __("Failed to save invoice offline. The sale was NOT saved.");
+	}
 }
 
 /**
@@ -21,11 +47,13 @@ export function useOfflineSale() {
 	const offlineStore = useOfflineStore();
 	const posStore = usePosStore();
 	const { printReceiptOffline } = usePrintInvoice();
+	const lastFailure = ref("");
 
 	async function completeOfflineSale(
 		invoiceData: InvoiceData,
 		options: { withPrint: boolean; cashier?: string },
 	): Promise<boolean> {
+		lastFailure.value = "";
 		// Taken before the cart is cleared: it is what the customer paid for.
 		const receipt = cartStore.getReceiptSnapshot("", options.cashier || "");
 
@@ -36,7 +64,10 @@ export function useOfflineSale() {
 			cartStore.getStockReservations(),
 			receipt,
 		);
-		if (!result.success || result.localId === undefined) return false;
+		if (!result.success || result.localId === undefined) {
+			lastFailure.value = saveFailureMessage(result);
+			return false;
+		}
 
 		const name = offlineReceiptName(result.localId);
 		posStore.lastInvoiceName = name;
@@ -50,5 +81,5 @@ export function useOfflineSale() {
 		return true;
 	}
 
-	return { completeOfflineSale };
+	return { completeOfflineSale, lastFailure };
 }

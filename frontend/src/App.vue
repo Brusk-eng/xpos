@@ -9,6 +9,7 @@
 		]"
 	>
 		<SplashScreen :show="showSplash" />
+		<AppStatusBanner />
 
 		<template v-if="isAuthPage || isFullScreen">
 			<router-view v-slot="{ Component }">
@@ -116,6 +117,7 @@ import DefaultLayout from "@/layouts/DefaultLayout.vue";
 import OpeningDialog from "@/components/dialogs/OpeningDialog.vue";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";
+import AppStatusBanner from "@/components/offline/AppStatusBanner.vue";
 import { AlertTriangle, Trash2 } from "lucide-vue-next";
 import { useOfflineStore } from "@/stores/offlineStore";
 import { showError } from "@/services/api";

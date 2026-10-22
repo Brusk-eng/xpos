@@ -53,7 +53,9 @@ const label = computed(() => {
 		case "offline":
 			return offlineStore.pendingCount > 0
 				? __("Offline · {0} pending", [offlineStore.pendingCount])
-				: __("Offline");
+				: offlineStore.catalogStatus?.freshness === "stale"
+					? __("Offline · prices stale")
+					: __("Offline");
 		case "failed":
 			return __("Sync issue");
 		case "pending":
@@ -63,10 +65,18 @@ const label = computed(() => {
 	}
 });
 
+const freshnessText = computed(() => {
+	const status = offlineStore.catalogStatus;
+	if (!status || status.status !== "complete" || !status.pricesAsOf) return __("No offline catalogue yet.");
+	const hours = Math.floor((status.ageMs ?? 0) / 3_600_000);
+	const age = hours >= 1 ? __("{0}h old", [hours]) : __("under 1h old");
+	return __("Prices as of {0} ({1}).", [new Date(status.pricesAsOf).toLocaleString(), age]);
+});
+
 const tooltip = computed(() => {
 	switch (state.value) {
 		case "offline":
-			return __("Offline. Sales are saved on this device and sync when the connection returns.");
+			return `${__("Offline. Sales are saved on this device and sync when the connection returns.")} ${freshnessText.value}`;
 		case "failed":
 			return __("Some records failed to sync. Click to review.");
 		case "pending":

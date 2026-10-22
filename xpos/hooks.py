@@ -200,12 +200,46 @@ doc_events = {
 		"after_insert": "xpos.x_pos.api.customer.after_insert",
 	},
 	"POS Profile": {
-		"validate": "xpos.api.print_formats.validate_print_format_rules",
+		"validate": [
+			"xpos.api.print_formats.validate_print_format_rules",
+			"xpos.api.profiles.validate_offline_payment_modes",
+		],
+		"on_update": "xpos.api.catalog_log.log_reset",
+		"on_trash": "xpos.api.catalog_log.log_reset",
+	},
+	"Item": {
+		"on_update": "xpos.api.catalog_log.log_item",
+		"on_trash": "xpos.api.catalog_log.log_item",
+		"after_rename": "xpos.api.catalog_log.log_item_rename",
+	},
+	"Item Price": {
+		"on_update": "xpos.api.catalog_log.log_item",
+		"on_trash": "xpos.api.catalog_log.log_item",
+	},
+	"Item Group": {
+		"on_update": "xpos.api.catalog_log.log_reset",
+		"on_trash": "xpos.api.catalog_log.log_reset",
+	},
+	"Price List": {
+		"on_update": "xpos.api.catalog_log.log_reset",
+		"on_trash": "xpos.api.catalog_log.log_reset",
+	},
+	"Warehouse": {
+		"on_update": "xpos.api.catalog_log.log_reset",
+		"on_trash": "xpos.api.catalog_log.log_reset",
+	},
+	"Item Tax Template": {
+		"on_update": "xpos.api.catalog_log.log_reset",
+		"on_trash": "xpos.api.catalog_log.log_reset",
 	},
 }
 
 # Scheduled Tasks
 # ---------------
+
+scheduler_events = {
+	"daily": ["xpos.api.catalog_log.prune_catalog_changes"],
+}
 
 # scheduler_events = {
 # 	"all": [

@@ -37,8 +37,9 @@
 			</DialogHeader>
 
 			<div class="flex-1 overflow-y-auto p-4 space-y-3">
-				<div v-if="offlineStore.pendingCount > 0" class="flex gap-2">
+				<div v-if="offlineStore.pendingInvoices.length > 0" class="flex gap-2">
 					<Button
+						v-if="offlineStore.pendingCount > 0"
 						variant="default"
 						size="sm"
 						class="flex-1 gap-1.5"
@@ -48,6 +49,15 @@
 						<Loader2 v-if="offlineStore.isSyncing" class="w-4 h-4 animate-spin" />
 						<CloudUpload v-else class="w-4 h-4" />
 						{{ __("Sync All") }} ({{ offlineStore.pendingCount }})
+					</Button>
+					<Button
+						variant="outline"
+						size="sm"
+						class="gap-1.5"
+						@click="offlineStore.downloadPendingExport()"
+					>
+						<Download class="w-4 h-4" />
+						{{ __("Export") }}
 					</Button>
 					<Button
 						v-if="posStore.allowDeleteOfflineInvoice"
@@ -95,7 +105,7 @@
 								{{ money(inv.grand_total) }}
 							</p>
 							<Badge :variant="statusVariant(inv.status)" class="text-[10px]">
-								{{ statusLabel(inv.status) }}
+								{{ statusLabel(inv) }}
 							</Badge>
 							<Badge
 								v-if="isDraft(inv)"
@@ -113,6 +123,28 @@
 					</p>
 
 					<p v-if="inv.error" class="text-xs text-destructive">Error: {{ inv.error }}</p>
+					<p
+						v-if="inv.status === 'failed' && inv.next_attempt_at"
+						class="text-xs text-muted-foreground"
+					>
+						{{ __("Next try {0}", [formatTime(inv.next_attempt_at)]) }}
+					</p>
+					<p v-if="inv.hold" class="text-xs text-destructive">
+						{{
+							__(
+								"The connection dropped while this sale was being sent. Check it, then press Retry.",
+							)
+						}}
+					</p>
+					<p
+						v-if="inv.owner && inv.owner.user !== sessionUser"
+						class="text-xs text-muted-foreground"
+					>
+						{{ __("Rung up by {0}. It sends when they sign in.", [inv.owner.user]) }}
+					</p>
+					<p v-if="inv.catalog_evidence" class="text-xs text-muted-foreground">
+						{{ __("Prices as of {0}", [formatTime(inv.catalog_evidence.activated_at)]) }}
+					</p>
 
 					<div v-if="inv.status === 'needs_review' && inv.review" class="text-xs space-y-0.5">
 						<p class="font-medium">
@@ -300,7 +332,10 @@ import {
 	CheckCircle2,
 	RefreshCw,
 	ShoppingCart,
+	Download,
 } from "lucide-vue-next";
+import { currentOwner } from "@/services/sessionScope";
+import { STALLED_AFTER_ATTEMPTS } from "@/services/syncClassify";
 import __ from "@/lib/translate";
 
 defineProps<{ open: boolean }>();
@@ -388,8 +423,14 @@ function statusVariant(status: string) {
 	return "secondary" as const;
 }
 
-function statusLabel(status: string): string {
-	if (status === "dead_letter") return __("Needs attention");
+const sessionUser = computed(() => currentOwner()?.user ?? "");
+
+function statusLabel(inv: (typeof offlineStore.pendingInvoices)[number]): string {
+	const status = inv.status;
+	if (inv.hold) return __("Held");
+	if (status === "failed" && (inv.attempts ?? 0) >= STALLED_AFTER_ATTEMPTS) return __("Stalled");
+	if (status === "failed") return __("Waiting to retry");
+	if (status === "dead_letter") return __("Refused: review");
 	if (status === "needs_review") return __("Price review");
 	if (status === "fiscal_uncertain") return __("FBR check");
 	return status;

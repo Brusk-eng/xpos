@@ -51,6 +51,14 @@
 					>
 						<WifiOff class="size-3" /> {{ __("Offline") }}
 					</Badge>
+					<div
+						v-if="offlineBlockerMessages.length"
+						class="basis-full text-xs text-destructive whitespace-pre-line"
+						role="alert"
+						data-testid="payment-offline-blockers"
+					>
+						{{ offlineBlockerMessages.join("\n") }}
+					</div>
 					<Button
 						variant="ghost"
 						size="icon-sm"
@@ -956,6 +964,7 @@ import { __ } from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { submitDurableInvoice } from "@/services/invoiceSubmission";
 import { useOfflineSale } from "@/composables/useOfflineSale";
+import { offlineSaleBlockers } from "@/services/offlinePolicy";
 import {
 	completeLocalFiscalization,
 	FiscalUncertainError,
@@ -1041,7 +1050,7 @@ import {
 const posStore = usePosStore();
 const { moneyPrecision, percent } = useMoney();
 const { printInvoice } = usePrintInvoice();
-const { completeOfflineSale } = useOfflineSale();
+const { completeOfflineSale, lastFailure } = useOfflineSale();
 const cartStore = useCartStore();
 const customerStore = useCustomerStore();
 const authStore = useAuthStore();
@@ -1353,8 +1362,32 @@ const outstandingSubmissionHint = computed(() => {
 	return __("Invoice will be submitted with a partial payment.");
 });
 
+const offlineBlockerMessages = computed(() => {
+	if (offlineStore.isOnline) return [];
+	return offlineSaleBlockers({
+		invoice: {
+			items: cartStore.items.map((item) => ({ gift_card_issue: item.gift_card_issue }) as never),
+			payments: activeLegs.value.map((leg) => ({
+				mode_of_payment: leg.mode_of_payment,
+				amount: leg.base_amount,
+				gift_card: leg.gift_card,
+				gift_card_auth: leg.gift_card_auth,
+			})) as never,
+			is_credit_sale: remainingAmount.value > 0,
+			customer_credit: creditApplied.value > 0 ? [{ source_type: "", source_name: "", amount: 0 }] : [],
+			is_return: cartStore.isReturnMode,
+		},
+		offlinePaymentModes: posStore.offlinePaymentModes,
+		outstanding: remainingAmount.value,
+		catalog: offlineStore.catalogStatus,
+		dbState: offlineStore.dbState,
+		storage: offlineStore.storageHealth,
+	}).map((blocker) => blocker.message);
+});
+
 const canSubmit = computed(() => {
 	if (cartStore.isEmpty) return false;
+	if (offlineBlockerMessages.value.length) return false;
 	if (isGiftCardSale.value && !offlineStore.isOnline) return false;
 	if (selectedRateMissing.value) return false;
 	if (!isSplitPayment.value && referenceMissing.value) return false;
@@ -1860,7 +1893,7 @@ async function submitPayment(withPrint: boolean = true) {
 				withPrint,
 				cashier: authStore.userFullName,
 			});
-			if (!saved) failSubmit(__("Failed to save invoice offline"));
+			if (!saved) failSubmit(lastFailure.value || __("Failed to save invoice offline"));
 			return;
 		}
 		const result = await submitDurableInvoice(
@@ -1904,7 +1937,7 @@ async function submitPayment(withPrint: boolean = true) {
 				cashier: authStore.userFullName,
 			});
 			if (saved) return;
-			failSubmit(__("You are offline. Invoice could not be saved locally."));
+			failSubmit(lastFailure.value || __("You are offline. Invoice could not be saved locally."));
 		} else {
 			failSubmit(__("Payment failed: {0}", [extractErrorMessage(error)]));
 		}
