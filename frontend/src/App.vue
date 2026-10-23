@@ -339,7 +339,14 @@ function handleSystemThemeChange(e: MediaQueryListEvent) {
 	systemPrefersDark.value = e.matches;
 }
 
+function guardUnsavedCart(event: BeforeUnloadEvent) {
+	if (cartStore.isEmpty) return;
+	event.preventDefault();
+	event.returnValue = "";
+}
+
 onMounted(() => {
+	window.addEventListener("beforeunload", guardUnsavedCart);
 	const saved = localStorage.getItem("xpos-theme") as "light" | "dark" | "system" | null;
 	if (saved && ["light", "dark", "system"].includes(saved)) {
 		theme.value = saved;
@@ -413,6 +420,7 @@ watch(
 );
 
 onUnmounted(() => {
+	window.removeEventListener("beforeunload", guardUnsavedCart);
 	if (mediaQuery) {
 		mediaQuery.removeEventListener("change", handleSystemThemeChange);
 	}

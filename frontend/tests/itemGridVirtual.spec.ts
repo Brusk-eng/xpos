@@ -21,6 +21,12 @@ const pos = reactive({
 	currencySymbol: "$",
 });
 vi.mock("@/stores/posStore", () => ({ usePosStore: () => pos }));
+vi.mock("@/stores/layoutStore", () => ({
+	useLayoutStore: () => ({
+		shared: { productDisplay: ["image", "item_code", "stock"] },
+		device: { density: "comfortable" },
+	}),
+}));
 
 import ItemGrid from "@/components/items/ItemGrid.vue";
 

@@ -141,11 +141,12 @@ after_uninstall = "xpos.uninstall.after_uninstall"
 # Permissions
 # -----------
 
-# permission_query_conditions = {
-# 	"Event": "frappe.desk.doctype.event.event.get_permission_query_conditions",
-# }
+permission_query_conditions = {
+	"XPOS User Layout": "xpos.x_pos.doctype.xpos_user_layout.xpos_user_layout.get_permission_query_conditions",
+}
 
 has_permission = {
+	"XPOS User Layout": "xpos.x_pos.doctype.xpos_user_layout.xpos_user_layout.has_permission",
 	"Sales Invoice": "xpos.api.print_formats.invoice_has_permission",
 	"POS Invoice": "xpos.api.print_formats.invoice_has_permission",
 }

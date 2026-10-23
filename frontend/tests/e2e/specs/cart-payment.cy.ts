@@ -370,10 +370,8 @@ describe("cart + payment behaviour", () => {
 		});
 		addFromGrid(ITEM_A.item_name);
 		cy.cartRow(ITEM_A.item_name).find("input[aria-label='Rate']").should("not.exist");
-		cy.cartRow(ITEM_A.item_name).find("[aria-label='Line options']").click();
-		cy.contains("[role='menuitem']", "Add discount").should("not.exist");
-		cy.get("body").type("{esc}");
-		cy.contains("button:visible", /^\s*Discount\s*$/).should("not.exist");
+		cy.cartRow(ITEM_A.item_name).find("[data-testid='row-action-item_discount']").should("not.exist");
+		cy.get("[data-testid='cart-discount']").should("not.exist");
 	});
 
 	it("keeps the sale when the server refuses it", () => {

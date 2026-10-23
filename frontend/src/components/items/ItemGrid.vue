@@ -15,7 +15,7 @@
 					:key="i"
 					class="flex h-12 items-center gap-3 border-b border-border/70 px-2"
 				>
-					<Skeleton v-if="!hideImages" class="size-9 rounded-md" />
+					<Skeleton v-if="showThumb" class="size-9 rounded-md" />
 					<Skeleton class="h-4 flex-1" />
 					<Skeleton class="h-4 w-16" />
 				</div>
@@ -53,15 +53,15 @@
 			data-testid="items-empty"
 		/>
 
-		<template v-else>
+		<div v-else data-testid="items-box">
 			<div
 				v-if="viewMode === 'list'"
-				class="sticky top-0 z-1 flex items-center gap-1 rounded-t-[calc(var(--radius)+3px)] border border-b-0 border-border bg-surface-sunken/95 pe-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-sm"
+				class="sticky top-0 z-10 flex items-center gap-1 border border-border bg-surface-sunken ring-1 ring-inset ring-border pe-1.5 text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground"
 				aria-hidden="true"
 			>
 				<div class="flex min-w-0 flex-1 items-center gap-3 py-1.5 ps-2 pe-1">
-					<div class="grid min-w-0 flex-1 items-center gap-3" :class="itemRowGrid(!hideImages)">
-						<span v-if="!hideImages" />
+					<div class="grid min-w-0 flex-1 items-center gap-3" :class="itemRowGrid(showThumb)">
+						<span v-if="showThumb" />
 						<span>{{ __("Item") }}</span>
 						<span class="hidden xl:block">{{ __("Group") }}</span>
 						<span class="justify-self-end">{{ __("Stock") }}</span>
@@ -86,7 +86,6 @@
 				role="list"
 				:aria-label="__('Products')"
 				class="relative w-full"
-				:class="viewMode === 'list' && 'overflow-clip rounded-b-xl border border-border bg-card'"
 				:style="{ height: `${virtualizer.getTotalSize()}px` }"
 			>
 				<div
@@ -126,7 +125,12 @@
 					</template>
 				</div>
 			</div>
-		</template>
+			<div
+				v-if="viewMode === 'list'"
+				class="h-2 border border-t-0 border-border bg-card"
+				aria-hidden="true"
+			/>
+		</div>
 
 		<div v-if="isLoading && items.length > 0" class="flex justify-center py-6" role="status">
 			<Loader2 class="size-6 animate-spin text-primary" aria-hidden="true" />
@@ -153,10 +157,22 @@ import { Button } from "@/components/ui/button";
 import { EmptyState, ErrorState } from "@/components/ui/state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { itemRowGrid } from "@/composables/useItemTileState";
+import { useLayoutStore } from "@/stores/layoutStore";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 
-const gridClass = "grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] sm:gap-3";
+const GRID_CLASS = {
+	compact: "grid grid-cols-3 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]",
+	comfortable: "grid grid-cols-2 gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(10.5rem,1fr))] sm:gap-3",
+	touch: "grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] sm:gap-4",
+} as const;
+const GRID_ROW = { compact: 224, comfortable: 268, touch: 304 } as const;
+const LIST_ROW = { compact: 41, comfortable: 49, touch: 64 } as const;
+
+const layoutStore = useLayoutStore();
+const density = computed(() => layoutStore.device.density);
+const showThumb = computed(() => !props.hideImages && layoutStore.shared.productDisplay.includes("image"));
+const gridClass = computed(() => GRID_CLASS[density.value]);
 
 const props = defineProps({
 	items: { type: Array as () => POSItem[], default: () => [] },
@@ -185,7 +201,7 @@ const virtualizer = useVirtualizer(
 	computed(() => ({
 		count: rowCount.value,
 		getScrollElement: () => props.scrollElement,
-		estimateSize: () => (props.viewMode === "grid" ? 268 : 49),
+		estimateSize: () => (props.viewMode === "grid" ? GRID_ROW[density.value] : LIST_ROW[density.value]),
 		gap: props.viewMode === "grid" ? rowGap.value : 0,
 		overscan: 3,
 		useAnimationFrameWithResizeObserver: true,
@@ -252,7 +268,7 @@ onUnmounted(() => {
 });
 
 watch(
-	() => [props.viewMode, props.scrollElement, props.hideImages] as const,
+	() => [props.viewMode, props.scrollElement, showThumb.value, density.value] as const,
 	async () => {
 		await nextTick();
 		measureLayout();

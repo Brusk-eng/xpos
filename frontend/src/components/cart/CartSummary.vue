@@ -239,249 +239,153 @@
 			</div>
 		</dl>
 
-		<div class="grid auto-cols-fr grid-flow-col gap-2">
-			<TooltipWrapper :content="__('Hold sale')" shortcut="Ctrl+H">
-				<Button
-					variant="outline"
-					class="h-11 gap-2 rounded-xl px-2 font-semibold"
-					:disabled="cartStore.isEmpty"
-					data-testid="hold-order"
-					@click="holdOrder"
+		<Popover v-model:open="moreOpen">
+			<PopoverAnchor as-child>
+				<div
+					class="grid auto-cols-fr grid-flow-col gap-1.5"
+					data-cart-actions
+					data-testid="cart-actions"
 				>
-					<Pause class="size-5!" />
-					{{ __("Hold") }}
-				</Button>
-			</TooltipWrapper>
-
-			<Popover v-if="hasPermission('apply_additional_discount')" v-model:open="showDiscount">
-				<PopoverTrigger as-child>
-					<Button
-						variant="outline"
-						class="h-11 gap-2 rounded-xl px-2 font-semibold"
-						:aria-pressed="showDiscount || hasDiscount"
-						:disabled="cartStore.isEmpty"
+					<TooltipWrapper
+						v-for="action in inlineActions"
+						:key="action.id"
+						:content="action.label"
+						:shortcut="action.shortcut"
 					>
-						<Percent class="size-5!" />
-						{{ __("Discount") }}
-					</Button>
-				</PopoverTrigger>
-				<PopoverContentStyled class="w-80 space-y-3" side="top" align="start">
-					<p class="text-sm font-semibold">{{ __("Additional Discount") }}</p>
-					<div class="flex items-center gap-2">
-						<div
-							class="inline-flex shrink-0 gap-1 rounded-xl border border-border bg-surface-sunken p-1"
+						<Button
+							variant="outline"
+							class="h-11 min-w-0 rounded-xl px-1"
+							:class="action.destructive && 'text-destructive-soft-foreground'"
+							:disabled="action.disabled"
+							:aria-pressed="action.pressed"
+							:aria-label="action.label"
+							:data-testid="action.testid"
+							@click="action.run()"
 						>
-							<Button
-								:variant="discountType === 'percentage' ? 'default' : 'ghost'"
-								size="sm"
-								class="px-3"
-								:aria-pressed="discountType === 'percentage'"
-								@click="discountType = 'percentage'"
-							>
-								%
-							</Button>
-							<Button
-								:variant="discountType === 'amount' ? 'default' : 'ghost'"
-								size="sm"
-								class="px-3"
-								:aria-pressed="discountType === 'amount'"
-								@click="discountType = 'amount'"
-							>
-								{{ posStore.currencySymbol }}
-							</Button>
-						</div>
-						<NumberInput
-							ref="discountInputRef"
-							v-model="discountInput"
-							:min="0"
-							:max="discountType === 'percentage' ? 100 : undefined"
-							:precision="moneyPrecision"
-							class="flex-1"
-							:placeholder="
-								discountType === 'percentage' ? __('Discount %') : __('Discount amount')
-							"
-							@change="applyDiscount"
-							@keydown.enter="showDiscount = false"
-						/>
-					</div>
-				</PopoverContentStyled>
-			</Popover>
-
-			<Popover v-if="posStore.allowCouponEntry" v-model:open="showCoupon">
-				<PopoverTrigger as-child>
-					<Button
-						variant="outline"
-						class="h-11 gap-2 rounded-xl px-2 font-semibold"
-						:aria-pressed="showCoupon || !!cartStore.appliedCoupon"
-						:disabled="cartStore.isEmpty"
-					>
-						<Ticket class="size-5!" />
-						{{ __("Coupon") }}
-					</Button>
-				</PopoverTrigger>
-				<PopoverContentStyled class="w-80 space-y-3" side="top" align="center">
-					<p class="text-sm font-semibold">{{ __("Coupon") }}</p>
-					<div class="flex items-center gap-2">
-						<Input
-							v-model="couponInput"
-							type="text"
-							:placeholder="__('Enter coupon code...')"
-							class="flex-1"
-							@keydown.enter="applyCouponCode"
-						/>
-						<Button :loading="isApplyingCoupon" :disabled="!couponInput" @click="applyCouponCode">
-							{{ __("Apply") }}
+							<component :is="action.icon" class="size-5!" />
 						</Button>
-					</div>
-					<p v-if="couponError" class="text-sm text-destructive-soft-foreground">
-						{{ couponError }}
-					</p>
-				</PopoverContentStyled>
-			</Popover>
+					</TooltipWrapper>
 
-			<Popover v-model:open="moreOpen">
-				<PopoverTrigger as-child>
 					<Button
+						v-if="overflowActions.length"
 						variant="outline"
-						class="h-11 gap-2 rounded-xl px-2 font-semibold"
+						class="h-11 min-w-0 rounded-xl px-1"
 						data-testid="cart-more"
 						:aria-label="__('More actions')"
+						:aria-expanded="moreOpen && moreView === 'menu'"
+						@click="openPanel('menu')"
 					>
 						<MoreHorizontal class="size-5!" />
-						{{ __("More") }}
 					</Button>
-				</PopoverTrigger>
-				<PopoverContentStyled
-					:class="moreView === 'menu' ? 'w-64 p-1.5' : 'w-80 space-y-3'"
-					align="end"
-					side="top"
-					:role="moreView === 'menu' ? 'menu' : undefined"
-				>
-					<template v-if="moreView === 'menu'">
-						<PopoverMenuItem @click="runMore(() => cartStore.openDraftDialog())">
-							<template #icon><FileText /></template>
-							{{ __("Restore draft") }}
-						</PopoverMenuItem>
+				</div>
+			</PopoverAnchor>
+			<PopoverContentStyled
+				:class="moreView === 'menu' ? 'w-64 p-1.5' : 'w-80 space-y-3'"
+				align="center"
+				side="top"
+				:role="moreView === 'menu' ? 'menu' : undefined"
+				@interact-outside="keepOpenOnActions"
+			>
+				<template v-if="moreView === 'menu'">
+					<template v-for="action in overflowActions" :key="action.id">
+						<div
+							v-if="action.id === 'clear_cart'"
+							class="my-1.5 h-px bg-border"
+							role="separator"
+						/>
 						<PopoverMenuItem
-							v-if="canSellGiftCards"
-							data-testid="sell-gift-card"
-							:disabled="
-								!offlineStore.isOnline || (!cartStore.isEmpty && !cartStore.isGiftCardSale)
+							:destructive="action.destructive"
+							:disabled="action.disabled"
+							:data-testid="action.testid"
+							@click="action.run(true)"
+						>
+							<template #icon><component :is="action.icon" /></template>
+							{{ action.label }}
+						</PopoverMenuItem>
+					</template>
+				</template>
+
+				<CartDiscountForm
+					v-else-if="moreView === 'discount'"
+					ref="discountFormRef"
+					v-model:type="discountType"
+					v-model:value="discountInput"
+					:symbol="posStore.currencySymbol"
+					:precision="moneyPrecision"
+					@apply="applyDiscount"
+					@done="moreOpen = false"
+				/>
+
+				<CartCouponForm
+					v-else-if="moreView === 'coupon'"
+					v-model="couponInput"
+					:loading="isApplyingCoupon"
+					:error="couponError"
+					@apply="applyCouponCode"
+				/>
+
+				<template v-else-if="moreView === 'gift'">
+					<p class="text-sm font-semibold">{{ __("Sell gift card") }}</p>
+					<div class="flex items-center gap-2">
+						<NumberInput
+							v-model="giftCardValue"
+							:min="0"
+							:precision="moneyPrecision"
+							class="flex-1"
+							data-testid="gift-card-value"
+							:placeholder="__('Gift card value')"
+							@keydown.enter="addGiftCard"
+						/>
+						<Button :disabled="!(giftCardValue > 0)" @click="addGiftCard">
+							{{ __("Add gift card") }}
+						</Button>
+					</div>
+					<p class="text-sm text-muted-foreground">
+						{{
+							__(
+								"A new code is printed when the sale is paid. Gift cards are sold on their own sale.",
+							)
+						}}
+					</p>
+				</template>
+
+				<template v-else>
+					<div class="flex items-center justify-between">
+						<p class="text-sm font-semibold">{{ __("Delivery Charges") }}</p>
+						<Button
+							v-if="cartStore.selectedDeliveryCharge"
+							variant="ghost"
+							size="sm"
+							class="text-destructive-soft-foreground"
+							@click="cartStore.setDeliveryCharge(null)"
+						>
+							{{ __("Remove") }}
+						</Button>
+					</div>
+					<LoadingState v-if="isLoadingDelivery" compact />
+					<p v-else-if="!availableDeliveryCharges.length" class="text-sm text-muted-foreground">
+						{{ __("No delivery charges available for this profile") }}
+					</p>
+					<div v-else class="flex flex-wrap gap-2">
+						<button
+							v-for="charge in availableDeliveryCharges"
+							:key="charge.name"
+							type="button"
+							class="h-9 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+							:class="
+								cartStore.selectedDeliveryCharge?.name === charge.name
+									? 'border-primary bg-primary text-primary-foreground'
+									: 'border-border bg-card hover:bg-surface-hover'
 							"
-							@click="openMoreView('gift')"
+							:aria-pressed="cartStore.selectedDeliveryCharge?.name === charge.name"
+							@click="selectDeliveryCharge(charge)"
 						>
-							<template #icon><Gift /></template>
-							{{ __("Sell gift card") }}
-						</PopoverMenuItem>
-						<PopoverMenuItem
-							v-if="!cartStore.isReturnMode && posStore.useDeliveryCharges"
-							:disabled="cartStore.isEmpty"
-							@click="openMoreView('delivery')"
-						>
-							<template #icon><Truck /></template>
-							{{
-								cartStore.selectedDeliveryCharge
-									? __("Change delivery charge")
-									: __("Delivery charge")
-							}}
-						</PopoverMenuItem>
-						<template v-if="canSaveAsOrder">
-							<PopoverMenuItem
-								data-testid="save-as-order"
-								:disabled="!orderable"
-								@click="runMore(() => (orderMode = 'order'))"
-							>
-								<template #icon><ClipboardList /></template>
-								{{ __("Save as sales order") }}
-							</PopoverMenuItem>
-							<PopoverMenuItem
-								data-testid="save-as-quotation"
-								:disabled="!orderable"
-								@click="runMore(() => (orderMode = 'quotation'))"
-							>
-								<template #icon><FileText /></template>
-								{{ __("Save as quotation") }}
-							</PopoverMenuItem>
-						</template>
-						<PopoverMenuItem :disabled="!hasAnyDiscount" @click="runMore(clearAllDiscounts)">
-							<template #icon><X /></template>
-							{{ __("Clear all discounts") }}
-						</PopoverMenuItem>
-						<div class="my-1.5 h-px bg-border" role="separator" />
-						<PopoverMenuItem
-							destructive
-							data-testid="clear-cart"
-							:disabled="cartStore.isEmpty"
-							@click="runMore(handleClearCart)"
-						>
-							<template #icon><Trash2 /></template>
-							{{ __("Clear cart") }}
-						</PopoverMenuItem>
-					</template>
-
-					<template v-else-if="moreView === 'gift'">
-						<p class="text-sm font-semibold">{{ __("Sell gift card") }}</p>
-						<div class="flex items-center gap-2">
-							<NumberInput
-								v-model="giftCardValue"
-								:min="0"
-								:precision="moneyPrecision"
-								class="flex-1"
-								data-testid="gift-card-value"
-								:placeholder="__('Gift card value')"
-								@keydown.enter="addGiftCard"
-							/>
-							<Button :disabled="!(giftCardValue > 0)" @click="addGiftCard">
-								{{ __("Add gift card") }}
-							</Button>
-						</div>
-						<p class="text-sm text-muted-foreground">
-							{{
-								__(
-									"A new code is printed when the sale is paid. Gift cards are sold on their own sale.",
-								)
-							}}
-						</p>
-					</template>
-
-					<template v-else>
-						<div class="flex items-center justify-between">
-							<p class="text-sm font-semibold">{{ __("Delivery Charges") }}</p>
-							<Button
-								v-if="cartStore.selectedDeliveryCharge"
-								variant="ghost"
-								size="sm"
-								class="text-destructive-soft-foreground"
-								@click="cartStore.setDeliveryCharge(null)"
-							>
-								{{ __("Remove") }}
-							</Button>
-						</div>
-						<LoadingState v-if="isLoadingDelivery" compact />
-						<p v-else-if="!availableDeliveryCharges.length" class="text-sm text-muted-foreground">
-							{{ __("No delivery charges available for this profile") }}
-						</p>
-						<div v-else class="flex flex-wrap gap-2">
-							<button
-								v-for="charge in availableDeliveryCharges"
-								:key="charge.name"
-								type="button"
-								class="h-9 rounded-lg border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-								:class="
-									cartStore.selectedDeliveryCharge?.name === charge.name
-										? 'border-primary bg-primary text-primary-foreground'
-										: 'border-border bg-card hover:bg-surface-hover'
-								"
-								:aria-pressed="cartStore.selectedDeliveryCharge?.name === charge.name"
-								@click="selectDeliveryCharge(charge)"
-							>
-								{{ charge.label }} &mdash; {{ money(charge.rate) }}
-							</button>
-						</div>
-					</template>
-				</PopoverContentStyled>
-			</Popover>
-		</div>
+							{{ charge.label }} &mdash; {{ money(charge.rate) }}
+						</button>
+					</div>
+				</template>
+			</PopoverContentStyled>
+		</Popover>
 
 		<Button
 			class="relative h-14 w-full gap-3 rounded-2xl text-lg font-bold shadow-primary transition-[transform,box-shadow,background-color] duration-fast active:translate-y-px active:shadow-pressed"
@@ -508,7 +412,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Component } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { hasPermission } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
@@ -520,10 +424,13 @@ import { useOfflineStore } from "@/stores/offlineStore";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip";
-import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Separator } from "@/components/ui/separator";
-import { Popover, PopoverContentStyled, PopoverMenuItem, PopoverTrigger } from "@/components/ui/popover";
+import { Popover, PopoverAnchor, PopoverContentStyled, PopoverMenuItem } from "@/components/ui/popover";
+import CartDiscountForm from "./CartDiscountForm.vue";
+import CartCouponForm from "./CartCouponForm.vue";
+import { useLayoutStore } from "@/stores/layoutStore";
+import { visibleActionCount } from "@/services/posLayout";
 import { LoadingState } from "@/components/ui/state";
 import {
 	Tag,
@@ -555,7 +462,6 @@ const offerStore = useOfferStore();
 const offlineStore = useOfflineStore();
 const { printInvoice } = usePrintInvoice();
 
-const showDiscount = ref(false);
 const orderMode = ref<"order" | "quotation" | null>(null);
 const canSaveAsOrder = computed(() => posStore.allowSalesOrder && !cartStore.isReturnMode);
 const orderable = computed(
@@ -566,20 +472,174 @@ const orderable = computed(
 		!cartStore.sourceOrder &&
 		!cartStore.isGiftCardSale,
 );
-const showCoupon = ref(false);
+type PanelView = "menu" | "discount" | "coupon" | "gift" | "delivery";
+const layoutStore = useLayoutStore();
 const moreOpen = ref(false);
-const moreView = ref<"menu" | "gift" | "delivery">("menu");
+const moreView = ref<PanelView>("menu");
+const discountFormRef = ref<InstanceType<typeof CartDiscountForm> | null>(null);
 
-function runMore(action: () => unknown) {
-	moreOpen.value = false;
+/** Discount and coupon live in the one action panel, wherever their button sits. */
+function panelFlag(view: "discount" | "coupon") {
+	return computed({
+		get: () => moreOpen.value && moreView.value === view,
+		set: (open: boolean) => {
+			if (open) {
+				moreView.value = view;
+				moreOpen.value = true;
+			} else if (moreView.value === view) {
+				moreOpen.value = false;
+			}
+		},
+	});
+}
+const showDiscount = panelFlag("discount");
+const showCoupon = panelFlag("coupon");
+
+function openPanel(view: PanelView) {
+	if (moreOpen.value && moreView.value === view) {
+		moreOpen.value = false;
+		return;
+	}
+	moreView.value = view;
+	moreOpen.value = true;
+	if (view === "gift") showGiftCard.value = true;
+	else if (view === "delivery") {
+		showDelivery.value = false;
+		void toggleDelivery();
+	} else if (view === "discount") nextTick(() => setTimeout(() => discountFormRef.value?.focus()));
+}
+
+/** A click on an action button toggles the panel itself; do not let "outside" close it first. */
+function keepOpenOnActions(event: Event) {
+	const target = (event as CustomEvent<{ originalEvent?: Event }>).detail?.originalEvent?.target;
+	if (target instanceof Element && target.closest("[data-cart-actions]")) event.preventDefault();
+}
+
+interface CartAction {
+	id: string;
+	label: string;
+	icon: Component;
+	testid?: string;
+	shortcut?: string;
+	disabled?: boolean;
+	pressed?: boolean;
+	destructive?: boolean;
+	run: (fromMenu?: boolean) => void;
+}
+
+function menuRun(fromMenu: boolean | undefined, action: () => unknown) {
+	if (fromMenu) moreOpen.value = false;
 	action();
 }
 
-function openMoreView(view: "gift" | "delivery") {
-	moreView.value = view;
-	if (view === "gift") showGiftCard.value = true;
-	else void toggleDelivery();
-}
+const actionRegistry = computed<Record<string, (CartAction & { available: boolean }) | undefined>>(() => ({
+	hold: {
+		id: "hold",
+		available: true,
+		label: __("Hold sale"),
+		icon: Pause,
+		testid: "hold-order",
+		shortcut: "Ctrl+H",
+		disabled: cartStore.isEmpty,
+		run: (m) => menuRun(m, holdOrder),
+	},
+	discount: {
+		id: "discount",
+		available: hasPermission("apply_additional_discount"),
+		label: __("Discount"),
+		icon: Percent,
+		testid: "cart-discount",
+		disabled: cartStore.isEmpty,
+		pressed: showDiscount.value || hasDiscount.value,
+		run: () => openPanel("discount"),
+	},
+	coupon: {
+		id: "coupon",
+		available: posStore.allowCouponEntry,
+		label: __("Coupon"),
+		icon: Ticket,
+		testid: "cart-coupon",
+		disabled: cartStore.isEmpty,
+		pressed: showCoupon.value || !!cartStore.appliedCoupon,
+		run: () => openPanel("coupon"),
+	},
+	clear_discounts: {
+		id: "clear_discounts",
+		available: true,
+		label: __("Clear all discounts"),
+		icon: X,
+		testid: "clear-discounts",
+		disabled: !hasAnyDiscount.value,
+		run: (m) => menuRun(m, clearAllDiscounts),
+	},
+	delivery_charge: {
+		id: "delivery_charge",
+		available: !cartStore.isReturnMode && posStore.useDeliveryCharges,
+		label: cartStore.selectedDeliveryCharge ? __("Change delivery charge") : __("Delivery charge"),
+		icon: Truck,
+		testid: "cart-delivery",
+		disabled: cartStore.isEmpty,
+		run: () => openPanel("delivery"),
+	},
+	restore_draft: {
+		id: "restore_draft",
+		available: true,
+		label: __("Restore draft"),
+		icon: FileText,
+		testid: "restore-draft",
+		run: (m) => menuRun(m, () => cartStore.openDraftDialog()),
+	},
+	gift_card: {
+		id: "gift_card",
+		available: canSellGiftCards.value,
+		label: __("Sell gift card"),
+		icon: Gift,
+		testid: "sell-gift-card",
+		disabled: !offlineStore.isOnline || (!cartStore.isEmpty && !cartStore.isGiftCardSale),
+		run: () => openPanel("gift"),
+	},
+	sales_order: {
+		id: "sales_order",
+		available: canSaveAsOrder.value,
+		label: __("Save as sales order"),
+		icon: ClipboardList,
+		testid: "save-as-order",
+		disabled: !orderable.value,
+		run: (m) => menuRun(m, () => (orderMode.value = "order")),
+	},
+	quotation: {
+		id: "quotation",
+		available: canSaveAsOrder.value,
+		label: __("Save as quotation"),
+		icon: FileText,
+		testid: "save-as-quotation",
+		disabled: !orderable.value,
+		run: (m) => menuRun(m, () => (orderMode.value = "quotation")),
+	},
+	clear_cart: {
+		id: "clear_cart",
+		available: true,
+		label: __("Clear cart"),
+		icon: Trash2,
+		testid: "clear-cart",
+		destructive: true,
+		disabled: cartStore.isEmpty,
+		run: (m) => menuRun(m, handleClearCart),
+	},
+}));
+
+/** The cashier's ordered actions that this sale, profile and user may actually use. */
+const orderedActions = computed<CartAction[]>(() =>
+	layoutStore.shared.quickActions.footer
+		.map((id) => actionRegistry.value[id])
+		.filter((action): action is CartAction & { available: boolean } => !!action?.available),
+);
+const inlineCount = computed(() =>
+	visibleActionCount(orderedActions.value.length, layoutStore.policy.min_visible_actions),
+);
+// Exactly one slot is the More button, so overflow only starts once more than N actions exist.
+const inlineActions = computed(() => orderedActions.value.slice(0, inlineCount.value));
+const overflowActions = computed(() => orderedActions.value.slice(inlineCount.value));
 
 watch(moreOpen, (open) => {
 	if (open) return;
@@ -741,12 +801,9 @@ function handleCheckout() {
 	if (!opened.success) showError(opened.message);
 }
 
-const discountInputRef = ref<InstanceType<typeof NumberInput> | null>(null);
-
 function openDiscount() {
 	if (!hasPermission("apply_additional_discount") || cartStore.isEmpty) return;
-	showDiscount.value = true;
-	nextTick(() => setTimeout(() => discountInputRef.value?.focus()));
+	if (!(moreOpen.value && moreView.value === "discount")) openPanel("discount");
 }
 
 // F4 / menu "Process Payment" and Ctrl+H come here, so they behave exactly like the buttons.

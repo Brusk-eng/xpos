@@ -53,8 +53,10 @@
 
 		<div
 			ref="rowRef"
-			class="flex min-h-0 flex-1 overflow-hidden p-3 pt-2 lg:pt-3"
+			class="relative flex min-h-0 flex-1 overflow-hidden p-3 pt-2 lg:pt-3"
 			:style="{ '--cart-w': `${cartWidth}px` }"
+			:data-density="layoutStore.device.density"
+			:data-cart-side="cartSide"
 		>
 			<section
 				id="pos-products"
@@ -62,6 +64,7 @@
 				aria-labelledby="pos-tab-items"
 				:class="[
 					'min-w-0 flex-1 flex-col overflow-hidden rounded-2xl border border-border bg-card/50 shadow-raised lg:flex',
+					cartSide === 'left' ? 'lg:order-3' : 'lg:order-1',
 					activeTab === 'items' ? 'flex' : 'hidden',
 				]"
 				@focusin="activeZone = 'items'"
@@ -115,6 +118,24 @@
 								</button>
 							</TooltipWrapper>
 						</div>
+						<TooltipWrapper v-if="layoutStore.canCustomize" :content="__('Customize view')">
+							<Button
+								variant="outline"
+								size="icon"
+								class="hidden size-12 shrink-0 rounded-xl sm:inline-flex"
+								:class="layoutStore.customizing && 'border-primary text-primary'"
+								:aria-label="__('Customize view')"
+								:aria-pressed="layoutStore.customizing"
+								data-testid="customize-open"
+								@click="
+									layoutStore.customizing
+										? layoutStore.cancelCustomize()
+										: startCustomizing()
+								"
+							>
+								<SlidersHorizontal class="size-4.5" />
+							</Button>
+						</TooltipWrapper>
 					</div>
 					<CategoryBar
 						:groups="itemStore.itemGroups"
@@ -123,12 +144,17 @@
 						@select="selectGroup"
 						@picked="searchBarRef?.focus()"
 					/>
+					<QuickAccess
+						:favorites="layoutStore.shared.favoriteCategories"
+						:pinned="layoutStore.pinnedItems"
+						:selected="itemStore.selectedGroup"
+						:groups="itemStore.itemGroups.map((group) => group.name)"
+						@select-group="selectGroup"
+						@add-item="handleAddItem"
+					/>
 				</div>
 
-				<div
-					ref="itemsScrollRef"
-					class="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1 xpos-scrollbar"
-				>
+				<div ref="itemsScrollRef" class="min-h-0 flex-1 overflow-y-auto px-3 pb-3 xpos-scrollbar">
 					<ItemGrid
 						ref="itemGridRef"
 						:scroll-element="itemsScrollRef"
@@ -174,7 +200,8 @@
 			<PaneSplitter
 				v-model="cartWidth"
 				data-testid="cart-splitter"
-				class="mx-0.5 hidden lg:flex"
+				class="mx-0.5 hidden lg:order-2 lg:flex"
+				:side="cartSide === 'left' ? 'start' : 'end'"
 				:min="cartBounds.min"
 				:max="cartBounds.max"
 				:default-value="cartBounds.preferred"
@@ -189,6 +216,7 @@
 				aria-labelledby="pos-tab-cart"
 				:class="[
 					'min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card/50 shadow-raised focus:outline-none lg:flex lg:w-(--cart-w) lg:flex-none',
+					cartSide === 'left' ? 'lg:order-1' : 'lg:order-3',
 					activeTab === 'cart' ? 'flex flex-1' : 'hidden',
 				]"
 				@focusin="activeZone = 'cart'"
@@ -196,6 +224,18 @@
 			>
 				<Cart />
 			</section>
+
+			<div
+				v-if="layoutStore.customizing"
+				class="absolute inset-y-3 z-30 flex"
+				:class="cartSide === 'left' ? 'inset-e-3' : 'inset-s-3'"
+			>
+				<CustomizePanel
+					:current-cart-width="cartWidth"
+					:wide="rowWidth >= 1024"
+					@close="stopCustomizing"
+				/>
+			</div>
 
 			<CameraBarcodeDialog
 				v-if="cameraSeen"
@@ -222,16 +262,22 @@ import { useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showError, isNetworkError } from "@/services/api";
-import { cacheItemTax, getCachedItemTax, getSetting, setSetting } from "@/services/dbBridge";
+import { cacheItemTax, getCachedItemTax } from "@/services/dbBridge";
 import SearchBar from "@/components/items/SearchBar.vue";
 import ItemGrid from "@/components/items/ItemGrid.vue";
 import CommandSearch from "@/components/items/CommandSearch.vue";
 import CategoryBar from "@/components/items/CategoryBar.vue";
 import Cart from "@/components/cart/Cart.vue";
 import PaneSplitter from "@/components/core/PaneSplitter.vue";
+import { Button } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { ALL_GROUPS } from "@/composables/useCategoryTree";
-import { ChevronRight, LayoutGrid, List, ShoppingCart, Package } from "lucide-vue-next";
+import { ChevronRight, LayoutGrid, List, ShoppingCart, Package, SlidersHorizontal } from "lucide-vue-next";
+import QuickAccess from "@/components/items/QuickAccess.vue";
+import CustomizePanel from "@/components/layout/CustomizePanel.vue";
+import { useLayoutStore } from "@/stores/layoutStore";
+import { useAuthStore } from "@/stores/authStore";
+import { deviceClassFor } from "@/services/posLayout";
 
 import { useEverTrue } from "@/composables/useEverTrue";
 import type { POSItem } from "@/types/pos.types";
@@ -246,6 +292,8 @@ const { money } = useMoney();
 const itemStore = useItemStore();
 const cartStore = useCartStore();
 const offerStore = useOfferStore();
+const layoutStore = useLayoutStore();
+const authStore = useAuthStore();
 
 const viewMode = ref<"grid" | "list">("grid");
 const activeTab = ref<"items" | "cart">("items");
@@ -253,12 +301,12 @@ const showCameraScanner = ref(false);
 const cameraSeen = useEverTrue(showCameraScanner);
 const mobileCartTotal = computed(() => money(Math.abs(cartStore.grandTotal)));
 
+// The saved layout (personal, else the profile default) decides the view; F5 and the toggle
+// only change it for this session, or the draft while customizing.
 watch(
-	() => posStore.defaultView,
-	(defaultView) => {
-		if (defaultView) {
-			viewMode.value = defaultView.toLowerCase() === "list" ? "list" : "grid";
-		}
+	() => layoutStore.shared.view,
+	(view) => {
+		viewMode.value = view;
 	},
 	{ immediate: true },
 );
@@ -276,12 +324,12 @@ const highlightedIndex = ref(-1);
 const hasFilters = computed(() => !!itemStore.searchTerm || itemStore.selectedGroup !== ALL_GROUPS);
 
 /**
- * Cart width on wide screens. The cashier's preferred width is stored with the other
- * terminal settings; what is shown is clamped so the catalogue keeps at least 32rem.
+ * Cart width on wide screens. The saved layout supplies the preferred width; dragging the
+ * splitter is a session-only change, or edits the draft while customizing. What is shown is
+ * clamped so the catalogue keeps at least 32rem.
  */
-const CART_SETTING = "pos_cart_width";
 const rowWidth = ref(0);
-const preferredCartWidth = ref<number | null>(null);
+const dragCartWidth = ref<number | null>(null);
 const cartBounds = computed(() => {
 	const row = rowWidth.value || 1280;
 	// Below ~27rem the cart's own rows (customer, line stepper) start to collide.
@@ -293,27 +341,71 @@ const cartBounds = computed(() => {
 const cartWidth = computed({
 	get: () => {
 		const { min, max, preferred } = cartBounds.value;
-		return Math.round(Math.min(max, Math.max(min, preferredCartWidth.value ?? preferred)));
+		const wanted = dragCartWidth.value ?? layoutStore.device.cartWidth ?? preferred;
+		return Math.round(Math.min(max, Math.max(min, wanted)));
 	},
 	set: (value: number) => {
-		preferredCartWidth.value = value;
+		dragCartWidth.value = value;
 	},
 });
+const cartSide = computed(() => layoutStore.device.cartSide);
 
 let rowObserver: ResizeObserver | null = null;
 
 function saveCartWidth(value: number) {
-	setSetting(CART_SETTING, String(Math.round(value)), "ui").catch(() => {});
-}
-
-async function loadCartWidth() {
-	try {
-		const saved = Number(await getSetting(CART_SETTING));
-		if (saved > 0) preferredCartWidth.value = saved;
-	} catch {
-		/* keep the default width */
+	if (layoutStore.customizing && layoutStore.draft) {
+		layoutStore.draft.device[layoutStore.deviceClass].cartWidth = Math.round(value);
+		dragCartWidth.value = null;
 	}
 }
+
+function syncDeviceClass() {
+	layoutStore.setDeviceClass(deviceClassFor(window.innerWidth));
+}
+
+function startCustomizing() {
+	layoutStore.startCustomize();
+}
+
+function stopCustomizing() {
+	dragCartWidth.value = null;
+	nextTick(() => searchBarRef.value?.focus());
+}
+
+const layoutScope = computed(() => ({
+	user: authStore.userName,
+	company: posStore.companyName,
+	profile: posStore.profileName,
+}));
+
+watch(
+	() =>
+		[
+			posStore.isReady,
+			layoutScope.value.user,
+			layoutScope.value.company,
+			layoutScope.value.profile,
+		] as const,
+	([ready, user, company, profile]) => {
+		if (ready && user && company && profile) void layoutStore.load({ user, company, profile });
+	},
+	{ immediate: true },
+);
+
+watch(
+	() => layoutStore.customizing,
+	(on) => {
+		if (!on) dragCartWidth.value = null;
+	},
+);
+
+// Pinned items preview live while editing; the saved list is reloaded after save/cancel in the store.
+watch(
+	() => layoutStore.draft?.shared.pinnedItems.join("|"),
+	() => {
+		if (layoutStore.customizing) void layoutStore.resolvePinned();
+	},
+);
 
 function switchTab() {
 	activeTab.value = activeTab.value === "items" ? "cart" : "items";
@@ -326,6 +418,7 @@ function showCart() {
 }
 
 function setViewMode(mode: "grid" | "list") {
+	if (layoutStore.customizing && layoutStore.draft) layoutStore.draft.shared.view = mode;
 	viewMode.value = mode;
 	scrollHighlightedIntoView();
 }
@@ -348,7 +441,9 @@ function clearFilters() {
 }
 
 onMounted(() => {
-	loadCartWidth();
+	syncDeviceClass();
+	window.addEventListener("resize", syncDeviceClass);
+	window.addEventListener("online", layoutStore.syncPending);
 	if (rowRef.value && typeof ResizeObserver !== "undefined") {
 		rowObserver = new ResizeObserver(([entry]) => (rowWidth.value = entry.contentRect.width));
 		rowObserver.observe(rowRef.value);
@@ -365,6 +460,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+	window.removeEventListener("resize", syncDeviceClass);
+	window.removeEventListener("online", layoutStore.syncPending);
 	rowObserver?.disconnect();
 	document.removeEventListener("keydown", handleGlobalKeydown);
 	window.removeEventListener("xpos:toggle-view", handleToggleView as EventListener);
