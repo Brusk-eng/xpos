@@ -16,6 +16,7 @@ from xpos.api.exchange import get_currency_precision
 from xpos.api.profile_rules import is_blind_closing
 from xpos.api.shifts import get_shift_payment_totals, resolve_cash_mode_of_payment
 from xpos.api.utilities import get_invoice_type
+from xpos.reports import scope
 
 
 def execute(filters=None):
@@ -33,6 +34,9 @@ def execute(filters=None):
 
 
 def get_invoices(filters, doctype):
+	scope.enforce(filters)
+	report_scope = scope.get_scope()
+	check_requested_scope(filters, report_scope)
 	conditions = {"docstatus": 1, "is_pos": 1}
 	if doctype == "POS Invoice":
 		conditions["consolidated_invoice"] = ["in", ["", None]]
@@ -47,11 +51,25 @@ def get_invoices(filters, doctype):
 		if filters.get("from_date") and filters.get("to_date"):
 			conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
 
-	return frappe.get_all(
+	invoices = frappe.get_all(
 		doctype,
 		filters=conditions,
 		fields=["name", "currency", "grand_total", "net_total", "change_amount", "is_return", "pos_profile"],
 	)
+	if not report_scope.restricted:
+		return invoices
+	return [inv for inv in invoices if report_scope.allows_profile(inv["pos_profile"])]
+
+
+def check_requested_scope(filters, report_scope):
+	"""A shift or profile named in the filters must belong to the caller's company and warehouses."""
+	profile = filters.get("pos_profile")
+	if not profile and filters.get("pos_opening_shift"):
+		profile = frappe.db.get_value("POS Opening Shift", filters["pos_opening_shift"], "pos_profile")
+	if profile and not report_scope.allows_profile(profile):
+		frappe.throw(
+			_("You are not permitted to report on POS Profile {0}.").format(profile), frappe.PermissionError
+		)
 
 
 def ensure_not_blind(pos_profiles):

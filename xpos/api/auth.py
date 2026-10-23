@@ -26,6 +26,7 @@ ALL_PERMISSION_KEYS = (
 	"bank_drop",
 	"current_stock_by_brand",
 	"current_stock_report",
+	"gift_card_liability_report",
 	"manage_role_permissions",
 )
 

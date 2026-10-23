@@ -138,6 +138,7 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 		items: [
 			{ key: "current_stock_by_brand", label: "Current Stock by Brand" },
 			{ key: "current_stock_report", label: "Current Stock Report" },
+			{ key: "gift_card_liability_report", label: "Gift Card Liability Report" },
 		],
 	},
 	{

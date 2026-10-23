@@ -1,10 +1,10 @@
 import { call } from "@/services/api";
 import { __ } from "@/lib/utils";
-import { hasPermission, type PosPermissions } from "@/services/userRights";
 import { formatWithSymbol } from "@/composables/useCurrency";
 import { formatFloat, formatInt } from "@/utils/numberFormat";
 
-export type ReportCategory = "Inventory" | "Sales" | "Purchasing" | "Operations";
+export type ReportCategory = "Inventory" | "Sales" | "Purchasing" | "Operations" | "Accounting" | "Other";
+export type ReportCapabilityState = "supported" | "adapter_required" | "unsupported";
 export type ReportFilterType = "link" | "multi-link" | "date" | "integer" | "float" | "select" | "text";
 
 export interface ReportFilterOption {
@@ -27,13 +27,16 @@ export interface ReportFilterDefinition {
 }
 
 export interface ReportDefinition {
+	id: string;
 	slug: string;
+	aliases: string[];
 	title: string;
-	reportName: string;
 	description: string;
 	category: ReportCategory;
-	permissionKey?: keyof PosPermissions;
-	thermalPrint?: boolean;
+	ref_doctype: string;
+	capability: { state: ReportCapabilityState; reasons: string[] };
+	export: { allowed: boolean };
+	print: { allowed: boolean; thermal: boolean };
 }
 
 export interface ReportColumn {
@@ -87,155 +90,44 @@ const reportUtilityFields = new Set([
 	"__index",
 ]);
 
-const reportDefinitions: ReportDefinition[] = [
-	{
-		slug: "current-stock-report",
-		title: __("Current Stock Report"),
-		reportName: "Current Stock Report",
-		description: __("Live stock valuation by item, warehouse, supplier, brand, and group."),
-		category: "Inventory",
-		permissionKey: "current_stock_report",
-	},
-	{
-		slug: "current-stock-by-brand",
-		title: __("Current Stock By Brand"),
-		reportName: "Current Stock By Brand",
-		description: __("Brand-wise stock snapshot with quantities and valuation."),
-		category: "Inventory",
-		permissionKey: "current_stock_by_brand",
-	},
-	{
-		slug: "current-stock-summary",
-		title: __("Current Stock Summary"),
-		reportName: "Current Stock Summary",
-		description: __("Compact warehouse stock overview with totals and stock movement levels."),
-		category: "Inventory",
-	},
-	{
-		slug: "current-stock-with-levels",
-		title: __("Current Stock With Levels"),
-		reportName: "Current Stock With Levels",
-		description: __("Stock snapshot grouped with reorder and alert levels."),
-		category: "Inventory",
-	},
-	{
-		slug: "dead-stock-report",
-		title: __("Dead Stock Report"),
-		reportName: "Dead Stock Report",
-		description: __("Stock that has been sitting too long with low value movement."),
-		category: "Inventory",
-	},
-	{
-		slug: "stock-value-by-warehouse",
-		title: __("Stock Value By Warehouse"),
-		reportName: "Stock Value By Warehouse",
-		description: __("Warehouse value and quantity summary for quick inventory valuation."),
-		category: "Inventory",
-	},
-	{
-		slug: "stock-value-summary-by-date",
-		title: __("Stock Value Summary By Date"),
-		reportName: "Stock Value Summary By Date",
-		description: __("Snapshot stock balance by posting date for trend review."),
-		category: "Inventory",
-	},
-	{
-		slug: "warehouse-stock-movement",
-		title: __("Warehouse Stock Movement"),
-		reportName: "Warehouse Stock Movement",
-		description: __("Movement summary by warehouse and voucher type over time."),
-		category: "Operations",
-	},
-	{
-		slug: "branch-item-summary",
-		title: __("Branch Item Summary"),
-		reportName: "Branch Item Summary",
-		description: __("Item movement and sales summary for a branch and warehouse window."),
-		category: "Operations",
-	},
-	{
-		slug: "branch-set-summary",
-		title: __("Branch Set Summary"),
-		reportName: "Branch Set Summary",
-		description: __("Set-level summary for branch stock and movement tracking."),
-		category: "Operations",
-	},
-	{
-		slug: "low-qty-sales-report",
-		title: __("Low Qty Sales Report"),
-		reportName: "Low Qty Sales Report",
-		description: "Items sold in low quantities over a selected period.",
-		category: "Sales",
-	},
-	{
-		slug: "zero-qty-sales-report",
-		title: __("Zero Qty Sales Report"),
-		reportName: "Zero Qty Sales Report",
-		description: __("Sales lines where no quantity was fulfilled during the period."),
-		category: "Sales",
-	},
-	{
-		slug: "slow-fast-moving-items",
-		title: __("Slow Fast Moving Items"),
-		reportName: "Slow Fast Moving Items",
-		description: __("Movement velocity overview to identify fast and slow sellers."),
-		category: "Sales",
-	},
-	// prettier-ignore
-	{
-		slug: "stock-audit-report",
-		title: __("Stock Audit Report"),
-		reportName: "Stock Audit Report",
-		description: __(
-			"Thermal-printable stock audit by item with available qty. Filter by warehouse, brand, supplier, or item."
-		),
-		category: "Inventory",
-		thermalPrint: true,
-	},
-	{
-		slug: "purchase-order-report",
-		title: __("Purchase Order Report"),
-		reportName: "Purchase Order Report",
-		description: __("Purchase order summary with supplier, date range, and type filters."),
-		category: "Purchasing",
-	},
-	// prettier-ignore
-	{
-		slug: "pos-shift-reconciliation",
-		title: __("Shift Reconciliation"),
-		reportName: "POS Shift Reconciliation",
-		description: __(
-			"Z-report: items sold with quantities plus totals by payment mode for end-of-shift cash-up."
-		),
-		category: "Sales",
-		permissionKey: "shift_report",
-		thermalPrint: true,
-	},
-];
-
-const reportMap = new Map(reportDefinitions.map((report) => [report.slug, report]));
-
 function cloneValue<T>(value: T): T {
 	if (Array.isArray(value)) return [...value] as T;
 	if (value && typeof value === "object") return { ...(value as Record<string, unknown>) } as T;
 	return value;
 }
 
-export function getReportDefinition(slug: string | string[] | undefined): ReportDefinition | undefined {
-	if (!slug || Array.isArray(slug)) return undefined;
-	return reportMap.get(slug);
+let catalogRequest: Promise<ReportDefinition[]> | null = null;
+
+export function fetchReportCatalog(force = false): Promise<ReportDefinition[]> {
+	if (!catalogRequest || force) {
+		catalogRequest = call<ReportDefinition[]>("xpos.api.reports.get_report_catalog")
+			.then((rows) => (Array.isArray(rows) ? rows : []))
+			.catch((error) => {
+				catalogRequest = null;
+				throw error;
+			});
+	}
+	return catalogRequest;
 }
 
-export function getReportDefinitions(): ReportDefinition[] {
-	return [...reportDefinitions];
+export function resetReportCatalog(): void {
+	catalogRequest = null;
 }
 
-export function getAccessibleReports(): ReportDefinition[] {
-	return reportDefinitions.filter((report) => !report.permissionKey || hasPermission(report.permissionKey));
+/** Match a URL segment against a report's canonical id, slug or any alias. */
+export function findReportDefinition(
+	reports: ReportDefinition[],
+	identifier: string | string[] | undefined,
+): ReportDefinition | undefined {
+	if (!identifier || Array.isArray(identifier)) return undefined;
+	return reports.find(
+		(report) =>
+			report.id === identifier || report.slug === identifier || report.aliases.includes(identifier),
+	);
 }
 
-export function isReportAccessible(report: ReportDefinition): boolean {
-	return !report.permissionKey || hasPermission(report.permissionKey);
+export function isReportRunnable(report: ReportDefinition): boolean {
+	return report.capability.state === "supported";
 }
 
 export function buildInitialReportFilters(
@@ -548,19 +440,21 @@ export function formatReportCell(column: ReportColumn, value: unknown, currency 
 	}
 }
 
-export async function fetchReportMeta(reportName: string): Promise<ReportFilterDefinition[]> {
+export async function fetchReportMeta(reportId: string): Promise<ReportFilterDefinition[]> {
 	const response = await call<{ filters: ReportFilterDefinition[] }>("xpos.api.reports.get_report_meta", {
-		report: reportName,
+		report: reportId,
 	});
 	return Array.isArray(response?.filters) ? response.filters : [];
 }
 
 export async function fetchReportData(
-	reportName: string,
+	reportId: string,
 	filters: Record<string, unknown>,
+	purpose: "view" | "export" | "print" = "view",
 ): Promise<ReportQueryResult> {
-	return call<ReportQueryResult>("frappe.desk.query_report.run", {
-		report_name: reportName,
+	return call<ReportQueryResult>("xpos.api.reports.run_report", {
+		report: reportId,
 		filters: JSON.stringify(filters),
+		purpose,
 	});
 }

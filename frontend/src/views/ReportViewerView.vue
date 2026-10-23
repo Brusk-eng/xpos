@@ -32,18 +32,20 @@ import {
 	buildInitialReportFilters,
 	buildReportDelimitedRows,
 	compareReportRows,
+	fetchReportCatalog,
 	fetchReportData,
 	fetchReportMeta,
 	formatReportCell,
-	getReportDefinition,
+	findReportDefinition,
 	getVisibleReportColumns,
 	hydrateReportFiltersFromQuery,
-	isReportAccessible,
+	isReportRunnable,
 	isReportTotalRow,
 	normalizeReportFilters,
 	normalizeReportRows,
 	serializeReportFiltersToQuery,
 	type ReportColumn,
+	type ReportDefinition,
 	type ReportFilterDefinition,
 	type ReportSummaryItem,
 } from "@/services/reports";
@@ -54,9 +56,11 @@ const posStore = usePosStore();
 
 const reportCurrency = computed(() => posStore.invoiceCurrency || posStore.currency || "");
 
-const activeReport = computed(() => getReportDefinition(route.params.reportSlug));
+const catalog = ref<ReportDefinition[]>([]);
+const catalogLoaded = ref(false);
+const activeReport = computed(() => findReportDefinition(catalog.value, route.params.reportSlug));
 const isReportVisible = computed(() => Boolean(activeReport.value));
-const isReportAllowed = computed(() => (activeReport.value ? isReportAccessible(activeReport.value) : false));
+const isReportAllowed = computed(() => (activeReport.value ? isReportRunnable(activeReport.value) : false));
 
 const filters = ref<ReportFilterDefinition[]>([]);
 const filterState = reactive<Record<string, unknown>>({});
@@ -148,8 +152,18 @@ function resetState() {
 }
 
 async function loadReport() {
-	const report = activeReport.value;
 	resetState();
+	if (!catalogLoaded.value) {
+		try {
+			catalog.value = await fetchReportCatalog();
+		} catch (error) {
+			errorMessage.value = extractErrorMessage(error);
+			showError(errorMessage.value);
+			return;
+		}
+		catalogLoaded.value = true;
+	}
+	const report = activeReport.value;
 
 	if (!report) {
 		document.title = `${__("Reports")} | X POS`;
@@ -157,13 +171,17 @@ async function loadReport() {
 	}
 
 	document.title = `${report.title} | X POS`;
-	if (!isReportAccessible(report)) {
-		errorMessage.value = __("You do not have access to this report.");
+	if (route.params.reportSlug !== report.slug) {
+		await router.replace({ path: `/reports/${report.slug}`, query: route.query });
+		return;
+	}
+	if (!isReportRunnable(report)) {
+		errorMessage.value = __("This report cannot be run from the POS yet.");
 		return;
 	}
 
 	try {
-		filters.value = await fetchReportMeta(report.reportName);
+		filters.value = await fetchReportMeta(report.id);
 	} catch (error) {
 		errorMessage.value = extractErrorMessage(error);
 		showError(errorMessage.value);
@@ -198,8 +216,8 @@ async function runReport() {
 	const report = activeReport.value;
 	if (!report) return;
 
-	if (!isReportAccessible(report)) {
-		errorMessage.value = __("You do not have access to this report.");
+	if (!isReportRunnable(report)) {
+		errorMessage.value = __("This report cannot be run from the POS yet.");
 		showError(errorMessage.value);
 		return;
 	}
@@ -224,7 +242,7 @@ async function runReport() {
 
 	try {
 		const payload = normalizeReportFilters(filters.value, filterState);
-		const response = await fetchReportData(report.reportName, payload);
+		const response = await fetchReportData(report.id, payload);
 		if (id !== runRequestId) return;
 		reportColumns.value = response.columns || [];
 		reportRows.value = normalizeReportRows(
@@ -303,11 +321,24 @@ async function copyText(text: string) {
 	document.body.removeChild(textarea);
 }
 
+async function authorizeAction(purpose: "export" | "print"): Promise<boolean> {
+	const report = activeReport.value;
+	if (!report) return false;
+	try {
+		await fetchReportData(report.id, normalizeReportFilters(filters.value, filterState), purpose);
+		return true;
+	} catch (error) {
+		showError(extractErrorMessage(error));
+		return false;
+	}
+}
+
 async function copyReport() {
 	if (filteredRows.value.length === 0) {
 		showError(__("No rows to copy."));
 		return;
 	}
+	if (!(await authorizeAction("export"))) return;
 	const rows = [...filteredRows.value, ...totalRowsList.value];
 	await copyText(buildReportDelimitedRows(visibleColumns.value, rows, reportCurrency.value, "\t"));
 	showSuccess(__("Copied {0} rows to clipboard.", [String(filteredRows.value.length)]));
@@ -320,11 +351,12 @@ function slugify(value: string): string {
 		.replace(/^-+|-+$/g, "");
 }
 
-function exportCsv() {
+async function exportCsv() {
 	if (filteredRows.value.length === 0) {
 		showError(__("No rows available to export."));
 		return;
 	}
+	if (!(await authorizeAction("export"))) return;
 	const rows = [...filteredRows.value, ...totalRowsList.value];
 	const csv = buildReportDelimitedRows(visibleColumns.value, rows, reportCurrency.value, ",");
 	const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -340,11 +372,12 @@ function exportCsv() {
 	showSuccess(__("Report exported as CSV."));
 }
 
-function printThermal() {
+async function printThermal() {
 	if (filteredRows.value.length === 0) {
 		showError(__("No data to print."));
 		return;
 	}
+	if (!(await authorizeAction("print"))) return;
 	const ok = printThermalReport({
 		title: activeReport.value?.title || __("Report"),
 		filters: filters.value,
@@ -423,16 +456,28 @@ function goBack() {
 				<RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
 				{{ __("Refresh") }}
 			</Button>
-			<Button variant="outline" size="sm" class="h-9" @click="copyReport">
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-9"
+				:disabled="!activeReport.export.allowed"
+				@click="copyReport"
+			>
 				<Copy class="h-4 w-4" />
 				{{ __("Copy") }}
 			</Button>
-			<Button variant="outline" size="sm" class="h-9" @click="exportCsv">
+			<Button
+				variant="outline"
+				size="sm"
+				class="h-9"
+				:disabled="!activeReport.export.allowed"
+				@click="exportCsv"
+			>
 				<Download class="h-4 w-4" />
 				{{ __("Export CSV") }}
 			</Button>
 			<Button
-				v-if="activeReport.thermalPrint"
+				v-if="activeReport.print.thermal && activeReport.print.allowed"
 				variant="outline"
 				size="sm"
 				class="h-9"

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { Search, BarChart3, ArrowRight, Lock, Sparkles, Layers3, FolderOpen } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import __ from "@/lib/translate";
+import { showError } from "@/services/api";
+import { extractErrorMessage } from "@/utils";
 import {
-	getReportDefinitions,
-	isReportAccessible,
+	fetchReportCatalog,
+	isReportRunnable,
 	type ReportCategory,
 	type ReportDefinition,
 } from "@/services/reports";
@@ -18,14 +20,22 @@ import {
 const router = useRouter();
 const searchTerm = ref("");
 
-const reportDefinitions = computed(() => getReportDefinitions());
+const reportDefinitions = ref<ReportDefinition[]>([]);
+
+onMounted(async () => {
+	try {
+		reportDefinitions.value = await fetchReportCatalog(true);
+	} catch (error) {
+		showError(extractErrorMessage(error));
+	}
+});
 
 const filteredReports = computed(() => {
 	const query = searchTerm.value.trim().toLowerCase();
 	if (!query) return reportDefinitions.value;
 
 	return reportDefinitions.value.filter((report) => {
-		const textParts = [report.title, report.reportName, report.description, report.category, report.slug]
+		const textParts = [report.title, report.id, report.description, report.category, report.slug]
 			.join(" ")
 			.toLowerCase();
 		return textParts.includes(query);
@@ -33,7 +43,7 @@ const filteredReports = computed(() => {
 });
 
 const accessibleCount = computed(
-	() => reportDefinitions.value.filter((report) => isReportAccessible(report)).length,
+	() => reportDefinitions.value.filter((report) => isReportRunnable(report)).length,
 );
 
 const sectionReports = computed(() => {
@@ -65,10 +75,20 @@ const categoryAccent: Record<ReportCategory, { accent: string; chip: string; ico
 		chip: "bg-primary/10 text-primary border-primary/30",
 		icon: "text-primary",
 	},
+	Accounting: {
+		accent: "from-info/20 via-info/10 to-transparent",
+		chip: "bg-info/10 text-info border-info/30",
+		icon: "text-info",
+	},
+	Other: {
+		accent: "from-muted via-muted/50 to-transparent",
+		chip: "bg-muted text-muted-foreground border-border",
+		icon: "text-muted-foreground",
+	},
 };
 
 function openReport(report: ReportDefinition) {
-	if (!isReportAccessible(report)) return;
+	if (!isReportRunnable(report)) return;
 	router.push(`/reports/${report.slug}`);
 }
 
@@ -206,18 +226,18 @@ function clearSearch() {
 
 								<div class="flex items-center justify-end gap-2 pt-1">
 									<Badge
-										v-if="!isReportAccessible(report)"
+										v-if="!isReportRunnable(report)"
 										variant="destructive"
 										class="gap-1.5"
 									>
 										<Lock class="h-3 w-3" />
-										{{ __("Locked") }}
+										{{ __("Needs adapter") }}
 									</Badge>
 									<Button
 										variant="outline"
 										size="sm"
 										class="gap-1.5"
-										:disabled="!isReportAccessible(report)"
+										:disabled="!isReportRunnable(report)"
 										@click="openReport(report)"
 									>
 										{{ __("Open") }}

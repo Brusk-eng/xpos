@@ -204,8 +204,8 @@ doc_events = {
 			"xpos.api.print_formats.validate_print_format_rules",
 			"xpos.api.profiles.validate_offline_payment_modes",
 		],
-		"on_update": "xpos.api.catalog_log.log_reset",
-		"on_trash": "xpos.api.catalog_log.log_reset",
+		"on_update": ["xpos.api.catalog_log.log_reset", "xpos.reports.catalog.bump_version"],
+		"on_trash": ["xpos.api.catalog_log.log_reset", "xpos.reports.catalog.bump_version"],
 	},
 	"Item": {
 		"on_update": "xpos.api.catalog_log.log_item",
@@ -232,7 +232,28 @@ doc_events = {
 		"on_update": "xpos.api.catalog_log.log_reset",
 		"on_trash": "xpos.api.catalog_log.log_reset",
 	},
+	"Report": {
+		"on_update": "xpos.reports.catalog.bump_version",
+		"on_trash": "xpos.reports.catalog.bump_version",
+	},
+	"User Permission": {
+		"on_update": "xpos.reports.catalog.bump_version",
+		"on_trash": "xpos.reports.catalog.bump_version",
+	},
+	"Custom DocPerm": {
+		"on_update": "xpos.reports.catalog.bump_version",
+		"on_trash": "xpos.reports.catalog.bump_version",
+	},
+	"POS Role": {
+		"on_update": "xpos.reports.catalog.bump_version",
+		"on_trash": "xpos.reports.catalog.bump_version",
+	},
 }
+
+# Filter providers the POS report catalog may call. Reports in the X POS module are offered
+# automatically; an administrator enables any other report with an XPOS Report Setting.
+xpos_report_filter_providers = ["xpos.reports.providers.bundled_filters"]
+
 
 # Scheduled Tasks
 # ---------------

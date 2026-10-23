@@ -31,6 +31,7 @@ POS_PERMISSIONS = (
 	# Reports
 	("current_stock_by_brand", "Current Stock by Brand", "Reports"),
 	("current_stock_report", "Current Stock Report", "Reports"),
+	("gift_card_liability_report", "Gift Card Liability Report", "Reports"),
 	# Administration
 	("manage_role_permissions", "Manage Role Permissions", "Administration"),
 )
