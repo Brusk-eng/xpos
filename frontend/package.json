@@ -29,6 +29,7 @@
     "@tanstack/vue-virtual": "3.13.47",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
+    "air-datepicker": "3.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dayjs": "^1.11.20",

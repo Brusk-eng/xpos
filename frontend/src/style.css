@@ -415,3 +415,72 @@ html [data-sonner-toaster][data-theme] {
 		user-select: text;
 	}
 }
+
+:root .air-datepicker {
+	--adp-font-family: inherit;
+	--adp-font-size: 0.875rem;
+	--adp-z-index: 10050;
+	--adp-width: 17.5rem;
+	--adp-border-radius: 1rem;
+	--adp-background-color: hsl(var(--popover));
+	--adp-background-color-hover: hsl(var(--surface-hover));
+	--adp-background-color-active: hsl(var(--surface-pressed));
+	--adp-color: hsl(var(--popover-foreground));
+	--adp-color-secondary: hsl(var(--muted-foreground));
+	--adp-accent-color: hsl(var(--primary));
+	--adp-color-other-month: hsl(var(--muted-foreground) / 0.6);
+	--adp-color-other-month-hover: hsl(var(--muted-foreground));
+	--adp-color-disabled: hsl(var(--muted-foreground) / 0.45);
+	--adp-color-disabled-in-range: hsl(var(--muted-foreground) / 0.45);
+	--adp-border-color: hsl(var(--border));
+	--adp-border-color-inner: hsl(var(--border));
+	--adp-border-color-inline: hsl(var(--border));
+	--adp-day-name-color: hsl(var(--primary));
+	--adp-day-name-color-hover: hsl(var(--foreground));
+	--adp-cell-background-color-hover: hsl(var(--surface-hover));
+	--adp-cell-background-color-selected: hsl(var(--primary));
+	--adp-cell-background-color-selected-hover: hsl(var(--primary) / 0.9);
+	--adp-cell-background-color-in-range: hsl(var(--surface-selected));
+	--adp-cell-background-color-in-range-hover: hsl(var(--surface-selected));
+	--adp-background-color-in-range: hsl(var(--surface-selected));
+	--adp-background-color-in-range-focused: hsl(var(--surface-selected));
+	--adp-background-color-selected-other-month: hsl(var(--primary) / 0.7);
+	--adp-background-color-selected-other-month-focused: hsl(var(--primary));
+	--adp-btn-color: hsl(var(--primary));
+	--adp-btn-color-hover: hsl(var(--foreground));
+	--adp-time-track-color: hsl(var(--border));
+	--adp-time-track-color-hover: hsl(var(--border-strong));
+	--adp-time-day-period-color: hsl(var(--muted-foreground));
+	box-shadow: var(--shadow-overlay, 0 12px 32px hsl(var(--foreground) / 0.18));
+}
+
+:root .air-datepicker-cell.-selected-,
+:root .air-datepicker-cell.-selected-.-current- {
+	color: hsl(var(--primary-foreground));
+}
+
+:root .air-datepicker-cell.-current- {
+	color: hsl(var(--primary));
+	font-weight: 600;
+}
+
+:root .air-datepicker-cell,
+:root .air-datepicker-nav--action,
+:root .air-datepicker-nav--title,
+:root .air-datepicker-button {
+	border-radius: 0.625rem;
+}
+
+:root .air-datepicker-time--row input[type="range"]::-webkit-slider-thumb {
+	background: hsl(var(--card));
+	border-color: hsl(var(--primary));
+}
+
+:root .air-datepicker-time--row input[type="range"]::-moz-range-thumb {
+	background: hsl(var(--card));
+	border-color: hsl(var(--primary));
+}
+
+[dir="rtl"] .air-datepicker {
+	direction: rtl;
+}
