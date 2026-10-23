@@ -14,14 +14,10 @@
 				<div class="flex items-center gap-3">
 					<div
 						class="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
-						:class="
-							offlineStore.isOnline
-								? 'bg-linear-to-br from-emerald-500 to-emerald-600'
-								: 'bg-linear-to-br from-red-500 to-red-600'
-						"
+						:class="offlineStore.isOnline ? 'bg-success' : 'bg-destructive'"
 					>
-						<WifiOff v-if="!offlineStore.isOnline" class="w-4 h-4 text-white" />
-						<Wifi v-else class="w-4 h-4 text-white" />
+						<WifiOff v-if="!offlineStore.isOnline" class="w-4 h-4 text-destructive-foreground" />
+						<Wifi v-else class="w-4 h-4 text-success-foreground" />
 					</div>
 					<div>
 						<DialogTitle class="text-base">{{ __("Offline Invoices") }}</DialogTitle>
@@ -80,7 +76,7 @@
 					v-if="offlineStore.pendingInvoices.length === 0"
 					class="flex flex-col items-center justify-center py-10 text-muted-foreground"
 				>
-					<CheckCircle2 class="w-12 h-12 mb-3 text-emerald-400" />
+					<CheckCircle2 class="w-12 h-12 mb-3 text-success" />
 					<p class="text-sm font-medium">{{ __("All caught up") }}!</p>
 					<p class="text-xs mt-1">{{ __("No pending offline invoices.") }}</p>
 				</div>
@@ -89,7 +85,7 @@
 					v-for="inv in offlineStore.pendingInvoices"
 					:key="inv.id"
 					class="rounded-xl border border-border bg-card p-3 space-y-2"
-					:class="isDraft(inv) ? 'border-amber-300 dark:border-amber-700' : ''"
+					:class="isDraft(inv) ? 'border-warning/30' : ''"
 				>
 					<div class="flex items-center justify-between">
 						<div>
@@ -110,7 +106,7 @@
 							<Badge
 								v-if="isDraft(inv)"
 								variant="outline"
-								class="text-[10px] text-amber-600 border-amber-400"
+								class="text-[10px] text-warning border-warning/30"
 							>
 								{{ __("Draft") }}
 							</Badge>
@@ -241,7 +237,7 @@
 							v-else-if="isDraft(inv)"
 							variant="default"
 							size="sm"
-							class="flex-1 gap-1 text-xs bg-amber-500 hover:bg-amber-600"
+							class="flex-1 gap-1 text-xs bg-warning hover:bg-warning/90 text-warning-foreground"
 							@click="inv.id && loadToCart(inv)"
 						>
 							<ShoppingCart class="w-3.5 h-3.5" />

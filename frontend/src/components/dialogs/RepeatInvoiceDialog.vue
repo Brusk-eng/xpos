@@ -10,7 +10,7 @@
 		<DialogContent class="max-w-2xl max-h-[80vh] flex flex-col p-0 gap-0">
 			<DialogHeader class="shrink-0 px-5 pt-5 pb-3 border-b border-border">
 				<div class="flex items-center gap-2">
-					<Repeat class="w-5 h-5 text-blue-500" />
+					<Repeat class="w-5 h-5 text-info" />
 					<DialogTitle class="text-base">{{ __("Repeat Invoice") }}</DialogTitle>
 					<Badge variant="outline" class="text-[10px] font-mono">Ctrl+G</Badge>
 				</div>

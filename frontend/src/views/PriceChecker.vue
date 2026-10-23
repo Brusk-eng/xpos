@@ -152,7 +152,7 @@
 						>
 							<span
 								v-if="item.in_stock"
-								class="rounded-full bg-emerald-500/10 px-3.5 py-1.5 text-[clamp(12px,1.8vh,14px)] font-semibold text-emerald-500"
+								class="rounded-full bg-success/10 px-3.5 py-1.5 text-[clamp(12px,1.8vh,14px)] font-semibold text-success"
 							>
 								✓ {{ __("In Stock") }}
 							</span>

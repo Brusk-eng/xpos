@@ -89,7 +89,7 @@ function clearAll() {
 					v-for="item in selectedItems"
 					:key="item.value"
 					variant="secondary"
-					class="gap-1.5 pl-2.5 pr-1.5"
+					class="gap-1.5 ps-2.5 pe-1.5"
 				>
 					<span class="max-w-36 truncate">{{ item.label || item.value }}</span>
 					<button

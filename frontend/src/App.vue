@@ -298,6 +298,8 @@ const isDark = computed(() => {
 
 function applyThemeToDocument(dark: boolean) {
 	const html = document.documentElement;
+	const themeColor = document.querySelector('meta[name="theme-color"]');
+	if (themeColor) themeColor.setAttribute("content", dark ? "#0b1220" : "#e8ecf2");
 	if (dark) {
 		html.classList.add("dark");
 		html.classList.remove("light");

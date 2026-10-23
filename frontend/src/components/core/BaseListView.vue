@@ -52,18 +52,21 @@
 								class="skeleton h-20 w-full rounded-xl"
 							></div>
 						</div>
-						<div
+						<ErrorState
+							v-else-if="error && items.length === 0"
+							:title="__('Could not load records')"
+							:description="error"
+							retryable
+							:retrying="isLoading"
+							@retry="emit('retry')"
+						/>
+						<EmptyState
 							v-else-if="items.length === 0"
-							class="flex flex-col items-center justify-center h-64 text-muted-foreground"
-						>
-							<component
-								:is="emptyIcon"
-								v-if="emptyIcon"
-								class="w-16 h-16 mb-4 text-muted-foreground/30"
-							/>
-							<p class="text-lg font-medium">{{ emptyTitle }}</p>
-							<p v-if="emptyDescription" class="text-sm">{{ emptyDescription }}</p>
-						</div>
+							class="h-64"
+							:title="emptyTitle"
+							:description="emptyDescription"
+							:icon="emptyIcon"
+						/>
 
 						<div v-else :class="[listClass, { 'opacity-50': isLoading }]">
 							<template v-for="(item, index) in items" :key="resolveItemKey(item, index)">
@@ -92,6 +95,7 @@ import { Button } from "@/components/ui/button";
 import ListFilterBar from "@/components/core/ListFilterBar.vue";
 import QueryFilterPanel from "@/components/core/QueryFilterPanel.vue";
 import SortBy from "@/components/core/SortBy.vue";
+import { EmptyState, ErrorState } from "@/components/ui/state";
 import Pagination from "@/components/orders/Pagination.vue";
 import type { DocField } from "@/services/doctypeMeta";
 import __ from "@/lib/translate";
@@ -109,6 +113,7 @@ const props = withDefaults(
 		queryFilters?: QueryFilterModel[];
 		orderBy: string;
 		isLoading: boolean;
+		error?: string | null;
 		items: any[];
 		total: number;
 		pageSize: number;
@@ -123,6 +128,7 @@ const props = withDefaults(
 		loadingSkeletonCount?: number;
 	}>(),
 	{
+		error: null,
 		queryFilters: () => [],
 		emptyDescription: "",
 		hideStandardFiltersOnMobile: false,
@@ -137,6 +143,7 @@ const emit = defineEmits<{
 	(e: "update:queryFilters", filters: QueryFilterModel[]): void;
 	(e: "update:orderBy", value: string): void;
 	(e: "refresh"): void;
+	(e: "retry"): void;
 	(e: "clearFilters"): void;
 	(e: "update:currentPage", page: number): void;
 	(e: "update:pageSize", size: number): void;

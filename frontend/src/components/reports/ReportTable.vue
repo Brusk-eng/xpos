@@ -103,7 +103,7 @@ function totalCell(row: Record<string, unknown>, column: ReportColumn): string {
 					v-for="(row, index) in rows"
 					:key="rowKey(row, index)"
 					class="transition-colors hover:bg-muted/50"
-					:class="{ 'bg-amber-500/5 font-medium': isReportTotalRow(row) }"
+					:class="{ 'bg-warning/5 font-medium': isReportTotalRow(row) }"
 				>
 					<td class="px-3 py-2 text-muted-foreground">{{ index + 1 }}</td>
 					<td

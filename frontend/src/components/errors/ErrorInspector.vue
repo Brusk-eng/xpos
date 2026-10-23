@@ -1,16 +1,16 @@
 <template>
 	<Transition name="fade">
 		<div v-if="open" class="fixed inset-0 z-100 flex justify-end">
-			<div class="absolute inset-0 bg-black/40" @click="open = false" />
+			<div class="absolute inset-0 bg-scrim" @click="open = false" />
 			<div
 				class="relative flex h-full w-full max-w-2xl flex-col border-s border-border bg-background shadow-2xl"
 			>
 				<div class="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
 					<div class="flex items-center gap-2">
 						<div
-							class="flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-red-500 to-red-600 shadow-sm"
+							class="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive shadow-sm"
 						>
-							<Bug class="h-4 w-4 text-white" />
+							<Bug class="h-4 w-4 text-destructive-foreground" />
 						</div>
 						<div>
 							<h2 class="text-base font-semibold">{{ __("Error Inspector") }}</h2>
@@ -76,7 +76,7 @@
 							v-if="filteredEntries.length === 0"
 							class="flex flex-col items-center justify-center py-16 text-muted-foreground"
 						>
-							<ShieldCheck class="mb-3 h-12 w-12 text-emerald-400" />
+							<ShieldCheck class="mb-3 h-12 w-12 text-success" />
 							<p class="text-sm font-medium">{{ __("No errors captured") }}</p>
 						</div>
 
@@ -219,11 +219,11 @@ function toggle(id: string) {
 }
 
 const SOURCE_CLASSES: Record<ErrorSource, string> = {
-	api: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
-	sync: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-	"dead-letter": "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
-	renderer: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300",
-	promise: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+	api: "bg-destructive-soft text-destructive",
+	sync: "bg-warning-soft text-warning",
+	"dead-letter": "bg-destructive-soft text-destructive",
+	renderer: "bg-info-soft text-info",
+	promise: "bg-info-soft text-info",
 };
 function sourceClass(source: ErrorSource): string {
 	return SOURCE_CLASSES[source] ?? "bg-muted text-muted-foreground";

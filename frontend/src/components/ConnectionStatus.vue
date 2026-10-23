@@ -9,7 +9,7 @@
 				cn(
 					'inline-flex shrink-0 items-center gap-2 whitespace-nowrap font-medium transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
 					compact
-						? 'h-6 rounded px-2 text-[12px] text-[#cccccc] hover:bg-[#505050] hover:text-white dark:hover:bg-[#2a2d2e]'
+						? 'h-6 rounded px-2 text-[12px] text-muted-foreground hover:bg-surface-hover hover:text-foreground'
 						: 'h-control rounded-lg border px-3 text-sm shadow-raised',
 					!compact && toneClass,
 				)

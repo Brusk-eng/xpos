@@ -342,7 +342,7 @@
 							</template>
 						</div>
 
-						<div v-if="!isSplitPayment" class="grid grid-cols-4 gap-2">
+						<div v-if="!isSplitPayment" class="grid grid-cols-2 sm:grid-cols-4 gap-2">
 							<Button
 								v-for="(amount, idx) in quickAmounts"
 								:key="amount"
@@ -775,7 +775,7 @@
 									:model-value="leg.amount"
 									:min="0"
 									:precision="precisionFor(leg.currency)"
-									class="w-28 text-right text-sm py-1"
+									class="w-28 text-end text-sm py-1"
 									data-testid="change-leg-input"
 									@update:model-value="updateChangeLeg(idx, Number($event) || 0)"
 								/>

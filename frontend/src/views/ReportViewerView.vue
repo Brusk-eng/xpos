@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select } from "@/components/ui/select";
+import { PageHeader } from "@/components/ui/page";
 import Pagination from "@/components/orders/Pagination.vue";
 import ReportFilterBar from "@/components/reports/ReportFilterBar.vue";
 import ReportTable, { type ReportSortState } from "@/components/reports/ReportTable.vue";
@@ -191,6 +192,8 @@ function isValidFilterValue(value: unknown): boolean {
 	return true;
 }
 
+let runRequestId = 0;
+
 async function runReport() {
 	const report = activeReport.value;
 	if (!report) return;
@@ -215,12 +218,14 @@ async function runReport() {
 		return;
 	}
 
+	const id = ++runRequestId;
 	isLoading.value = true;
 	errorMessage.value = "";
 
 	try {
 		const payload = normalizeReportFilters(filters.value, filterState);
 		const response = await fetchReportData(report.reportName, payload);
+		if (id !== runRequestId) return;
 		reportColumns.value = response.columns || [];
 		reportRows.value = normalizeReportRows(
 			reportColumns.value,
@@ -239,10 +244,11 @@ async function runReport() {
 		});
 		if (response.message) showSuccess(response.message);
 	} catch (error) {
+		if (id !== runRequestId) return;
 		errorMessage.value = extractErrorMessage(error);
 		showError(errorMessage.value);
 	} finally {
-		isLoading.value = false;
+		if (id === runRequestId) isLoading.value = false;
 	}
 }
 
@@ -404,55 +410,42 @@ function goBack() {
 			</Card>
 		</div>
 
-		<ScrollArea v-else class="flex-1">
+		<PageHeader v-else :title="activeReport.title" :subtitle="activeReport.description">
+			<template #leading>
+				<Button variant="ghost" size="icon-sm" :aria-label="__('Back to Reports')" @click="goBack">
+					<ArrowLeft class="h-4 w-4" />
+				</Button>
+			</template>
+			<template #meta>
+				<Badge variant="outline">{{ activeReport.category }}</Badge>
+			</template>
+			<Button variant="outline" size="sm" class="h-9" :disabled="isLoading" @click="runReport">
+				<RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
+				{{ __("Refresh") }}
+			</Button>
+			<Button variant="outline" size="sm" class="h-9" @click="copyReport">
+				<Copy class="h-4 w-4" />
+				{{ __("Copy") }}
+			</Button>
+			<Button variant="outline" size="sm" class="h-9" @click="exportCsv">
+				<Download class="h-4 w-4" />
+				{{ __("Export CSV") }}
+			</Button>
+			<Button
+				v-if="activeReport.thermalPrint"
+				variant="outline"
+				size="sm"
+				class="h-9"
+				:disabled="reportRows.length === 0"
+				@click="printThermal"
+			>
+				<Printer class="h-4 w-4" />
+				{{ __("Print") }}
+			</Button>
+		</PageHeader>
+
+		<ScrollArea v-if="isReportVisible && activeReport && isReportAllowed" class="flex-1">
 			<div class="space-y-4 p-3 pb-4 sm:p-4">
-				<div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-					<div class="min-w-0 space-y-1">
-						<div class="flex flex-wrap items-center gap-2">
-							<Button variant="ghost" size="icon-sm" @click="goBack">
-								<ArrowLeft class="h-4 w-4" />
-							</Button>
-							<h1 class="truncate text-xl font-bold tracking-tight text-foreground sm:text-2xl">
-								{{ activeReport.title }}
-							</h1>
-							<Badge variant="outline">{{ activeReport.category }}</Badge>
-						</div>
-						<p class="text-sm text-muted-foreground">{{ activeReport.description }}</p>
-					</div>
-
-					<div class="flex flex-wrap items-center gap-2">
-						<Button
-							variant="outline"
-							size="sm"
-							class="h-9"
-							:disabled="isLoading"
-							@click="runReport"
-						>
-							<RefreshCw class="h-4 w-4" :class="{ 'animate-spin': isLoading }" />
-							{{ __("Refresh") }}
-						</Button>
-						<Button variant="outline" size="sm" class="h-9" @click="copyReport">
-							<Copy class="h-4 w-4" />
-							{{ __("Copy") }}
-						</Button>
-						<Button variant="outline" size="sm" class="h-9" @click="exportCsv">
-							<Download class="h-4 w-4" />
-							{{ __("Export CSV") }}
-						</Button>
-						<Button
-							v-if="activeReport.thermalPrint"
-							variant="outline"
-							size="sm"
-							class="h-9"
-							:disabled="reportRows.length === 0"
-							@click="printThermal"
-						>
-							<Printer class="h-4 w-4" />
-							{{ __("Print") }}
-						</Button>
-					</div>
-				</div>
-
 				<ReportFilterBar
 					:filters="filters"
 					:values="filterState"

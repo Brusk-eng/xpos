@@ -263,11 +263,11 @@ export const useOfflineStore = defineStore("offline", () => {
 	});
 
 	const statusColor = computed(() => {
-		if (isSyncing.value) return "text-blue-500";
-		if (deadLetterCount.value > 0) return "text-red-500";
-		if (!isOnline.value) return "text-red-500";
-		if (pendingCount.value > 0) return "text-amber-500";
-		return "text-emerald-500";
+		if (isSyncing.value) return "text-info";
+		if (deadLetterCount.value > 0) return "text-destructive";
+		if (!isOnline.value) return "text-destructive";
+		if (pendingCount.value > 0) return "text-warning";
+		return "text-success";
 	});
 
 	function init() {

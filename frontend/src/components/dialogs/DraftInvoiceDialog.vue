@@ -11,7 +11,7 @@
 			<DialogHeader class="shrink-0 px-5 pt-5 pb-3 border-b border-border">
 				<div class="flex items-center gap-2">
 					<div
-						class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-600 flex items-center justify-center"
+						class="w-8 h-8 rounded-lg bg-warning/10 text-warning flex items-center justify-center"
 					>
 						<Clock class="w-4 h-4" />
 					</div>
@@ -94,9 +94,13 @@
 						<div
 							v-for="draft in visibleDrafts"
 							:key="draft.name"
-							class="p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer group"
+							class="p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus group"
 							data-testid="open-tab-row"
+							role="button"
+							tabindex="0"
 							@click="selectDraft(draft)"
+							@keydown.self.enter.prevent="selectDraft(draft)"
+							@keydown.self.space.prevent="selectDraft(draft)"
 						>
 							<div class="flex items-start justify-between">
 								<div class="flex-1 min-w-0">
@@ -194,9 +198,13 @@
 						<div
 							v-for="invoice in outstanding"
 							:key="invoice.name"
-							class="p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer"
+							class="p-3 rounded-lg border border-border hover:border-primary/30 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
 							data-testid="unpaid-invoice-row"
+							role="button"
+							tabindex="0"
 							@click="selectedOutstanding = invoice"
+							@keydown.self.enter.prevent="selectedOutstanding = invoice"
+							@keydown.self.space.prevent="selectedOutstanding = invoice"
 						>
 							<div class="flex items-start justify-between gap-3">
 								<div class="flex-1 min-w-0">

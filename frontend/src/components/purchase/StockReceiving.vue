@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { NumberInput } from "@/components/ui/number-input";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ErrorState } from "@/components/ui/state";
 import type { InTransitEntry, ReceiveTransitItem, ReturnShortageItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 
@@ -176,18 +177,15 @@ onMounted(() => {
 							}}
 						</p>
 					</div>
-					<Badge
-						variant="secondary"
-						class="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
-					>
+					<Badge variant="secondary" class="bg-info-soft text-info">
 						{{ percent(purchaseStore.selectedTransit.per_transferred, 0) }}
 						{{ __("transferred") }}
 					</Badge>
 				</div>
 			</div>
 
-			<div class="px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-border shrink-0">
-				<p class="text-xs text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+			<div class="px-4 py-2 bg-info-soft border-b border-border shrink-0">
+				<p class="text-xs text-info flex items-center gap-1.5">
 					<Warehouse class="w-3.5 h-3.5" />
 					{{ __("Receiving at") }}: <strong>{{ posStore.warehouse }}</strong>
 				</p>
@@ -223,7 +221,7 @@ onMounted(() => {
 						<div class="grid grid-cols-2 gap-3">
 							<div>
 								<label class="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-									<CheckCircle2 class="w-3 h-3 text-green-500" />
+									<CheckCircle2 class="w-3 h-3 text-success" />
 									{{ __("Receive Qty") }}
 								</label>
 								<div class="flex items-center gap-1">
@@ -246,7 +244,7 @@ onMounted(() => {
 							</div>
 							<div>
 								<label class="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-									<CornerDownLeft class="w-3 h-3 text-amber-500" />
+									<CornerDownLeft class="w-3 h-3 text-warning" />
 									{{ __("Return Qty") }}
 								</label>
 								<div class="flex items-center gap-1">
@@ -262,17 +260,14 @@ onMounted(() => {
 										@click="returnAllTransit(index)"
 										variant="outline"
 										size="sm"
-										class="h-8 text-xs px-2 text-amber-600 shrink-0"
+										class="h-8 text-xs px-2 text-warning shrink-0"
 										>{{ __("All") }}</Button
 									>
 								</div>
 							</div>
 						</div>
 
-						<div
-							v-if="item.return_qty > 0"
-							class="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400"
-						>
+						<div v-if="item.return_qty > 0" class="flex items-center gap-2 text-xs text-warning">
 							<CornerDownLeft class="w-3 h-3" />
 							<span
 								>{{ qty(item.return_qty) }} {{ item.uom }} {{ __("will be returned to") }}
@@ -282,7 +277,7 @@ onMounted(() => {
 
 						<div
 							v-if="item.pending_qty - item.receive_qty - item.return_qty > 0"
-							class="flex items-center gap-2 text-xs text-red-500"
+							class="flex items-center gap-2 text-xs text-destructive"
 						>
 							<AlertTriangle class="w-3 h-3" />
 							<span
@@ -346,6 +341,14 @@ onMounted(() => {
 					<p>{{ __("Loading in-transit stock...") }}</p>
 				</div>
 
+				<ErrorState
+					v-else-if="purchaseStore.transitError"
+					:title="__('Could not load in-transit stock')"
+					:description="purchaseStore.transitError"
+					retryable
+					@retry="purchaseStore.fetchInTransitTransfers()"
+				/>
+
 				<div
 					v-else-if="purchaseStore.inTransitEntries.length === 0"
 					class="p-8 text-center text-muted-foreground"
@@ -363,19 +366,16 @@ onMounted(() => {
 						class="w-full p-4 text-start hover:bg-muted transition-colors flex items-center gap-3"
 					>
 						<div
-							class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0"
+							class="w-10 h-10 rounded-full bg-info-soft flex items-center justify-center shrink-0"
 						>
-							<ArrowRightLeft class="w-5 h-5 text-blue-600 dark:text-blue-400" />
+							<ArrowRightLeft class="w-5 h-5 text-info" />
 						</div>
 						<div class="flex-1 min-w-0">
 							<div class="flex items-center justify-between">
 								<p class="font-medium text-foreground truncate">
 									{{ entry.name }}
 								</p>
-								<Badge
-									variant="secondary"
-									class="shrink-0 ms-2 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
-								>
+								<Badge variant="secondary" class="shrink-0 ms-2 bg-info-soft text-info">
 									{{ entry.total_pending_items }} {{ __("items") }}
 								</Badge>
 							</div>

@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, reactive, watch } from "vue";
 import { useRouter } from "vue-router";
 import { usePurchaseStore } from "@/stores/purchaseStore";
+import { PageHeader } from "@/components/ui/page";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { Button } from "@/components/ui/button";
@@ -518,7 +519,7 @@ const invoiceColumns = computed<TableColumn[]>(() => {
 			width: "w-[90px]",
 			align: "right" as const,
 			editable: false,
-			cellClass: "text-green-600 font-medium",
+			cellClass: "text-success font-medium",
 			format: (_: any, row: any) => formatCurrency(getTotalAmount(row)),
 		},
 		{
@@ -538,7 +539,8 @@ const invoiceColumns = computed<TableColumn[]>(() => {
 			align: "right" as const,
 			editable: false,
 			format: (_: any, row: any) => percent(getMarginPercent(row), 1),
-			cellClass: (_: any, row: any) => (getMarginPercent(row) >= 0 ? "text-green-600" : "text-red-500"),
+			cellClass: (_: any, row: any) =>
+				getMarginPercent(row) >= 0 ? "text-success" : "text-destructive",
 		},
 	);
 
@@ -885,79 +887,67 @@ onMounted(() => {
 </script>
 
 <template>
-	<div class="h-full flex flex-col bg-background overflow-hidden">
-		<header class="bg-card border-b border-border px-4 py-2.5 shrink-0">
-			<div class="flex items-center justify-between gap-3">
-				<div class="flex items-center gap-2">
-					<Receipt class="w-5 h-5 text-primary" />
-					<h1 class="text-lg font-semibold text-foreground">
-						{{ __("Purchase Invoice") }}
-					</h1>
-					<span
-						v-if="currentDraftName"
-						class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded"
-					>
-						{{ currentDraftName }}
-					</span>
-				</div>
-				<div class="flex items-center gap-1.5">
-					<Button @click="clearForm" variant="outline" size="sm" class="h-7 text-xs">
-						<X class="w-3.5 h-3.5 me-1" />
-						{{ __("Clear") }}
-					</Button>
-					<Button
-						@click="saveDraft"
-						variant="outline"
-						size="sm"
-						class="h-7 text-xs"
-						:disabled="
-							!purchaseStore.selectedSupplier || invoiceItems.length === 0 || isDraftSaving
-						"
-					>
-						<Save class="w-3.5 h-3.5 me-1" />
-						{{ isDraftSaving ? __("Saving...") : __("Save Draft") }}
-					</Button>
-					<Button
-						v-if="currentDraftName"
-						@click="submitDraft"
-						:disabled="isProcessing"
-						size="sm"
-						class="h-7 text-xs"
-					>
-						<Send class="w-3.5 h-3.5 me-1" />
-						{{ isProcessing ? __("Submitting...") : __("Submit") }}
-					</Button>
-					<Button
-						v-else
-						@click="createInvoice"
-						:disabled="
-							!purchaseStore.selectedSupplier || invoiceItems.length === 0 || isProcessing
-						"
-						size="sm"
-						class="h-7 text-xs"
-					>
-						<Send class="w-3.5 h-3.5 me-1" />
-						{{ isProcessing ? __("Creating...") : __("Create & Submit") }}
-					</Button>
-					<div class="w-px h-5 bg-border mx-0.5"></div>
-					<Button @click="loadDrafts" variant="outline" size="sm" class="h-7 text-xs">
-						<FileDown class="w-3.5 h-3.5 me-1" />
-						{{ __("Drafts") }}
-					</Button>
-					<Button @click="fetchPurchaseOrders" variant="outline" size="sm" class="h-7 text-xs">
-						<ShoppingCart class="w-3.5 h-3.5 me-1" />
-						{{ __("From PO") }}
-					</Button>
-					<Button @click="goToList" variant="outline" size="sm" class="h-7 text-xs">
-						<List class="w-3.5 h-3.5 me-1" />
-						{{ __("Invoices") }}
-					</Button>
-				</div>
-			</div>
-		</header>
+	<div class="h-full flex flex-col bg-background overflow-y-auto lg:overflow-hidden">
+		<PageHeader :title="__('Purchase Invoice')" :icon="Receipt" class="py-2.5">
+			<template #meta>
+				<span
+					v-if="currentDraftName"
+					class="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded"
+				>
+					{{ currentDraftName }}
+				</span>
+			</template>
+			<Button @click="clearForm" variant="outline" size="sm" class="h-7 text-xs">
+				<X class="w-3.5 h-3.5 me-1" />
+				{{ __("Clear") }}
+			</Button>
+			<Button
+				@click="saveDraft"
+				variant="outline"
+				size="sm"
+				class="h-7 text-xs"
+				:disabled="!purchaseStore.selectedSupplier || invoiceItems.length === 0 || isDraftSaving"
+			>
+				<Save class="w-3.5 h-3.5 me-1" />
+				{{ isDraftSaving ? __("Saving...") : __("Save Draft") }}
+			</Button>
+			<Button
+				v-if="currentDraftName"
+				@click="submitDraft"
+				:disabled="isProcessing"
+				size="sm"
+				class="h-7 text-xs"
+			>
+				<Send class="w-3.5 h-3.5 me-1" />
+				{{ isProcessing ? __("Submitting...") : __("Submit") }}
+			</Button>
+			<Button
+				v-else
+				@click="createInvoice"
+				:disabled="!purchaseStore.selectedSupplier || invoiceItems.length === 0 || isProcessing"
+				size="sm"
+				class="h-7 text-xs"
+			>
+				<Send class="w-3.5 h-3.5 me-1" />
+				{{ isProcessing ? __("Creating...") : __("Create & Submit") }}
+			</Button>
+			<div class="hidden sm:block w-px h-5 bg-border"></div>
+			<Button @click="loadDrafts" variant="outline" size="sm" class="h-7 text-xs">
+				<FileDown class="w-3.5 h-3.5 me-1" />
+				{{ __("Drafts") }}
+			</Button>
+			<Button @click="fetchPurchaseOrders" variant="outline" size="sm" class="h-7 text-xs">
+				<ShoppingCart class="w-3.5 h-3.5 me-1" />
+				{{ __("From PO") }}
+			</Button>
+			<Button @click="goToList" variant="outline" size="sm" class="h-7 text-xs">
+				<List class="w-3.5 h-3.5 me-1" />
+				{{ __("Invoices") }}
+			</Button>
+		</PageHeader>
 
 		<div class="bg-card border-b border-border px-4 py-2.5 shrink-0">
-			<div class="grid grid-cols-5 gap-3">
+			<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
 				<div>
 					<label class="text-xs text-muted-foreground mb-1 block">{{ __("Date") }}</label>
 					<DateTimePicker v-model="invoiceHeader.posting_date" mode="date" class="h-8 text-sm" />
@@ -1005,10 +995,10 @@ onMounted(() => {
 			</div>
 		</div>
 
-		<div class="flex-1 flex min-h-0 overflow-hidden">
+		<div class="relative flex lg:flex-1 lg:min-h-0 lg:overflow-hidden">
 			<div
 				v-if="showDraftPanel"
-				class="w-72 border-e border-border bg-card shrink-0 flex flex-col overflow-hidden"
+				class="absolute inset-y-0 inset-s-0 z-20 w-[min(18rem,90vw)] shadow-overlay lg:static lg:z-auto lg:w-72 lg:shadow-none border-e border-border bg-card shrink-0 flex flex-col overflow-hidden"
 			>
 				<div class="px-3 py-2 border-b border-border flex items-center justify-between">
 					<span class="text-sm font-medium">{{ __("Saved Drafts") }}</span>
@@ -1059,7 +1049,7 @@ onMounted(() => {
 
 			<div
 				v-if="showPOPanel"
-				class="w-80 border-e border-border bg-card shrink-0 flex flex-col overflow-hidden"
+				class="absolute inset-y-0 inset-s-0 z-20 w-[min(20rem,90vw)] shadow-overlay lg:static lg:z-auto lg:w-80 lg:shadow-none border-e border-border bg-card shrink-0 flex flex-col overflow-hidden"
 			>
 				<div class="px-3 py-2 border-b border-border flex items-center justify-between">
 					<span class="text-sm font-medium">{{ __("Purchase Orders") }}</span>
@@ -1084,9 +1074,7 @@ onMounted(() => {
 					>
 						<div class="flex items-center justify-between mb-1">
 							<span class="font-medium">{{ po.name }}</span>
-							<span class="text-green-600 font-medium">{{
-								formatCurrency(po.grand_total)
-							}}</span>
+							<span class="text-success font-medium">{{ formatCurrency(po.grand_total) }}</span>
 						</div>
 						<div class="text-muted-foreground mb-1">
 							{{ po.transaction_date }} &middot; {{ (po.items || []).length }} {{ __("items") }}
@@ -1109,7 +1097,7 @@ onMounted(() => {
 				</div>
 			</div>
 
-			<div class="flex-1 flex flex-col min-h-0 overflow-hidden">
+			<div class="flex-1 flex flex-col min-w-0 lg:min-h-0 lg:overflow-hidden">
 				<Table
 					:rows="invoiceItems"
 					:columns="invoiceColumns"
@@ -1131,7 +1119,7 @@ onMounted(() => {
 					@add-row="addEmptyRow"
 					@cell-change="onCellChange"
 					@link-select="onItemLinkSelect"
-					class="flex-1 min-h-0 flex flex-col"
+					class="flex-1 min-h-88 lg:min-h-0 flex flex-col"
 				>
 					<template #toolbar>
 						<div class="flex w-full flex-wrap items-center gap-1.5 sm:w-auto">
@@ -1143,9 +1131,10 @@ onMounted(() => {
 									v-model="barcodeValue"
 									class="ps-7 h-7 w-full text-xs sm:w-40"
 									:class="{
-										'ring-2 ring-green-500/50 border-green-500':
+										'ring-2 ring-success/50 border-success/30':
 											barcodeFlash === 'success',
-										'ring-2 ring-red-500/50 border-red-500': barcodeFlash === 'error',
+										'ring-2 ring-destructive/50 border-destructive/30':
+											barcodeFlash === 'error',
 									}"
 									:placeholder="__('Scan barcode...')"
 									@keydown.enter.prevent="onBarcodeScan"
@@ -1170,7 +1159,7 @@ onMounted(() => {
 				</Table>
 
 				<div class="border-t border-border bg-muted shrink-0">
-					<div class="px-4 py-2 grid grid-cols-7 gap-3 text-xs">
+					<div class="px-4 py-2 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
 						<div>
 							<span class="text-muted-foreground block">{{ __("Items") }}</span>
 							<span class="font-semibold text-sm">{{ invoiceItems.length }}</span>
@@ -1185,7 +1174,7 @@ onMounted(() => {
 						</div>
 						<div>
 							<span class="text-muted-foreground block">{{ __("Item Discount") }}</span>
-							<span class="font-semibold text-sm text-red-500"
+							<span class="font-semibold text-sm text-destructive"
 								>-{{ formatCurrency(totalDiscount) }}</span
 							>
 						</div>
@@ -1244,7 +1233,7 @@ onMounted(() => {
 							</div>
 							<div>
 								<span class="text-sm text-muted-foreground">{{ __("Grand Total") }}</span>
-								<div class="text-xl font-bold text-green-600">
+								<div class="text-xl font-bold text-success">
 									{{ formatCurrency(grandTotal) }}
 								</div>
 							</div>

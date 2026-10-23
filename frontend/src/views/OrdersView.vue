@@ -34,10 +34,7 @@
 				item-key="name"
 			>
 				<template #item="{ item: order }">
-					<Card
-						class="p-3 sm:p-4 cursor-pointer transition-all duration-200 border-border/60 dark:border-transparent hover:border-primary/40 hover:shadow-md dark:hover:bg-accent/50 dark:hover:shadow-primary/5"
-						@click="viewOrder(order)"
-					>
+					<Card interactive class="p-3 sm:p-4" @click="viewOrder(order)">
 						<div class="flex items-center gap-2 sm:gap-4">
 							<div class="min-w-0 flex-1">
 								<div class="flex items-center gap-2 mb-1 flex-wrap">

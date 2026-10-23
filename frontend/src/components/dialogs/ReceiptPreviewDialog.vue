@@ -272,7 +272,7 @@
 					v-if="invoice && !invoice.is_return"
 					variant="outline"
 					size="sm"
-					class="text-blue-600 border-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950"
+					class="text-info border-info/30 hover:bg-info-soft"
 					:disabled="isRepeatLoading"
 					@click="repeatFromOrder(invoice)"
 				>
@@ -284,7 +284,7 @@
 					v-if="invoice && !invoice.is_return && invoice.status !== 'Cancelled'"
 					variant="outline"
 					size="sm"
-					class="text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950"
+					class="text-warning border-warning/30 hover:bg-warning-soft"
 					@click="returnFromOrder(invoice)"
 				>
 					<RotateCcw class="w-4 h-4" />

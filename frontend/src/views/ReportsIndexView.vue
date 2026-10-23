@@ -46,24 +46,24 @@ const sectionReports = computed(() => {
 
 const categoryAccent: Record<ReportCategory, { accent: string; chip: string; icon: string }> = {
 	Inventory: {
-		accent: "from-emerald-500/20 via-emerald-500/10 to-transparent",
-		chip: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20",
-		icon: "text-emerald-500",
+		accent: "from-success/20 via-success/10 to-transparent",
+		chip: "bg-success/10 text-success border-success/30",
+		icon: "text-success",
 	},
 	Sales: {
-		accent: "from-sky-500/20 via-sky-500/10 to-transparent",
-		chip: "bg-sky-500/10 text-sky-700 dark:text-sky-300 border-sky-500/20",
-		icon: "text-sky-500",
+		accent: "from-info/20 via-info/10 to-transparent",
+		chip: "bg-info/10 text-info border-info/30",
+		icon: "text-info",
 	},
 	Purchasing: {
-		accent: "from-amber-500/20 via-amber-500/10 to-transparent",
-		chip: "bg-amber-500/10 text-amber-700 dark:text-amber-300 border-amber-500/20",
-		icon: "text-amber-500",
+		accent: "from-warning/20 via-warning/10 to-transparent",
+		chip: "bg-warning/10 text-warning border-warning/30",
+		icon: "text-warning",
 	},
 	Operations: {
-		accent: "from-violet-500/20 via-violet-500/10 to-transparent",
-		chip: "bg-violet-500/10 text-violet-700 dark:text-violet-300 border-violet-500/20",
-		icon: "text-violet-500",
+		accent: "from-primary/20 via-primary/10 to-transparent",
+		chip: "bg-primary/10 text-primary border-primary/30",
+		icon: "text-primary",
 	},
 };
 
@@ -80,12 +80,7 @@ function clearSearch() {
 <template>
 	<div class="flex flex-col h-full overflow-hidden bg-background">
 		<div class="shrink-0 p-3 sm:p-4 pb-2 sm:pb-3">
-			<Card
-				class="relative overflow-hidden border-border/70 bg-linear-to-br from-emerald-500/12 via-card to-background"
-			>
-				<div
-					class="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.16),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(14,165,233,0.10),transparent_30%)]"
-				/>
+			<Card class="relative overflow-hidden border-border/70 bg-card">
 				<div class="relative p-5 sm:p-6 space-y-4">
 					<div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
 						<div class="space-y-2 max-w-3xl">
