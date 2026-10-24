@@ -189,6 +189,7 @@ When connectivity returns:
 | Expenses and bank drops | Require connectivity |
 | Gift cards and customer credit | Require connectivity |
 | Storage | IndexedDB. X POS asks for persistent storage, but clearing site data can still remove queued sales, so sync (or use **Export** in the Offline Invoices panel) before clearing anything |
+| Storage notice | If the browser refuses persistent storage and sales are waiting to sync, a yellow bar says the browser may clear offline data. It sits above the header (it never covers it) and **Dismiss** hides it on this device. Syncing the queue is the real fix |
 
 X POS v3 runs only in the browser. For what the retired desktop app did differently, see [X POS v3: browser and PWA only](../v3-browser-only.md#browser-capability-gaps).
 

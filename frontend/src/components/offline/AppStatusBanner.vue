@@ -1,7 +1,7 @@
 <template>
 	<div
 		v-if="messages.length"
-		class="fixed inset-x-0 top-0 z-60 flex flex-col gap-1 bg-warning-soft px-4 py-2 text-sm text-warning-soft-foreground shadow"
+		class="relative z-10 flex shrink-0 flex-col gap-1 bg-warning-soft px-4 py-2 text-sm text-warning-soft-foreground shadow"
 		role="status"
 		data-testid="app-status-banner"
 	>
@@ -22,7 +22,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 import { useCartStore } from "@/stores/cartStore";
 import { useOfflineStore } from "@/stores/offlineStore";
 import {
@@ -33,6 +33,27 @@ import {
 	updateWaiting,
 } from "@/services/appUpdate";
 import __ from "@/lib/translate";
+
+const PERSIST_DISMISSED_KEY = "xpos-persist-notice-dismissed";
+
+function readDismissed(): boolean {
+	try {
+		return localStorage.getItem(PERSIST_DISMISSED_KEY) === "1";
+	} catch {
+		return false;
+	}
+}
+
+const persistDismissed = ref(readDismissed());
+
+function dismissPersist() {
+	persistDismissed.value = true;
+	try {
+		localStorage.setItem(PERSIST_DISMISSED_KEY, "1");
+	} catch {
+		/* the notice just returns on the next load */
+	}
+}
 
 const cartStore = useCartStore();
 const offlineStore = useOfflineStore();
@@ -87,12 +108,19 @@ const messages = computed(() => {
 			text: __("This device is almost out of storage. Free space before selling offline."),
 		});
 	}
-	if (offlineStore.offlineModeEnabled && offlineStore.storagePersisted === false) {
+	if (
+		offlineStore.offlineModeEnabled &&
+		offlineStore.storagePersisted === false &&
+		offlineStore.pendingInvoices.length > 0 &&
+		!persistDismissed.value
+	) {
 		list.push({
 			key: "persist",
 			text: __(
 				"The browser may clear offline data on this device. Sync often and do not clear site data.",
 			),
+			label: __("Dismiss"),
+			action: dismissPersist,
 		});
 	}
 	return list;

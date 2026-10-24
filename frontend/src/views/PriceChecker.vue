@@ -1,5 +1,8 @@
 <template>
-	<div class="flex h-dvh flex-col overflow-hidden bg-background text-foreground antialiased" :dir="dir">
+	<div
+		class="flex min-h-0 flex-1 flex-col overflow-hidden bg-background text-foreground antialiased"
+		:dir="dir"
+	>
 		<header
 			class="flex flex-none items-center justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-8 sm:py-5"
 		>
