@@ -66,6 +66,12 @@ class CatalogStore(private val db: SQLiteDatabase) {
     fun insertAttrs(rows: List<ItemAttr>) = rows.forEach {
         db.execSQL("INSERT INTO item_attr (scope_id,gen,item_code,attr,value) VALUES (?,?,?,?,?)", arrayOf<Any>(it.scopeId, it.gen, it.itemCode, it.attr, it.value))
     }
+    fun deleteItem(id: String, gen: Int, code: String) {
+        for (t in listOf("item", "item_barcode", "item_attr")) db.execSQL("DELETE FROM $t WHERE scope_id = ? AND gen = ? AND item_code = ?", arrayOf<Any>(id, gen, code))
+    }
+    fun setCount(id: String, gen: Int, n: Int) = db.execSQL("UPDATE catalog_generation SET item_count = ? WHERE scope_id = ? AND gen = ?", arrayOf<Any>(n, id, gen))
+    fun codePage(id: String, gen: Int, after: String, limit: Int): List<String> =
+        q("SELECT item_code FROM item WHERE scope_id = ? AND gen = ? AND item_code > ? ORDER BY item_code LIMIT ?", id, gen, after, limit).list { getString(0) }
     fun countItems(id: String, gen: Int): Int = scalarInt("SELECT COUNT(*) FROM item WHERE scope_id = ? AND gen = ?", id, gen) ?: 0
     fun countBarcodes(id: String, gen: Int): Int = scalarInt("SELECT COUNT(*) FROM item_barcode WHERE scope_id = ? AND gen = ?", id, gen) ?: 0
 
@@ -111,6 +117,18 @@ class TxnStore(private val db: SQLiteDatabase) {
         "INSERT INTO outbox (command_id,txn_id,kind,state,claim_token,claim_until,attempts,blocked_reason,created_at) VALUES (?,?,?,?,?,?,?,?,?)",
         arrayOf<Any?>(o.commandId, o.txnId, o.kind, o.state, o.claimToken, o.claimUntil, o.attempts, o.blockedReason, o.createdAt),
     )
+    private fun sale(c: Cursor) = SaleRow(c.str("txn_id"), c.str("scope_id"), c.str("status"), c.str("body_json"), c.str("content_hash"), c.str("currency"), c.int("minor_digits"), c.long("payable_minor"), c.str("evidence_json"), c.strOrNull("server_json"), c.strOrNull("invoice"), c.str("message"), c.int("attempts"), c.long("created_at"), c.long("updated_at"))
+    fun sale(id: String): SaleRow? = q("SELECT * FROM sale WHERE txn_id = ?", id).list { sale(this) }.firstOrNull()
+    fun insertSale(r: SaleRow) = db.execSQL(
+        "INSERT INTO sale (txn_id,scope_id,status,body_json,content_hash,currency,minor_digits,payable_minor,evidence_json,server_json,invoice,message,attempts,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        arrayOf<Any?>(r.txnId, r.scopeId, r.status, r.bodyJson, r.contentHash, r.currency, r.minorDigits, r.payableMinor, r.evidenceJson, r.serverJson, r.invoice, r.message, r.attempts, r.createdAt, r.updatedAt),
+    )
+    fun updateSale(r: SaleRow) = db.execSQL(
+        "UPDATE sale SET status = ?, server_json = ?, invoice = ?, message = ?, body_json = ?, evidence_json = ?, payable_minor = ?, attempts = ?, updated_at = ? WHERE txn_id = ?",
+        arrayOf<Any?>(r.status, r.serverJson, r.invoice, r.message, r.bodyJson, r.evidenceJson, r.payableMinor, r.attempts, r.updatedAt, r.txnId),
+    )
+    fun sales(statuses: List<String>, limit: Int): List<SaleRow> =
+        if (statuses.isEmpty()) emptyList() else q("SELECT * FROM sale WHERE status IN (${statuses.joinToString(",") { "?" }}) ORDER BY created_at DESC LIMIT ?", *statuses.toTypedArray(), limit).list { sale(this) }
     fun outboxCounts(): List<StateCount> = q("SELECT state, COUNT(*) AS n FROM outbox GROUP BY state").list { StateCount(str("state"), int("n")) }
     fun nextClaimable(now: Long): Outbox? =
         q("SELECT * FROM outbox WHERE kind <> 'SAMPLE' AND (state = 'pending' OR (state = 'claimed' AND claim_until < ?)) ORDER BY created_at LIMIT 1", now).list { outbox(this) }.firstOrNull()

@@ -13,6 +13,7 @@ import type {
 	ItemPage,
 } from "@mobile/ports";
 import type { CommitResult, SampleReceipt, SampleSale } from "@mobile/domain/txn";
+import type { PreparedSale, SalePatch, SaleRecord, SaleStatus } from "@mobile/domain/sale";
 
 export interface XposNativePlugin {
 	createScope(s: Omit<CatalogScopeInfo, "activeGen">): Promise<void>;
@@ -34,6 +35,14 @@ export interface XposNativePlugin {
 	page(a: { scopeId: string; after?: string; limit?: number; variantsOnly?: boolean }): Promise<ItemPage>;
 	variantsOf(a: { scopeId: string; templateCode: string }): Promise<{ items: CatalogItem[] }>;
 	stats(a: { scopeId: string }): Promise<CatalogStats>;
+
+	applyDelta(a: { scopeId: string; upserts: CatalogItem[]; removed: string[] }): Promise<void>;
+	codePage(a: { scopeId: string; after?: string; limit: number }): Promise<{ codes: string[] }>;
+
+	saveSale(s: PreparedSale): Promise<{ created: boolean; sale: SaleRecord }>;
+	getSale(a: { txnId: string }): Promise<{ sale: SaleRecord | null }>;
+	updateSale(a: { txnId: string } & SalePatch): Promise<{ sale: SaleRecord }>;
+	listSales(a: { statuses: SaleStatus[]; limit: number }): Promise<{ sales: SaleRecord[] }>;
 
 	commitSample(s: SampleSale): Promise<CommitResult>;
 	getReceipt(a: { clientTxnId: string }): Promise<{ receipt: SampleReceipt | null }>;

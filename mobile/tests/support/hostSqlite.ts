@@ -32,6 +32,14 @@ import { ALL_MODELS } from "@mobile/db/models/index.ts";
 import { ALL_STEPS } from "@mobile/db/steps.ts";
 import { SchemaSync, type SqlExecutor, type SyncReport } from "@mobile/db/schemaSync.ts";
 import type { Model } from "@mobile/db/model.ts";
+import {
+	hashBody,
+	SaleConflictError,
+	type NewSale,
+	type SalePatch,
+	type SaleRecord,
+	type SaleStatus,
+} from "@mobile/domain/sale";
 import { buildReceipt, validateSale } from "./validate";
 
 export { buildReceipt, validateSale };
@@ -374,6 +382,15 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 		return this.hydrate(scopeId, gen, rows);
 	}
 
+	async codePage(scopeId: string, after: string | undefined, limit: number): Promise<string[]> {
+		const gen = this.activeGen(scopeId);
+		if (gen === null) return [];
+		const rows = this.q(
+			"SELECT item_code FROM item WHERE scope_id=? AND gen=? AND item_code > ? ORDER BY item_code LIMIT ?",
+		).all(scopeId, gen, after ?? "", Math.min(2000, Math.max(1, limit))) as Row[];
+		return rows.map((r) => String(r.item_code));
+	}
+
 	async stats(scopeId: string): Promise<CatalogStats> {
 		const gen = this.activeGen(scopeId);
 		const n = (sql: string) => Number((this.q(sql).get(scopeId, gen ?? -1) as Row).n);
@@ -455,6 +472,123 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 		return Object.fromEntries(rows.map((r) => [String(r.state), Number(r.n)]));
 	}
 
+	async saveSale(sale: NewSale): Promise<{ created: boolean; sale: SaleRecord }> {
+		const hash = await hashBody(sale.body);
+		const now = this.now();
+		return this.tx(() => {
+			const ex = this.q("SELECT * FROM sale WHERE txn_id=?").get(sale.txnId) as Row | undefined;
+			if (ex) {
+				if (ex.content_hash !== hash) throw new SaleConflictError(sale.txnId);
+				return { created: false, sale: toSale(ex) };
+			}
+			this.q(
+				"INSERT INTO sale (txn_id,scope_id,status,body_json,content_hash,currency,minor_digits,payable_minor,evidence_json,created_at,updated_at) VALUES (?,?,'captured',?,?,?,?,?,?,?,?)",
+			).run(
+				sale.txnId,
+				sale.scopeId,
+				canonicalJson(sale.body),
+				hash,
+				sale.currency,
+				sale.minorDigits,
+				sale.payableMinor,
+				canonicalJson(sale.evidence),
+				now,
+				now,
+			);
+			this.opts.fault?.("after-sale");
+			return {
+				created: true,
+				sale: toSale(this.q("SELECT * FROM sale WHERE txn_id=?").get(sale.txnId) as Row),
+			};
+		});
+	}
+
+	async getSale(txnId: string): Promise<SaleRecord | null> {
+		const r = this.q("SELECT * FROM sale WHERE txn_id=?").get(txnId) as Row | undefined;
+		return r ? toSale(r) : null;
+	}
+
+	async updateSale(txnId: string, patch: SalePatch): Promise<SaleRecord> {
+		return this.tx(() => {
+			const r = this.q("SELECT * FROM sale WHERE txn_id=?").get(txnId) as Row | undefined;
+			if (!r) throw new Error(`unknown sale ${txnId}`);
+			const cur = toSale(r);
+			const bodyJson = patch.bodyJson ?? cur.bodyJson;
+			this.q(
+				"UPDATE sale SET status=?, server_json=?, invoice=?, message=?, body_json=?, evidence_json=?, payable_minor=?, attempts=attempts+?, updated_at=? WHERE txn_id=?",
+			).run(
+				patch.status ?? cur.status,
+				patch.serverJson !== undefined ? patch.serverJson : cur.serverJson,
+				patch.invoice !== undefined ? patch.invoice : cur.invoice,
+				patch.message ?? cur.message,
+				bodyJson,
+				patch.evidenceJson ?? cur.evidenceJson,
+				patch.payableMinor ?? cur.payableMinor,
+				patch.attempt ? 1 : 0,
+				this.now(),
+				txnId,
+			);
+			return toSale(this.q("SELECT * FROM sale WHERE txn_id=?").get(txnId) as Row);
+		});
+	}
+
+	async listSales(statuses: SaleStatus[], limit = 100): Promise<SaleRecord[]> {
+		if (!statuses.length) return [];
+		const rows = this.q(
+			`SELECT * FROM sale WHERE status IN (${statuses.map(() => "?").join(",")}) ORDER BY created_at DESC LIMIT ?`,
+		).all(...statuses, Math.min(limit, 200)) as Row[];
+		return rows.map(toSale);
+	}
+
+	async applyDelta(scopeId: string, upserts: CatalogItem[], removed: string[]): Promise<void> {
+		const gen = this.activeGen(scopeId);
+		if (gen === null) throw new Error("no active catalog to update");
+		this.tx(() => {
+			const codes = [...removed, ...upserts.map((u) => u.itemCode)];
+			for (const code of codes) {
+				for (const t of ["item", "item_barcode", "item_attr"])
+					this.q(`DELETE FROM ${t} WHERE scope_id=? AND gen=? AND item_code=?`).run(
+						scopeId,
+						gen,
+						code,
+					);
+			}
+			const ii = this.q(
+				"INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+			);
+			const ib = this.q(
+				"INSERT OR IGNORE INTO item_barcode (scope_id,gen,barcode,item_code,uom) VALUES (?,?,?,?,?)",
+			);
+			const ia = this.q("INSERT INTO item_attr (scope_id,gen,item_code,attr,value) VALUES (?,?,?,?,?)");
+			for (const it of upserts) {
+				ii.run(
+					scopeId,
+					gen,
+					it.itemCode,
+					it.variantOf,
+					it.name,
+					normalize(it.name),
+					normalize(it.itemCode),
+					it.itemGroup,
+					it.uom,
+					it.priceMinor,
+					it.brand ?? null,
+				);
+				for (const b of it.barcodes) ib.run(scopeId, gen, b, it.itemCode, it.uom);
+				for (const [k, v] of Object.entries(it.attrs)) ia.run(scopeId, gen, it.itemCode, k, v);
+			}
+			const n = Number(
+				(this.q("SELECT COUNT(*) AS n FROM item WHERE scope_id=? AND gen=?").get(scopeId, gen) as Row)
+					.n,
+			);
+			this.q("UPDATE catalog_generation SET item_count=? WHERE scope_id=? AND gen=?").run(
+				n,
+				scopeId,
+				gen,
+			);
+		});
+	}
+
 	/** Atomic claim shared by foreground and background processors (SAMPLE rows are never claimable). */
 	claimNext(token: string, leaseMs: number): { commandId: string; txnId: string; kind: string } | null {
 		const now = this.now();
@@ -471,6 +605,26 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 				: null;
 		});
 	}
+}
+
+function toSale(r: Row): SaleRecord {
+	return {
+		txnId: String(r.txn_id),
+		scopeId: String(r.scope_id),
+		status: String(r.status) as SaleStatus,
+		bodyJson: String(r.body_json),
+		contentHash: String(r.content_hash),
+		currency: String(r.currency),
+		minorDigits: Number(r.minor_digits),
+		payableMinor: Number(r.payable_minor),
+		evidenceJson: String(r.evidence_json),
+		serverJson: (r.server_json as string | null) ?? null,
+		invoice: (r.invoice as string | null) ?? null,
+		message: String(r.message),
+		attempts: Number(r.attempts),
+		createdAt: Number(r.created_at),
+		updatedAt: Number(r.updated_at),
+	};
 }
 
 function toScope(r: Row): CatalogScopeInfo {

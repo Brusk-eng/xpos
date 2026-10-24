@@ -25,6 +25,7 @@ class FakeServer implements ApiTransport {
 	onPage?: (n: number) => void;
 	failAtPage?: number;
 	resyncAtPage?: number;
+	resyncAlways = false;
 	private pages = 0;
 	constructor(rows: Row[]) {
 		this.rows = [...rows].sort((a, b) => (a.item_code < b.item_code ? -1 : 1));
@@ -47,7 +48,8 @@ class FakeServer implements ApiTransport {
 		if (name === "catalog_page") {
 			this.pages++;
 			if (this.failAtPage === this.pages) throw new TypeError("network down");
-			if (this.resyncAtPage === this.pages) return { resync: "scope_changed" } as T;
+			if (this.resyncAlways || this.resyncAtPage === this.pages)
+				return { resync: "scope_changed" } as T;
 			const after = String(args.cursor).slice(6);
 			const limit = Number(args.limit);
 			const rest = this.rows.filter((r) => r.item_code > after);
@@ -97,7 +99,7 @@ describe("real catalog download", () => {
 			...opts(server, repo),
 			onProgress: (p) => progress.push(p.downloaded),
 		});
-		expect(r).toEqual({ items: 1200, skippedBarcodes: 0 });
+		expect(r).toMatchObject({ items: 1200, skippedBarcodes: 0, mode: "full" });
 		expect(server.calls.filter((c) => c === "catalog_page")).toHaveLength(3); // 500 + 500 + 200
 		expect(progress.at(-1)).toBe(1200);
 		const scope = (await repo.listScopes())[0];
@@ -195,7 +197,7 @@ describe("real catalog download", () => {
 		server.failAtPage = server.calls.filter((c) => c === "catalog_page").length + 2;
 		await expect(downloadCatalog(opts(server, repo))).rejects.toThrow("network down");
 		server.failAtPage = undefined;
-		server.resyncAtPage = server.calls.filter((c) => c === "catalog_page").length + 1;
+		server.resyncAlways = true; // the server keeps asking for a restart: the download gives up, the old catalog stays
 		await expect(downloadCatalog(opts(server, repo))).rejects.toBeInstanceOf(CatalogSyncError);
 		expect((await repo.stats("real:c|Main@shop")).items).toBe(1100);
 		expect(

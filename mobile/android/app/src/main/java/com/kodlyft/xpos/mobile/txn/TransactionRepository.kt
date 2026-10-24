@@ -2,6 +2,7 @@ package com.kodlyft.xpos.mobile.txn
 
 import com.kodlyft.xpos.mobile.db.Outbox
 import com.kodlyft.xpos.mobile.db.SampleTxn
+import com.kodlyft.xpos.mobile.db.SaleRow
 import com.kodlyft.xpos.mobile.db.XposDb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -60,6 +61,48 @@ class TransactionRepository(
             throw TxnWriteException(e)
         }
     }
+
+    /** Real sales. JSON bodies and the hash arrive from the web layer as strings and are stored verbatim. */
+    class SaleConflictException(id: String) : Exception("sale id $id already exists with different contents")
+
+    suspend fun saveSale(n: SaleRow): Pair<Boolean, SaleRow> = withContext(Dispatchers.IO) {
+        db.write {
+            val dao = db.txn()
+            val ex = dao.sale(n.txnId)
+            if (ex != null) {
+                if (ex.contentHash != n.contentHash) throw SaleConflictException(n.txnId)
+                return@write false to ex
+            }
+            val row = n.copy(status = "captured", serverJson = null, invoice = null, message = "", attempts = 0, createdAt = now(), updatedAt = now())
+            dao.insertSale(row)
+            true to row
+        }
+    }
+
+    suspend fun getSale(id: String): SaleRow? = withContext(Dispatchers.IO) { db.txn().sale(id) }
+
+    suspend fun updateSale(id: String, status: String?, serverJson: String?, setServer: Boolean, invoice: String?, setInvoice: Boolean, message: String?, bodyJson: String?, evidenceJson: String?, payableMinor: Long?, attempt: Boolean): SaleRow =
+        withContext(Dispatchers.IO) {
+            db.write {
+                val dao = db.txn()
+                val cur = requireNotNull(dao.sale(id)) { "unknown sale $id" }
+                val next = cur.copy(
+                    status = status ?: cur.status,
+                    serverJson = if (setServer) serverJson else cur.serverJson,
+                    invoice = if (setInvoice) invoice else cur.invoice,
+                    message = message ?: cur.message,
+                    bodyJson = bodyJson ?: cur.bodyJson,
+                    evidenceJson = evidenceJson ?: cur.evidenceJson,
+                    payableMinor = payableMinor ?: cur.payableMinor,
+                    attempts = cur.attempts + if (attempt) 1 else 0,
+                    updatedAt = now(),
+                )
+                dao.updateSale(next)
+                next
+            }
+        }
+
+    suspend fun listSales(statuses: List<String>, limit: Int): List<SaleRow> = withContext(Dispatchers.IO) { db.txn().sales(statuses, limit.coerceIn(1, 200)) }
 
     suspend fun receipt(id: String): String? = withContext(Dispatchers.IO) { db.txn().txn(id)?.receiptJson?.takeIf { it != "{}" } }
     suspend fun outboxCounts(): Map<String, Int> = withContext(Dispatchers.IO) { db.txn().outboxCounts().associate { it.state to it.n } }

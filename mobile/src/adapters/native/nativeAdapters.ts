@@ -2,6 +2,7 @@ import type {
 	AdapterKind,
 	AuthService,
 	BootstrapInfo,
+	CatalogItem,
 	CatalogRepository,
 	PageRequest,
 	Printer,
@@ -11,6 +12,13 @@ import type {
 	UnlockResult,
 } from "@mobile/ports";
 import type { CommitResult } from "@mobile/domain/txn";
+import {
+	prepareSale,
+	SaleConflictError,
+	type NewSale,
+	type SalePatch,
+	type SaleStatus,
+} from "@mobile/domain/sale";
 import { clampLimit } from "@mobile/domain/search";
 import type { OnlineLogin } from "../onlineLogin";
 import { XposNative } from "./plugin";
@@ -51,6 +59,16 @@ export class NativeCatalog implements CatalogRepository {
 	variantsOf = async (scopeId: string, templateCode: string) =>
 		(await XposNative.variantsOf({ scopeId, templateCode })).items;
 	stats = (scopeId: string) => XposNative.stats({ scopeId });
+	codePage = async (scopeId: string, after: string | undefined, limit: number) =>
+		(await XposNative.codePage({ scopeId, after, limit })).codes;
+	applyDelta = async (scopeId: string, upserts: CatalogItem[], removed: string[]) => {
+		for (let i = 0; i < Math.max(upserts.length, removed.length, 1); i += 1000)
+			await XposNative.applyDelta({
+				scopeId,
+				upserts: upserts.slice(i, i + 1000),
+				removed: removed.slice(i, i + 1000),
+			});
+	};
 }
 
 export class NativeTransactions implements TransactionStore {
@@ -59,6 +77,19 @@ export class NativeTransactions implements TransactionStore {
 		XposNative.commitSample(sale);
 	getReceipt = async (clientTxnId: string) => (await XposNative.getReceipt({ clientTxnId })).receipt;
 	outboxCounts = async () => (await XposNative.outboxCounts()).counts;
+	saveSale = async (sale: NewSale) => {
+		try {
+			return await XposNative.saveSale(await prepareSale(sale));
+		} catch (e) {
+			if ((e as { code?: string })?.code === "SALE_CONFLICT") throw new SaleConflictError(sale.txnId);
+			throw e;
+		}
+	};
+	getSale = async (txnId: string) => (await XposNative.getSale({ txnId })).sale;
+	updateSale = async (txnId: string, patch: SalePatch) =>
+		(await XposNative.updateSale({ txnId, ...patch })).sale;
+	listSales = async (statuses: SaleStatus[], limit = 100) =>
+		(await XposNative.listSales({ statuses, limit })).sales;
 }
 
 /** PIN/lease/vault live in Kotlin; only the PIN crosses the bridge, and never leaves the device. */

@@ -1,4 +1,4 @@
-import type { BootstrapInfo } from "@mobile/ports";
+import type { BootstrapInfo, PaymentMode, ProfileChoice } from "@mobile/ports";
 import { classifyLoginResponse, supportedVersion, validateServerOrigin } from "@mobile/domain/origin";
 import { FrappeHttpTransport, ServerError } from "./frappeHttp";
 
@@ -31,7 +31,13 @@ interface BootstrapReply {
 	currency: string;
 	minor_digits: number;
 	permissions: Record<string, boolean>;
-	erpnext_version: string;
+	erpnext_version: string | null;
+	frappe_version?: string;
+	price_list?: string | null;
+	customer?: string | null;
+	profiles?: ProfileChoice[];
+	payment_modes?: PaymentMode[];
+	open_shift?: string | null;
 	supported: boolean;
 	lease_ttl_seconds: number;
 	issued_at: number;
@@ -66,9 +72,23 @@ export class FrappeOnlineLogin implements OnlineLogin {
 				throw new LoginError("unexpected", `Unexpected response from the server (${outcome.detail})`);
 		}
 		await t.refreshCsrf();
+		return fetchBootstrap(t, v.origin);
+	}
+}
+
+export async function fetchBootstrap(
+	t: FrappeHttpTransport,
+	origin: string,
+	profile?: string,
+): Promise<BootstrapInfo> {
+	{
 		let b: BootstrapReply;
 		try {
-			b = await t.call<BootstrapReply>("xpos.api.mobile.bootstrap", {}, { get: true });
+			b = await t.call<BootstrapReply>(
+				"xpos.api.mobile.bootstrap",
+				profile ? { pos_profile: profile } : {},
+				{ get: true },
+			);
 		} catch (e) {
 			if (e instanceof ServerError && (e.status === 403 || e.status === 404))
 				throw new LoginError(
@@ -80,15 +100,23 @@ export class FrappeOnlineLogin implements OnlineLogin {
 		if (!b.supported || !supportedVersion(b.erpnext_version))
 			throw new LoginError(
 				"unsupported_server",
-				`ERPNext ${b.erpnext_version} is not supported. XPOS Mobile needs version 16.`,
+				b.erpnext_version
+					? `ERPNext ${b.erpnext_version} is not supported. XPOS Mobile needs version 16.`
+					: "The server did not report its ERPNext version, so compatibility with ERPNext 16 cannot be confirmed.",
 			);
 		return {
 			user: b.user,
-			site: v.origin,
+			site: origin,
 			profile: b.pos_profile,
 			currency: b.currency,
 			minorDigits: b.minor_digits,
 			erpnextVersion: b.erpnext_version,
+			frappeVersion: b.frappe_version ?? "",
+			priceList: b.price_list ?? null,
+			customer: b.customer ?? null,
+			profiles: b.profiles ?? [],
+			paymentModes: (b.payment_modes ?? []).map((m) => ({ ...m, type: m.type ?? null })),
+			openShift: b.open_shift ?? null,
 			company: b.company,
 			warehouse: b.warehouse,
 			leaseTtlSeconds: Math.min(b.lease_ttl_seconds, 24 * 3600),

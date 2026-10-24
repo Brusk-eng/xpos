@@ -1,6 +1,6 @@
 # XPOS Mobile (Android) foundation
 
-Status: **foundation build**. It connects to a real ERPNext 16 server, signs the cashier in, downloads the real catalog to the device, and lets the cashier build a cart in three layouts. A sale is saved on the device only (a sample record); nothing is posted to ERPNext, no payment is taken and nothing is fiscalized. Checkout, receiving and sync come in later milestones.
+Status: **connected build**. It connects to a real ERPNext 16 server, signs the cashier in, downloads the real catalog (and later only the changes), and posts real sales through the existing XPOS invoice API. See [mobile/README.md](../../mobile/README.md) for setup, `yarn dev`, builds and limits, and [33-mobile-selling.md](33-mobile-selling.md) for the cashier guide. Offline selling, returns, shift closing and printing are not implemented. The sections below describe the foundation; where they say sales are samples, checkout has since been replaced by `quote_sale` + `create_invoice`.
 
 Requires ERPNext/Frappe **16** with XPOS installed. The app lives in `mobile/` (separate from `frontend/`; the browser POS is unchanged) and runs only inside the Android app.
 
@@ -71,5 +71,5 @@ Server changes: `xpos.api.mobile.bootstrap` (read-only, guest-denied, uses the e
 - Re-check Play's target-API rule (Capacitor 8.5.3 targets 36), build an App Bundle, set up app signing.
 - Confirm 64-bit and 16 KB page-size compatibility on the release build (this build bundles no native libraries of its own; verify with the bundle analyzer).
 - Review dependency versions (WorkManager 2.12.0, Kotlin 2.3.10, AGP 8.13.0, Gradle 8.14.3) and test schema updates against real installs.
-- Bundle the Inter font; the shared stylesheet currently loads it from Google Fonts, which fails offline.
+- Inter is bundled (the Google Fonts import is stripped from the mobile build); the Urdu Nastaliq font is not.
 - Measure the catalog (lookup, search, import) with a real 100,000-item catalog on the exact devices you will support.

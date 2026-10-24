@@ -156,6 +156,12 @@ Then open your site and launch **X POS** from the app launcher.
 
 ---
 
+## Mobile (Android)
+
+XPOS Mobile is an Android app (Vue + Capacitor) that sells against the same ERPNext 16 site. See [mobile/README.md](mobile/README.md) for `yarn dev` (browser development with hot reload against a real dev site), Android Studio/Gradle builds, live reload on an emulator or phone, signing and troubleshooting, and [docs/features/33-mobile-selling.md](docs/features/33-mobile-selling.md) for the cashier guide.
+
+---
+
 ## Configuration
 
 1. Create or update a **POS Profile** in ERPNext and assign it to the relevant users.

@@ -55,3 +55,21 @@ data class Outbox(
     val blockedReason: String?,
     val createdAt: Long,
 )
+
+data class SaleRow(
+    val txnId: String,
+    val scopeId: String,
+    val status: String,
+    val bodyJson: String,
+    val contentHash: String,
+    val currency: String,
+    val minorDigits: Int,
+    val payableMinor: Long,
+    val evidenceJson: String,
+    val serverJson: String?,
+    val invoice: String?,
+    val message: String,
+    val attempts: Int,
+    val createdAt: Long,
+    val updatedAt: Long,
+)

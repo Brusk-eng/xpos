@@ -30,6 +30,8 @@ export interface SchemaPlan {
 
 export interface SyncReport {
 	changed: boolean;
+	readOnly: boolean;
+	deviceWriterLevel: number;
 	fingerprint: string;
 	createdTables: string[];
 	addedColumns: string[];
@@ -40,8 +42,43 @@ export interface SyncReport {
 
 const INTERNAL = new Set(["schema_state", "schema_steps", "schema_log"]);
 
+export function writerLevelOf(steps: Step[]): number {
+	return 1 + steps.filter((s) => s.breaksOlderWriters).length;
+}
+
+/** `CHECK (...)` expressions in a CREATE TABLE statement, whitespace-normalised, in source order. */
+export function extractChecks(createSql: string): string[] {
+	const out: string[] = [];
+	const re = /\bCHECK\s*\(/gi;
+	for (let m = re.exec(createSql); m; m = re.exec(createSql)) {
+		let depth = 1;
+		let i = m.index + m[0].length;
+		const start = i;
+		for (; i < createSql.length && depth > 0; i++) {
+			if (createSql[i] === "(") depth++;
+			else if (createSql[i] === ")") depth--;
+		}
+		out.push(
+			createSql
+				.slice(start, i - 1)
+				.replace(/\s+/g, " ")
+				.trim(),
+		);
+	}
+	return out;
+}
+
+function normalizeRef(table: string, from: string, to: string, onDelete: string): string {
+	return `${from}->${table}.${to}/${(onDelete || "NO ACTION").toUpperCase()}`;
+}
+
+function modelRef(column: string, ref: string): string | null {
+	const m = /REFERENCES\s+(\w+)\s*\((\w+)\)(?:\s+ON DELETE\s+([A-Z ]+))?/i.exec(ref);
+	return m ? normalizeRef(m[1], column, m[2], m[3] ?? "NO ACTION") : null;
+}
+
 const STATE_DDL = [
-	"CREATE TABLE IF NOT EXISTS schema_state (id INTEGER PRIMARY KEY CHECK (id = 1), fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL)",
+	"CREATE TABLE IF NOT EXISTS schema_state (id INTEGER PRIMARY KEY CHECK (id = 1), fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL, writer_level INTEGER NOT NULL DEFAULT 1)",
 	"CREATE TABLE IF NOT EXISTS schema_steps (id TEXT PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL)",
 	"CREATE TABLE IF NOT EXISTS schema_log (id INTEGER PRIMARY KEY AUTOINCREMENT, at INTEGER NOT NULL, change TEXT NOT NULL)",
 ];
@@ -52,7 +89,8 @@ const STATE_DDL = [
  *  - new field / table / index in a model: added automatically, existing rows kept;
  *  - rename, drop, type or NOT NULL change: refused with a clear error (needs a Step), database untouched;
  *  - extra tables/columns/indexes the models do not know (e.g. written by a newer build): kept, reported.
- * Downgrades are therefore safe by construction: older builds ignore columns they do not know.
+ * A downgrade is safe only while every change since that build was additive. Steps that break an older writer raise the
+ * writer level stored on the device; a build with a lower level then opens the database read-only (see sync()).
  */
 export class SchemaSync {
 	constructor(
@@ -71,6 +109,13 @@ export class SchemaSync {
 
 	private ensureState(): void {
 		for (const ddl of STATE_DDL) this.db.exec(ddl);
+		if (!this.db.all("PRAGMA table_info(schema_state)").some((r) => String(r.name) === "writer_level"))
+			this.db.exec("ALTER TABLE schema_state ADD COLUMN writer_level INTEGER NOT NULL DEFAULT 1");
+	}
+
+	private storedWriterLevel(): number {
+		const r = this.db.all("SELECT writer_level FROM schema_state WHERE id = 1")[0];
+		return r ? Number(r.writer_level) : 0;
 	}
 
 	private storedFingerprint(): string | null {
@@ -127,6 +172,38 @@ export class SchemaSync {
 						`${m.table}.${c.name}: NOT NULL changed (${Number(a.notnull) ? "NOT NULL" : "nullable"} -> ${c.notNull ? "NOT NULL" : "nullable"})`,
 					);
 			}
+			for (const c of spec.columns) {
+				const a = actual.get(c.name);
+				if (a && (a.dflt_value ?? null) !== c.defaultSql)
+					plan.blocked.push(
+						`${m.table}.${c.name}: default changed (${a.dflt_value ?? "none"} -> ${c.defaultSql ?? "none"})`,
+					);
+			}
+			const wantRefs = spec.columns
+				.filter((c) => c.references)
+				.map((c) => modelRef(c.name, c.references!))
+				.sort();
+			const haveRefs = this.db
+				.all(`PRAGMA foreign_key_list(${m.table})`)
+				.map((r) => normalizeRef(String(r.table), String(r.from), String(r.to), String(r.on_delete)))
+				.sort();
+			if (wantRefs.join("|") !== haveRefs.join("|"))
+				plan.blocked.push(
+					`${m.table}: foreign keys changed (${haveRefs.join(", ") || "none"} -> ${wantRefs.join(", ") || "none"})`,
+				);
+			const wantChecks = [
+				...spec.columns.map((c) => c.check).filter((x): x is string => !!x),
+				...spec.checks,
+			]
+				.map((x) => x.replace(/\s+/g, " ").trim())
+				.sort();
+			const haveSql = String(
+				this.db.all("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", [m.table])[0]
+					?.sql ?? "",
+			);
+			const haveChecks = extractChecks(haveSql).sort();
+			if (wantChecks.join("|") !== haveChecks.join("|"))
+				plan.blocked.push(`${m.table}: CHECK constraints changed`);
 			const modelCols = new Set(spec.columns.map((c) => c.name));
 			for (const name of actual.keys())
 				if (!modelCols.has(name)) plan.unmanaged.push(`column ${m.table}.${name}`);
@@ -161,11 +238,27 @@ export class SchemaSync {
 	sync(): SyncReport {
 		this.ensureState();
 		const fingerprint = this.fingerprint;
+		const ownLevel = writerLevelOf(this.steps);
+		const deviceLevel = this.storedWriterLevel();
+		if (deviceLevel > ownLevel)
+			return {
+				changed: false,
+				readOnly: true,
+				deviceWriterLevel: deviceLevel,
+				fingerprint,
+				createdTables: [],
+				addedColumns: [],
+				indexes: [],
+				stepsRun: [],
+				unmanaged: [],
+			};
 		const applied = new Set(this.db.all("SELECT id FROM schema_steps").map((r) => String(r.id)));
 		const pending = this.steps.filter((s) => !applied.has(s.id));
 		if (this.storedFingerprint() === fingerprint && !pending.length)
 			return {
 				changed: false,
+				readOnly: false,
+				deviceWriterLevel: deviceLevel,
 				fingerprint,
 				createdTables: [],
 				addedColumns: [],
@@ -201,7 +294,7 @@ export class SchemaSync {
 			}
 			for (const t of plan.createTables) this.log(`create table ${t}`);
 			this.db.exec(
-				`INSERT OR REPLACE INTO schema_state (id, fingerprint, updated_at) VALUES (1, '${fingerprint}', ${this.now()})`,
+				`INSERT OR REPLACE INTO schema_state (id, fingerprint, updated_at, writer_level) VALUES (1, '${fingerprint}', ${this.now()}, ${Math.max(ownLevel, deviceLevel)})`,
 			);
 		});
 		return {
@@ -211,6 +304,8 @@ export class SchemaSync {
 					plan.createIndexes.length +
 					stepsRun.length >
 				0,
+			readOnly: false,
+			deviceWriterLevel: Math.max(ownLevel, deviceLevel),
 			fingerprint,
 			createdTables: plan.createTables,
 			addedColumns: plan.addColumns.map((c) => `${c.table}.${c.column}`),

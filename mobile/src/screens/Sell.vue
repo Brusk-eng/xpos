@@ -73,6 +73,13 @@ async function openSheet() {
 			<p class="mt-1 text-xs text-muted-foreground">
 				{{ hint }} · {{ state.catalog.items.toLocaleString() }} items · same cart in every layout
 			</p>
+			<p
+				v-if="cart.error"
+				class="mt-1 rounded-lg border border-warning/30 bg-warning-soft px-2 py-1 text-xs text-warning-soft-foreground"
+				role="alert"
+			>
+				{{ cart.error }}
+			</p>
 		</div>
 
 		<div class="flex min-h-0 flex-1">

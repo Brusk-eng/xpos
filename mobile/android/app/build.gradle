@@ -18,12 +18,30 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
     }
-    kotlinOptions { jvmTarget = '17' }
+    kotlinOptions { jvmTarget = '21' }
+    // Release signing comes from android/keystore.properties (git-ignored) or XPOS_KEYSTORE_* environment variables.
+    // Without either, the release build is produced unsigned and cannot be uploaded anywhere.
+    def keystoreProps = new Properties()
+    def keystoreFile = rootProject.file('keystore.properties')
+    if (keystoreFile.exists()) keystoreFile.withInputStream { keystoreProps.load(it) }
+    def signingValue = { String key, String env -> keystoreProps.getProperty(key) ?: System.getenv(env) }
+    signingConfigs {
+        release {
+            def path = signingValue('storeFile', 'XPOS_KEYSTORE_FILE')
+            if (path) {
+                storeFile file(path)
+                storePassword signingValue('storePassword', 'XPOS_KEYSTORE_PASSWORD')
+                keyAlias signingValue('keyAlias', 'XPOS_KEY_ALIAS')
+                keyPassword signingValue('keyPassword', 'XPOS_KEY_PASSWORD')
+            }
+        }
+    }
     buildTypes {
         release {
+            if (signingConfigs.release.storeFile != null) signingConfig signingConfigs.release
             minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
@@ -36,6 +54,17 @@ tasks.configureEach { task ->
         task.doFirst {
             if (!file('src/main/assets/xpos-schema.json').exists())
                 throw new GradleException('Missing src/main/assets/xpos-schema.json. Run `yarn build` in mobile/ first.')
+        }
+    }
+}
+
+// A release must never carry a live-reload server url (it would load code from a developer machine).
+tasks.configureEach { task ->
+    if (task.name == 'preReleaseBuild') {
+        task.doFirst {
+            def cfg = file('src/main/assets/capacitor.config.json')
+            if (cfg.exists() && cfg.text =~ /"url"\s*:/)
+                throw new GradleException('capacitor.config.json contains a server url (live reload). Re-run `yarn cap sync android` without XPOS_ANDROID_DEV, or use `yarn android:bundle`.')
         }
     }
 }

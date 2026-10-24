@@ -5,14 +5,17 @@ import { XposLogo } from "@/components/ui/brand";
 import { Input } from "@/components/ui/input";
 import { isCleartext, validateServerOrigin } from "@mobile/domain/origin";
 import { setOrigin, useApp } from "@mobile/composables/useApp";
+import { WEB_DEV } from "@mobile/app/container";
+
+const ALLOW_CLEARTEXT = WEB_DEV || import.meta.env.VITE_ALLOW_CLEARTEXT === "1";
 
 const { state } = useApp();
-const input = ref(state.origin ?? "");
+const input = ref(state.origin ?? (state.kind === "web-dev" ? window.location.origin : ""));
 const error = ref("");
 const cleartext = computed(() => isCleartext(input.value));
 
 function submit() {
-	const r = validateServerOrigin(input.value);
+	const r = validateServerOrigin(input.value, { allowCleartext: ALLOW_CLEARTEXT });
 	if (!r.ok) {
 		error.value = r.reason;
 		return;
@@ -49,8 +52,18 @@ function submit() {
 			/>
 			<p v-if="error" id="origin-err" class="mt-1 text-sm text-destructive" role="alert">{{ error }}</p>
 			<p v-else id="origin-hint" class="mt-1 text-xs text-muted-foreground">
-				Start with https:// (recommended) or http://. The app never guesses the server from anything
-				else.
+				{{
+					ALLOW_CLEARTEXT ? "Start with https:// (recommended) or http://." : "Start with https://."
+				}}
+				The app never guesses the server from anything else.
+			</p>
+			<p
+				v-if="state.kind === 'web-dev'"
+				class="mt-2 rounded-xl border border-info/30 bg-info-soft px-3 py-2 text-xs text-info-soft-foreground"
+				role="note"
+			>
+				Browser development: requests to this address are forwarded by the Vite dev proxy to the
+				ERPNext site set in .env.local.
 			</p>
 			<p
 				v-if="cleartext"

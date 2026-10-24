@@ -1,14 +1,16 @@
-import type { ApiTransport, CatalogItem, CatalogRepository } from "@mobile/ports";
+import type { ApiTransport, CatalogItem, CatalogRepository, CatalogScopeInfo } from "@mobile/ports";
 import { crc32 } from "@mobile/domain/crc32";
 import { fromRate } from "@mobile/domain/money";
 
 /**
- * Downloads the catalog the signed-in cashier may sell, from the existing server API (xpos.api.catalog_sync),
- * into the device database: staged first, verified against the server's count and CRC32, then activated in one
- * atomic step. The live catalog is never touched until the new one is complete, so an interrupted or failed
- * download leaves the previous catalog usable offline.
- *
- * Not in this milestone: change-feed (delta) updates, stock and customers. Each refresh is a full download.
+ * Keeps the device catalog in step with what the signed-in cashier may sell, using the existing server protocol
+ * (xpos.api.catalog_sync):
+ *  - full download: begin -> pages -> digest, staged in a new generation, verified (count + CRC32) and activated
+ *    atomically. A failed or interrupted download leaves the active catalog untouched;
+ *  - refresh: when the device holds a catalog and a delta cursor from the last run, only changed items are fetched
+ *    (`catalog_delta`) and applied to the active generation page by page (each page atomic, replay-safe), then the
+ *    digest is checked; any disagreement, expired cursor or scope change falls back to a full download.
+ * Stock and customers are not downloaded here: a sale is validated by ERPNext at checkout.
  */
 
 const API = "xpos.api.catalog_sync";
@@ -25,12 +27,18 @@ export class CatalogSyncError extends Error {
 	}
 }
 
+/** Small key/value store for the delta cursor (localStorage on device and in the browser; a Map in tests). */
+export interface SyncMeta {
+	get(key: string): string | null;
+	set(key: string, value: string | null): void;
+}
+
 interface ServerBarcode {
 	barcode: string;
 	uom: string | null;
 	conversion_factor: number | null;
 }
-interface ServerItem {
+export interface ServerItem {
 	item_code: string;
 	item_name?: string | null;
 	item_group?: string | null;
@@ -45,12 +53,19 @@ interface Begin {
 	resync?: string;
 	scope: { company: string; warehouse: string; price_list: string | null; currency: string };
 	total: number;
-	cursors: { items: string };
+	cursors: { items: string; delta: string };
 }
 interface Page {
 	resync?: string;
 	items: ServerItem[];
 	next_cursor: string | null;
+}
+interface DeltaPage {
+	resync?: string;
+	upserts: ServerItem[];
+	removed: string[];
+	next_cursor: string;
+	has_more: boolean;
 }
 interface Digest {
 	count: number;
@@ -63,9 +78,12 @@ export interface SyncProgress {
 }
 
 export interface SyncResult {
+	mode: "full" | "delta";
 	items: number;
-	/** Barcodes not imported because they sell in a UOM the till cannot price yet (no 1:1 conversion). */
 	skippedBarcodes: number;
+	unpriced: number | null;
+	changed: number;
+	removed: number;
 }
 
 /** Barcodes of the item's stock UOM are imported; a barcode for another UOM would be sold at the wrong price. */
@@ -90,15 +108,117 @@ export function toCatalogItem(row: ServerItem, minorDigits: number): { item: Cat
 	};
 }
 
-export async function downloadCatalog(opts: {
+const cursorKey = (scopeId: string) => `delta:${scopeId}`;
+
+interface SavedCursor {
+	gen: number;
+	cursor: string;
+}
+
+function readCursor(meta: SyncMeta, scopeId: string): SavedCursor | null {
+	try {
+		const v = JSON.parse(meta.get(cursorKey(scopeId)) ?? "null");
+		return v && typeof v.gen === "number" && typeof v.cursor === "string" ? v : null;
+	} catch {
+		return null;
+	}
+}
+
+function sameScope(a: CatalogScopeInfo, b: Begin["scope"]): boolean {
+	return (
+		a.company === b.company &&
+		a.warehouse === b.warehouse &&
+		a.priceList === b.price_list &&
+		a.currency === b.currency
+	);
+}
+
+export interface SyncOptions {
 	api: ApiTransport;
 	repo: CatalogRepository;
+	meta?: SyncMeta;
 	scopeId: string;
 	site: string;
 	profile: string;
 	minorDigits: number;
 	onProgress?: (p: SyncProgress) => void;
-}): Promise<SyncResult> {
+}
+
+/** Delta when it is safe, otherwise a full staged download. */
+export function memoryMeta(): SyncMeta {
+	const m = new Map<string, string>();
+	return { get: (k) => m.get(k) ?? null, set: (k, v) => void (v === null ? m.delete(k) : m.set(k, v)) };
+}
+
+export async function syncCatalog(input: SyncOptions): Promise<SyncResult> {
+	const opts = { ...input, meta: input.meta ?? memoryMeta() };
+	const scope = (await opts.repo.listScopes()).find((s) => s.scopeId === opts.scopeId);
+	const saved = readCursor(opts.meta, opts.scopeId);
+	if (scope && scope.activeGen !== null && saved && saved.gen === scope.activeGen) {
+		try {
+			const r = await deltaRefresh(opts, saved);
+			if (r) return r;
+		} catch (e) {
+			if (!(e instanceof CatalogSyncError)) throw e; // network/session errors surface; protocol disagreements fall back
+		}
+	}
+	return downloadCatalog(opts);
+}
+
+async function deltaRefresh(
+	opts: SyncOptions & { meta: SyncMeta },
+	saved: SavedCursor,
+): Promise<SyncResult | null> {
+	const { api, repo, scopeId, profile, minorDigits } = opts;
+	const call = <T>(method: string, args: Record<string, unknown>) =>
+		api.call<T>(`${API}.${method}`, { pos_profile: profile, ...args });
+	let cursor = saved.cursor;
+	let changed = 0;
+	let removed = 0;
+	let skipped = 0;
+	for (;;) {
+		const page = await call<DeltaPage>("catalog_delta", { cursor, limit: PAGE });
+		if (page.resync) return null; // expired, scope changed or reset: a full download is required
+		const mapped = page.upserts.map((r) => toCatalogItem(r, minorDigits));
+		await repo.applyDelta(
+			scopeId,
+			mapped.map((m) => m.item),
+			page.removed,
+		);
+		changed += page.upserts.length;
+		removed += page.removed.length;
+		skipped += mapped.reduce((n, m) => n + m.skipped, 0);
+		cursor = page.next_cursor;
+		opts.onProgress?.({ downloaded: changed + removed, total: changed + removed });
+		if (!page.has_more) break;
+	}
+	// Check the whole set against the server before trusting the incremental result.
+	const digest = await call<Digest>("catalog_digest", {});
+	const stats = await repo.stats(scopeId);
+	const sum = await checksumOf(repo, scopeId);
+	if (digest.count !== stats.items || Number(digest.checksum) !== sum)
+		throw new CatalogSyncError(
+			"verify_failed",
+			"The catalog does not match the server after the update.",
+		);
+	opts.meta.set(cursorKey(scopeId), JSON.stringify({ gen: saved.gen, cursor }));
+	return { mode: "delta", items: stats.items, skippedBarcodes: skipped, unpriced: null, changed, removed };
+}
+
+/** CRC32 sum of the item codes on the device (codes only, 2000 per page), to compare with the server digest. */
+async function checksumOf(repo: CatalogRepository, scopeId: string): Promise<number> {
+	let sum = 0;
+	let after: string | undefined;
+	for (;;) {
+		const codes = await repo.codePage(scopeId, after, 2000);
+		for (const c of codes) sum += crc32(c);
+		if (codes.length < 2000) return sum;
+		after = codes[codes.length - 1];
+	}
+}
+
+export async function downloadCatalog(input: SyncOptions): Promise<SyncResult> {
+	const opts = { ...input, meta: input.meta ?? memoryMeta() };
 	const { api, repo, scopeId, profile, minorDigits } = opts;
 	const call = <T>(method: string, args: Record<string, unknown>) =>
 		api.call<T>(`${API}.${method}`, { pos_profile: profile, ...args });
@@ -107,7 +227,12 @@ export async function downloadCatalog(opts: {
 		const begin = await call<Begin>("catalog_begin", {});
 		if (begin.resync)
 			throw new CatalogSyncError("resync", `The server asked for a fresh start (${begin.resync}).`);
-		if (!(await repo.listScopes()).some((s) => s.scopeId === scopeId))
+		const existing = (await repo.listScopes()).find((s) => s.scopeId === scopeId);
+		if (existing && !sameScope(existing, begin.scope)) {
+			await repo.dropScope(scopeId);
+			opts.meta.set(cursorKey(scopeId), null);
+		}
+		if (!existing || !sameScope(existing, begin.scope))
 			await repo.createScope({
 				scopeId,
 				site: opts.site,
@@ -122,6 +247,7 @@ export async function downloadCatalog(opts: {
 			let cursor: string | null = begin.cursors.items;
 			let downloaded = 0;
 			let skipped = 0;
+			let unpriced = 0;
 			let sum = 0;
 			opts.onProgress?.({ downloaded, total: begin.total });
 			while (cursor) {
@@ -139,6 +265,7 @@ export async function downloadCatalog(opts: {
 				);
 				for (const r of page.items) sum += crc32(r.item_code);
 				skipped += mapped.reduce((n, m) => n + m.skipped, 0);
+				unpriced += mapped.filter((m) => m.item.priceMinor <= 0).length;
 				downloaded += page.items.length;
 				cursor = page.next_cursor;
 				opts.onProgress?.({ downloaded, total: Math.max(begin.total, downloaded) });
@@ -150,11 +277,19 @@ export async function downloadCatalog(opts: {
 					`The catalog changed while downloading (server ${digest.count} items, received ${downloaded}).`,
 				);
 			await repo.activate(scopeId, gen, downloaded);
-			return { items: downloaded, skippedBarcodes: skipped };
+			opts.meta.set(cursorKey(scopeId), JSON.stringify({ gen, cursor: begin.cursors.delta }));
+			return {
+				mode: "full",
+				items: downloaded,
+				skippedBarcodes: skipped,
+				unpriced,
+				changed: downloaded,
+				removed: 0,
+			};
 		} catch (e) {
-			await repo.discard(scopeId, gen).catch(() => undefined); // never leave a half-staged generation behind
+			await repo.discard(scopeId, gen).catch(() => undefined);
 			lastError = e;
-			if (!(e instanceof CatalogSyncError && e.code === "verify_failed")) throw e; // only a mid-download change is worth retrying
+			if (!(e instanceof CatalogSyncError)) throw e;
 		}
 	}
 	throw lastError;

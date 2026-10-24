@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import unittest
+from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -19,6 +20,19 @@ def profile(**over):
 			return getattr(self, key, default)
 
 	return P(**data)
+
+
+@contextmanager
+def extras():
+	with (
+		patch("xpos.api.mobile.frappe.db.get_single_value", return_value="Standard Selling"),
+		patch("xpos.api.mobile.profile_choices", return_value=[{"name": "Main"}]),
+		patch(
+			"xpos.api.mobile.payment_modes_for", return_value=[{"mode_of_payment": "Cash", "default": True}]
+		),
+		patch("xpos.api.mobile.open_shift_for", return_value="SHIFT-1"),
+	):
+		yield
 
 
 class TestMobileBootstrap(unittest.TestCase):
@@ -46,6 +60,7 @@ class TestMobileBootstrap(unittest.TestCase):
 			patch("xpos.api.mobile.get_my_pos_permissions", return_value={"can_sell": True}) as perms,
 			patch("xpos.api.mobile.minor_digits_for", return_value=3),
 			patch("xpos.api.mobile.erpnext_version", return_value="16.4.0"),
+			extras(),
 		):
 			out = mobile.bootstrap()
 		perms.assert_called_once_with("Main")
@@ -55,6 +70,9 @@ class TestMobileBootstrap(unittest.TestCase):
 			("Acme", "Stores - A", "KWD", 3),
 		)
 		self.assertEqual(out["permissions"], {"can_sell": True})
+		self.assertEqual(out["profiles"], [{"name": "Main"}])
+		self.assertEqual(out["open_shift"], "SHIFT-1")
+		self.assertEqual(out["price_list"], "Standard Selling")
 		self.assertLessEqual(out["lease_ttl_seconds"], 24 * 3600)
 		# nothing role- or secret-shaped leaks out
 		for key in out:
@@ -67,6 +85,7 @@ class TestMobileBootstrap(unittest.TestCase):
 				patch("xpos.api.mobile.get_my_pos_permissions", return_value={}),
 				patch("xpos.api.mobile.minor_digits_for", return_value=2),
 				patch("xpos.api.mobile.erpnext_version", return_value=version),
+				extras(),
 				patch("xpos.api.mobile.frappe.__version__", version or "0", create=True),
 			):
 				self.assertEqual(mobile.bootstrap()["supported"], supported, version)

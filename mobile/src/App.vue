@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { ShoppingBag, Stethoscope } from "@lucide/vue";
+import { Receipt, ShoppingBag, Stethoscope } from "@lucide/vue";
 import { XposLogo } from "@/components/ui/brand";
 import AppBar from "@mobile/ui/AppBar.vue";
 import MobileShell from "@mobile/ui/MobileShell.vue";
@@ -8,6 +8,10 @@ import ServerSetup from "@mobile/screens/ServerSetup.vue";
 import Login from "@mobile/screens/Login.vue";
 import EnrollPin from "@mobile/screens/EnrollPin.vue";
 import Unlock from "@mobile/screens/Unlock.vue";
+import ProfilePick from "@mobile/screens/ProfilePick.vue";
+import Sales from "@mobile/screens/Sales.vue";
+import PaymentSheet from "@mobile/ui/PaymentSheet.vue";
+import ReSignIn from "@mobile/ui/ReSignIn.vue";
 import Sell from "@mobile/screens/Sell.vue";
 import Diagnostics from "@mobile/screens/Diagnostics.vue";
 import { boot, selectTab, useApp, type Tab } from "@mobile/composables/useApp";
@@ -20,6 +24,7 @@ onMounted(async () => {
 
 const tabs: { id: Tab; label: string; title: string; icon: unknown }[] = [
 	{ id: "sell", label: "Sell", title: "Sell", icon: ShoppingBag },
+	{ id: "sales", label: "Sales", title: "Sales", icon: Receipt },
 	{ id: "diagnostics", label: "Device", title: "Device & storage", icon: Stethoscope },
 ];
 const screen = computed(
@@ -27,11 +32,12 @@ const screen = computed(
 		({
 			setup: ServerSetup,
 			login: Login,
+			profile: ProfilePick,
 			enroll: EnrollPin,
 			locked: Unlock,
 			booting: null,
 			unsupported: null,
-			unlocked: { sell: Sell, diagnostics: Diagnostics }[state.tab],
+			unlocked: { sell: Sell, sales: Sales, diagnostics: Diagnostics }[state.tab],
 		})[state.phase],
 );
 </script>
@@ -48,7 +54,8 @@ const screen = computed(
 			<XposLogo variant="full" :size="48" subtitle="Mobile" />
 			<p class="text-base font-semibold">XPOS Mobile runs inside the Android app.</p>
 			<p class="max-w-sm text-sm text-muted-foreground">
-				Install the app on an Android phone or POS terminal. For the browser, use the XPOS web POS.
+				Install the app on an Android phone or POS terminal, or run `yarn dev` in the mobile folder
+				for browser development. For the browser POS, use the XPOS web POS.
 			</p>
 		</div>
 		<div
@@ -60,6 +67,8 @@ const screen = computed(
 			<XposLogo variant="full" :size="56" subtitle="Mobile" />
 		</div>
 		<component :is="screen" v-else />
+		<PaymentSheet v-if="state.phase === 'unlocked'" />
+		<ReSignIn />
 		<template v-if="state.phase === 'unlocked'" #nav>
 			<ul
 				class="flex gap-1 rounded-xl border border-border bg-card/70 p-1 shadow-raised backdrop-blur-sm"

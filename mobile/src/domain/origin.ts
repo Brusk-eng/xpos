@@ -3,7 +3,7 @@
 export type OriginCheck = { ok: true; origin: string; secure: boolean } | { ok: false; reason: string };
 
 /** Accepts https:// (encrypted) and http:// (NOT encrypted: callers must warn). Never trusts the WebView host. */
-export function validateServerOrigin(input: string): OriginCheck {
+export function validateServerOrigin(input: string, opts: { allowCleartext?: boolean } = {}): OriginCheck {
 	let url: URL;
 	try {
 		url = new URL(input.trim());
@@ -12,6 +12,11 @@ export function validateServerOrigin(input: string): OriginCheck {
 	}
 	if (url.protocol !== "https:" && url.protocol !== "http:")
 		return { ok: false, reason: "The server address must start with https:// or http://" };
+	if (url.protocol === "http:" && opts.allowCleartext === false)
+		return {
+			ok: false,
+			reason: "This build only connects over https:// (encrypted). Use your server's https address.",
+		};
 	if (url.username || url.password)
 		return { ok: false, reason: "The address must not contain a username or password" };
 	if (url.pathname !== "/" || url.search || url.hash)
@@ -45,7 +50,7 @@ export function classifyLoginResponse(status: number, body: unknown): LoginOutco
 }
 
 export const MIN_ERPNEXT_MAJOR = 16;
-export function supportedVersion(versionText: string): boolean {
-	const major = Number.parseInt(versionText, 10);
+export function supportedVersion(versionText: string | null | undefined): boolean {
+	const major = Number.parseInt(versionText ?? "", 10);
 	return Number.isInteger(major) && major === MIN_ERPNEXT_MAJOR;
 }

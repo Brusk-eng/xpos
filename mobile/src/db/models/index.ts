@@ -8,7 +8,7 @@ import {
 	ItemBarcode,
 	SerialKnown,
 } from "./catalog.ts";
-import { DeviceMeta, Outbox, SampleTxn } from "./transactions.ts";
+import { DeviceMeta, Outbox, Sale, SampleTxn } from "./transactions.ts";
 
 /** Every table the app owns. Add a class here when you add a table. */
 export const ALL_MODELS: Model[] = [
@@ -20,6 +20,7 @@ export const ALL_MODELS: Model[] = [
 	new SerialKnown(),
 	new BatchKnown(),
 	new SampleTxn(),
+	new Sale(),
 	new Outbox(),
 	new DeviceMeta(),
 ];

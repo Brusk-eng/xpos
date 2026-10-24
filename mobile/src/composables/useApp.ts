@@ -1,12 +1,22 @@
 import { reactive, readonly } from "vue";
-import type { BootstrapInfo, Enrolled, Lifecycle } from "@mobile/ports";
+import type { BootstrapInfo, Enrolled, Lifecycle, PaymentMode, ProfileChoice } from "@mobile/ports";
 import { createContainer, NotAndroidError, type Container } from "@mobile/app/container";
 import { createLifecycle } from "@mobile/app/lifecycle";
-import { CatalogSyncError, downloadCatalog } from "@mobile/app/catalogSync";
+import { CatalogSyncError, syncCatalog, type SyncMeta } from "@mobile/app/catalogSync";
+import { drainPending } from "@mobile/app/checkout";
 import { OfflineError, SessionExpiredError } from "@mobile/adapters/frappeHttp";
+import { fetchBootstrap } from "@mobile/adapters/onlineLogin";
 
-export type Phase = "booting" | "unsupported" | "setup" | "login" | "enroll" | "locked" | "unlocked";
-export type Tab = "sell" | "diagnostics";
+export type Phase =
+	| "booting"
+	| "unsupported"
+	| "setup"
+	| "login"
+	| "profile"
+	| "enroll"
+	| "locked"
+	| "unlocked";
+export type Tab = "sell" | "sales" | "diagnostics";
 
 const ORIGIN_KEY = "xpos-mobile-origin";
 /** The origin is not a secret; it is the one thing remembered about the server (never the WebView host). */
@@ -30,6 +40,55 @@ export const AUTO_LOCK_MS = 30_000;
 /** A catalog older than this is refreshed on unlock when the server is reachable. */
 export const CATALOG_STALE_MS = 60 * 60 * 1000;
 
+/** Server-provided selling context for the signed-in profile, cached so a locked/offline start still has it. */
+export interface SellContext {
+	profiles: ProfileChoice[];
+	paymentModes: PaymentMode[];
+	customer: string | null;
+	openShift: string | null;
+	priceList: string | null;
+	company: string;
+	warehouse: string;
+	erpnextVersion: string | null;
+	frappeVersion: string;
+	permissions: Record<string, boolean>;
+}
+
+const emptyContext = (): SellContext => ({
+	profiles: [],
+	paymentModes: [],
+	customer: null,
+	openShift: null,
+	priceList: null,
+	company: "",
+	warehouse: "",
+	erpnextVersion: null,
+	frappeVersion: "",
+	permissions: {},
+});
+
+const ctxKey = (scopeId: string) => `xpos-mobile-ctx:${scopeId}`;
+const lsGet = (k: string): string | null => {
+	try {
+		return localStorage.getItem(k);
+	} catch {
+		return null;
+	}
+};
+const lsSet = (k: string, v: string | null) => {
+	try {
+		if (v === null) localStorage.removeItem(k);
+		else localStorage.setItem(k, v);
+	} catch {
+		/* informational / cache only */
+	}
+};
+/** Delta cursors and sync times: not secret, safe to lose (the next refresh is then a full download). */
+const syncMeta: SyncMeta = {
+	get: (k) => lsGet(`xpos-mobile-sync:${k}`),
+	set: (k, v) => lsSet(`xpos-mobile-sync:${k}`, v),
+};
+
 export interface CatalogStatus {
 	scopeId: string;
 	/** A usable catalog is on the device (it keeps working offline). */
@@ -38,10 +97,11 @@ export interface CatalogStatus {
 	syncing: boolean;
 	downloaded: number;
 	total: number;
-	/** Plain-language state for the cashier: why there is no catalog, or why the refresh failed. */
 	message: string;
 	syncedAt: number | null;
 	skippedBarcodes: number;
+	unpriced: number | null;
+	lastMode: "full" | "delta" | null;
 }
 
 const emptyCatalog = (): CatalogStatus => ({
@@ -54,6 +114,8 @@ const emptyCatalog = (): CatalogStatus => ({
 	message: "",
 	syncedAt: null,
 	skippedBarcodes: 0,
+	unpriced: null,
+	lastMode: null,
 });
 
 const state = reactive({
@@ -64,6 +126,11 @@ const state = reactive({
 	cashier: null as Enrolled | null,
 	lockReason: "",
 	catalog: emptyCatalog(),
+	context: emptyContext(),
+	kind: "native" as "native" | "web-dev",
+	online: true,
+	sessionExpired: false,
+	salesTick: 0,
 });
 
 let container: Container;
@@ -82,6 +149,43 @@ export function scopeIdFor(e: Enrolled): string {
 	return `real:${e.user}|${e.profile}@${new URL(e.site).host}`;
 }
 
+export function bumpSales(): void {
+	state.salesTick++;
+}
+
+/** Opens a POS shift on the server (online, as the signed-in cashier) with the counted opening amounts. */
+export async function openShift(openingMinor: Record<string, number>): Promise<void> {
+	const e = state.cashier;
+	if (!e) return;
+	const c = getContainer();
+	const api = await c.session(e.site);
+	const dec = (m: number) => m / 10 ** e.minorDigits;
+	try {
+		const r = await api.call<{ pos_opening_shift?: { name?: string } }>("xpos.api.shifts.open_shift", {
+			pos_profile: e.profile,
+			company: state.context.company,
+			balance_details: JSON.stringify(
+				state.context.paymentModes.map((m) => ({
+					mode_of_payment: m.mode_of_payment,
+					opening_amount: dec(openingMinor[m.mode_of_payment] ?? 0),
+				})),
+			),
+		});
+		const name = r.pos_opening_shift?.name;
+		if (!name) throw new Error("The server did not return the opened shift.");
+		state.context.openShift = name;
+		lsSet(ctxKey(scopeIdFor(e)), JSON.stringify(state.context));
+	} catch (err) {
+		if (err instanceof SessionExpiredError) state.sessionExpired = true;
+		throw err;
+	}
+}
+
+/** Called from screens when a server call reports an expired session. */
+export function markSessionExpired(): void {
+	state.sessionExpired = true;
+}
+
 export async function boot(): Promise<void> {
 	let c: Container;
 	try {
@@ -93,34 +197,63 @@ export async function boot(): Promise<void> {
 		}
 		throw e;
 	}
+	state.kind = c.kind;
 	const lc = getLifecycle();
+	state.online = lc.isOnline();
 	lc.onBackground(() => {
 		hiddenAt = Date.now();
 	});
 	lc.onForeground(() => {
 		if (state.phase === "unlocked" && hiddenAt && Date.now() - hiddenAt >= AUTO_LOCK_MS)
 			void lock("Locked after the app was in the background");
+		else if (state.phase === "unlocked") void settlePending();
 		hiddenAt = 0;
+	});
+	lc.onConnectivity((on) => {
+		state.online = on;
+		if (on && state.phase === "unlocked") void reconnect();
 	});
 	const enrolled = await c.auth.enrolled();
 	state.cashier = enrolled;
 	state.phase = enrolled ? "locked" : "setup";
 }
 
-const syncedKey = (scopeId: string) => `xpos-mobile-synced:${scopeId}`;
-function readSyncedAt(scopeId: string): number | null {
+function loadContext(scopeId: string): SellContext {
 	try {
-		const v = Number(localStorage.getItem(syncedKey(scopeId)));
-		return v > 0 ? v : null;
+		return { ...emptyContext(), ...JSON.parse(lsGet(ctxKey(scopeId)) ?? "{}") };
 	} catch {
-		return null;
+		return emptyContext();
 	}
 }
-function writeSyncedAt(scopeId: string, at: number) {
+
+function applyBootstrap(scopeId: string, b: BootstrapInfo): void {
+	state.context = {
+		profiles: b.profiles,
+		paymentModes: b.paymentModes,
+		customer: b.customer,
+		openShift: b.openShift,
+		priceList: b.priceList,
+		company: b.company,
+		warehouse: b.warehouse,
+		erpnextVersion: b.erpnextVersion,
+		frappeVersion: b.frappeVersion,
+		permissions: b.permissions,
+	};
+	lsSet(ctxKey(scopeId), JSON.stringify(state.context));
+}
+
+export async function refreshContext(): Promise<void> {
+	const e = state.cashier;
+	if (!e) return;
+	const scopeId = scopeIdFor(e);
 	try {
-		localStorage.setItem(syncedKey(scopeId), String(at));
-	} catch {
-		/* informational only */
+		const c = getContainer();
+		const t = await c.session(e.site);
+		applyBootstrap(scopeId, await fetchBootstrap(t, e.site, e.profile));
+	} catch (err) {
+		if (err instanceof SessionExpiredError) state.sessionExpired = true;
+		else if (!(err instanceof OfflineError))
+			state.catalog.message ||= "The sale settings could not be refreshed from the server.";
 	}
 }
 
@@ -132,17 +265,40 @@ export async function startCatalog(): Promise<void> {
 	const c = getContainer();
 	const cat = state.catalog;
 	if (cat.scopeId !== scopeId) Object.assign(cat, emptyCatalog(), { scopeId });
+	state.context = loadContext(scopeId);
 	const mine = (await c.catalog.listScopes()).find((s) => s.scopeId === scopeId);
 	if (mine?.activeGen != null) {
 		cat.ready = true;
 		cat.items = (await c.catalog.stats(scopeId)).items;
-		cat.syncedAt = readSyncedAt(scopeId);
+		const at = Number(syncMeta.get(`at:${scopeId}`));
+		cat.syncedAt = at > 0 ? at : null;
 	}
-	const stale = !cat.syncedAt || Date.now() - cat.syncedAt > CATALOG_STALE_MS;
-	if (!cat.ready || stale) {
-		if (getLifecycle().isOnline()) await refreshCatalog();
-		else if (!cat.ready)
-			cat.message = "No catalog on this device yet. Connect to the server to download it.";
+	if (getLifecycle().isOnline()) {
+		await refreshContext();
+		const stale = !cat.syncedAt || Date.now() - cat.syncedAt > CATALOG_STALE_MS;
+		if (!cat.ready || stale) await refreshCatalog();
+		await settlePending();
+	} else if (!cat.ready)
+		cat.message = "No catalog on this device yet. Connect to the server to download it.";
+}
+
+export async function reconnect(): Promise<void> {
+	await refreshContext();
+	await refreshCatalog();
+	await settlePending();
+}
+
+export async function settlePending(): Promise<void> {
+	const e = state.cashier;
+	if (!e || !getLifecycle().isOnline() || state.sessionExpired) return;
+	try {
+		const c = getContainer();
+		const api = await c.session(e.site);
+		await drainPending(c.transactions, api, scopeIdFor(e));
+	} catch (err) {
+		if (err instanceof SessionExpiredError) state.sessionExpired = true;
+	} finally {
+		state.salesTick++;
 	}
 }
 
@@ -156,9 +312,10 @@ export async function refreshCatalog(): Promise<void> {
 	cat.downloaded = 0;
 	try {
 		const api = await c.session(e.site);
-		const r = await downloadCatalog({
+		const r = await syncCatalog({
 			api,
 			repo: c.catalog,
+			meta: syncMeta,
 			scopeId: cat.scopeId,
 			site: e.site,
 			profile: e.profile,
@@ -167,23 +324,35 @@ export async function refreshCatalog(): Promise<void> {
 		});
 		cat.ready = true;
 		cat.items = r.items;
-		cat.skippedBarcodes = r.skippedBarcodes;
+		cat.skippedBarcodes = r.mode === "full" ? r.skippedBarcodes : cat.skippedBarcodes;
+		cat.unpriced = r.unpriced;
+		cat.lastMode = r.mode;
 		cat.syncedAt = Date.now();
-		writeSyncedAt(cat.scopeId, cat.syncedAt);
+		syncMeta.set(`at:${cat.scopeId}`, String(cat.syncedAt));
 	} catch (err) {
-		const have = cat.ready ? " The catalog from the last download is still available." : "";
+		const have = cat.ready ? " The catalog from the last update is still available." : "";
+		if (err instanceof SessionExpiredError) state.sessionExpired = true;
 		cat.message =
 			err instanceof OfflineError
 				? "The server cannot be reached." + have
 				: err instanceof SessionExpiredError
-					? "Your server session has expired. Sign out and sign in again to refresh the catalog." +
-						have
+					? "Your server session has expired. Sign in again to update the catalog." + have
 					: err instanceof CatalogSyncError
 						? err.message + have
-						: "The catalog could not be downloaded." + have;
+						: "The catalog could not be updated." + have;
 	} finally {
 		cat.syncing = false;
 	}
+}
+
+export async function reSignIn(password: string): Promise<void> {
+	const e = state.cashier;
+	if (!e) throw new Error("not signed in");
+	await getContainer().auth.loginOnline(e.site, e.user, password);
+	state.sessionExpired = false;
+	await refreshContext();
+	await refreshCatalog();
+	await settlePending();
 }
 
 export async function lock(reason = ""): Promise<void> {
@@ -202,10 +371,21 @@ export function changeServer(): void {
 }
 export function loggedIn(info: BootstrapInfo): void {
 	state.pending = info;
+	state.phase = info.profiles.length > 1 ? "profile" : "enroll";
+}
+
+export async function chooseProfile(name: string): Promise<void> {
+	const p = state.pending;
+	if (!p) return;
+	if (name !== p.profile) {
+		const t = await getContainer().session(p.site);
+		state.pending = await fetchBootstrap(t, p.site, name);
+	}
 	state.phase = "enroll";
 }
 export async function enrolled(): Promise<void> {
 	state.cashier = await getContainer().auth.enrolled();
+	if (state.cashier && state.pending) applyBootstrap(scopeIdFor(state.cashier), state.pending);
 	state.pending = null;
 	state.phase = "unlocked";
 	await startCatalog();
@@ -219,6 +399,8 @@ export async function signOut(): Promise<void> {
 	await getContainer().auth.signOut();
 	state.cashier = null;
 	state.catalog = emptyCatalog();
+	state.context = emptyContext();
+	state.sessionExpired = false;
 	state.phase = "setup";
 }
 export function selectTab(t: Tab) {

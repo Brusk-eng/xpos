@@ -25,10 +25,14 @@ const doc = {
 			table: m.table,
 			createSql: m.createSql(),
 			primaryKey: spec.primaryKey,
+			checks: spec.checks,
 			columns: spec.columns.map((c) => ({
 				name: c.name,
 				type: c.type,
 				notNull: c.notNull,
+				defaultSql: c.defaultSql,
+				check: c.check,
+				references: c.references,
 				addSql: m.addColumnSql(c), // null when the column cannot be added to an existing table
 			})),
 			indexes: m.indexSqls().map((ix, i) => ({ ...spec.indexes[i], sql: ix.sql })),

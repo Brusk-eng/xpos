@@ -61,6 +61,28 @@ class CatalogRepository(private val db: XposDb, private val now: () -> Long = Sy
         }
     }
 
+    /** Delta for the ACTIVE generation, one transaction: changed items are replaced with their barcodes and attributes, removed ones deleted. */
+    suspend fun applyDelta(scopeId: String, upserts: List<Item>, removed: List<String>) {
+        require(upserts.size <= MAX_BATCH && removed.size <= MAX_BATCH) { "delta too large" }
+        io {
+            db.write {
+                val gen = checkNotNull(activeGen(scopeId)) { "no active catalog to update" }
+                (removed + upserts.map { it.itemCode }).forEach { dao.deleteItem(scopeId, gen, it) }
+                dao.insertItems(upserts.map {
+                    ItemRow(scopeId, gen, it.itemCode, it.variantOf, it.name, Text.normalize(it.name), Text.normalize(it.itemCode), it.itemGroup, it.uom, it.priceMinor, it.brand)
+                })
+                dao.insertBarcodes(upserts.flatMap { i -> i.barcodes.toSet().map { ItemBarcode(scopeId, gen, it, i.itemCode, i.uom) } })
+                dao.insertAttrs(upserts.flatMap { i -> i.attrs.map { (k, v) -> ItemAttr(scopeId, gen, i.itemCode, k, v) } })
+                dao.setCount(scopeId, gen, dao.countItems(scopeId, gen))
+            }
+        }
+    }
+
+    suspend fun codePage(scopeId: String, after: String?, limit: Int): List<String> = io {
+        val gen = activeGen(scopeId) ?: return@io emptyList()
+        dao.codePage(scopeId, gen, after ?: "", limit.coerceIn(1, 2000))
+    }
+
     /** Atomic: either the new generation becomes the only active one, or nothing changes. */
     suspend fun activate(scopeId: String, gen: Int, expectedItems: Int) {
         io {

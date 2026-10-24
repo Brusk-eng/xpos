@@ -8,6 +8,7 @@ export interface Step {
 	id: string;
 	name: string;
 	statements: string[];
+	breaksOlderWriters?: boolean;
 }
 
 export const ALL_STEPS: Step[] = [];

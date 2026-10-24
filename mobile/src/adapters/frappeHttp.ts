@@ -21,10 +21,28 @@ export class ServerError extends Error {
 	constructor(
 		readonly status: number,
 		message: string,
+		readonly excType?: string,
 	) {
 		super(message);
 		this.name = "ServerError";
 	}
+}
+
+export function serverMessageOf(body: unknown, status: number): string {
+	const b = (body ?? {}) as Record<string, unknown>;
+	try {
+		const msgs = JSON.parse(String(b._server_messages ?? "[]")) as string[];
+		const texts = msgs
+			.map((m) => String((JSON.parse(m) as { message?: string }).message ?? ""))
+			.map((t) => t.replace(/<[^>]*>/g, "").trim())
+			.filter(Boolean);
+		if (texts.length) return texts.join(" ");
+	} catch {
+		/* fall through */
+	}
+	const exc = String(b.exception ?? "");
+	if (exc) return exc.replace(/^[\w.]+:\s*/, "").slice(0, 300);
+	return `Server returned ${status}`;
 }
 
 export interface RawResponse {
@@ -98,9 +116,16 @@ export class FrappeHttpTransport implements ApiTransport {
 		opts: { get?: boolean } = {},
 	): Promise<T> {
 		const r = await this.request(method, args, opts);
-		if (r.status === 401 || (r.status === 403 && !/CSRF/i.test(JSON.stringify(r.body ?? ""))))
-			throw new SessionExpiredError();
-		if (r.status < 200 || r.status >= 300) throw new ServerError(r.status, `Server returned ${r.status}`);
+		if (r.status === 401) throw new SessionExpiredError();
+		if (r.status === 403 && !/CSRF/i.test(JSON.stringify(r.body ?? ""))) {
+			await this.refreshCsrf();
+		}
+		if (r.status < 200 || r.status >= 300)
+			throw new ServerError(
+				r.status,
+				serverMessageOf(r.body, r.status),
+				String((r.body as { exc_type?: string })?.exc_type ?? ""),
+			);
 		return (r.body as { message: T }).message;
 	}
 }

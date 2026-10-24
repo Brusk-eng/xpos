@@ -3,9 +3,10 @@
  * Capacitor plugin) implementation under adapters/native.
  */
 import type { CommitResult, SampleSale } from "@mobile/domain/txn";
+import type { NewSale, SalePatch, SaleRecord, SaleStatus } from "@mobile/domain/sale";
 
-/** "host-test" is the node:sqlite double used only by the unit tests. */
-export type AdapterKind = "native" | "host-test";
+/** "host-test" is the node:sqlite double used only by the unit tests; "web-dev" is the browser development adapter. */
+export type AdapterKind = "native" | "host-test" | "web-dev";
 
 export interface CatalogItem {
 	itemCode: string;
@@ -71,6 +72,13 @@ export interface CatalogRepository {
 	page(scopeId: string, req?: PageRequest & { variantsOnly?: boolean }): Promise<ItemPage>;
 	variantsOf(scopeId: string, templateCode: string): Promise<CatalogItem[]>;
 	stats(scopeId: string): Promise<CatalogStats>;
+	/** Item codes of the active catalog in code order, after `after` (exclusive), at most `limit` (<= 2000). */
+	codePage(scopeId: string, after: string | undefined, limit: number): Promise<string[]>;
+	/**
+	 * Applies a change-feed delta to the ACTIVE generation in one transaction: `upserts` replace (or add) items with all
+	 * their barcodes and attributes, `removed` delete items. Nothing changes if it fails.
+	 */
+	applyDelta(scopeId: string, upserts: CatalogItem[], removed: string[]): Promise<void>;
 }
 
 export interface TransactionStore {
@@ -79,6 +87,12 @@ export interface TransactionStore {
 	commitSample(sale: SampleSale): Promise<CommitResult>;
 	getReceipt(clientTxnId: string): Promise<CommitResult["receipt"] | null>;
 	outboxCounts(): Promise<Record<string, number>>;
+	/** Writes the sale (with tender and receipt evidence) durably; an existing id with the same contents is a no-op. */
+	saveSale(sale: NewSale): Promise<{ created: boolean; sale: SaleRecord }>;
+	getSale(txnId: string): Promise<SaleRecord | null>;
+	updateSale(txnId: string, patch: SalePatch): Promise<SaleRecord>;
+	/** Newest first, bounded. */
+	listSales(statuses: SaleStatus[], limit?: number): Promise<SaleRecord[]>;
 }
 
 export interface ApiTransport {
@@ -103,8 +117,27 @@ export interface AuthSession {
 	minorDigits: number;
 }
 
+export interface PaymentMode {
+	mode_of_payment: string;
+	default: boolean;
+	type: string | null;
+}
+
+export interface ProfileChoice {
+	name: string;
+	company: string;
+	warehouse: string;
+}
+
 export interface BootstrapInfo extends AuthSession {
-	erpnextVersion: string;
+	/** null when the server did not report an ERPNext version (the Frappe version is never substituted). */
+	erpnextVersion: string | null;
+	frappeVersion: string;
+	priceList: string | null;
+	customer: string | null;
+	profiles: ProfileChoice[];
+	paymentModes: PaymentMode[];
+	openShift: string | null;
 	company: string;
 	warehouse: string;
 	leaseTtlSeconds: number;

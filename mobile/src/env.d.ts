@@ -8,3 +8,7 @@ declare module "*.vue" {
 interface Window {
 	xpos?: { _messages?: Record<string, string> };
 }
+
+interface ImportMetaEnv {
+	readonly VITE_ALLOW_CLEARTEXT?: string;
+}

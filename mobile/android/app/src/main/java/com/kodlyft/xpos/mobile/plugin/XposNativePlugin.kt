@@ -13,6 +13,7 @@ import com.kodlyft.xpos.mobile.catalog.CatalogRepository
 import com.kodlyft.xpos.mobile.catalog.Item
 import com.kodlyft.xpos.mobile.catalog.ItemPage
 import com.kodlyft.xpos.mobile.db.CatalogScope
+import com.kodlyft.xpos.mobile.db.SaleRow
 import com.kodlyft.xpos.mobile.db.XposDb
 import com.kodlyft.xpos.mobile.hw.Capabilities
 import com.kodlyft.xpos.mobile.txn.SampleLine
@@ -69,6 +70,10 @@ class XposNativePlugin : Plugin() {
             try {
                 if (needsUnlock) auth.requireUnlocked()
                 call.resolve(block() ?: JSObject())
+            } catch (e: com.kodlyft.xpos.mobile.txn.TransactionRepository.SaleConflictException) {
+                call.reject(e.message, "SALE_CONFLICT")
+            } catch (e: com.kodlyft.xpos.mobile.db.ReadOnlySchemaException) {
+                call.reject(e.message, "SCHEMA_READ_ONLY")
             } catch (e: TxnConflictException) {
                 call.reject(e.message, "TXN_CONFLICT")
             } catch (e: TxnWriteException) {
@@ -142,6 +147,43 @@ class XposNativePlugin : Plugin() {
             List(lines.length()) { lines.getJSONObject(it).let { l -> SampleLine(l.getString("itemCode"), l.getString("name"), l.getLong("priceMinor"), l.getLong("qtyMilli")) } })
         val r = txns.commitSample(sale)
         JSObject().put("status", r.status).put("receipt", JSONObject(r.receiptJson))
+    }
+    private fun saleJson(r: SaleRow) = JSObject()
+        .put("txnId", r.txnId).put("scopeId", r.scopeId).put("status", r.status).put("bodyJson", r.bodyJson).put("contentHash", r.contentHash)
+        .put("currency", r.currency).put("minorDigits", r.minorDigits).put("payableMinor", r.payableMinor).put("evidenceJson", r.evidenceJson)
+        .put("serverJson", r.serverJson ?: JSONObject.NULL).put("invoice", r.invoice ?: JSONObject.NULL).put("message", r.message)
+        .put("attempts", r.attempts).put("createdAt", r.createdAt).put("updatedAt", r.updatedAt)
+    @PluginMethod fun saveSale(call: PluginCall) = launch(call) {
+        auth.requireWritable() // same offline-lease rule as any new sale
+        val d = call.data
+        val r = txns.saveSale(SaleRow(d.str("txnId"), d.str("scopeId"), "captured", d.str("bodyJson"), d.str("contentHash"), d.str("currency"), d.getInt("minorDigits"), d.getLong("payableMinor"), d.str("evidenceJson"), null, null, "", 0, 0, 0))
+        JSObject().put("created", r.first).put("sale", saleJson(r.second))
+    }
+    @PluginMethod fun getSale(call: PluginCall) = launch(call) { JSObject().put("sale", txns.getSale(call.data.str("txnId"))?.let(::saleJson) ?: JSONObject.NULL) }
+    @PluginMethod fun updateSale(call: PluginCall) = launch(call) {
+        val d = call.data
+        fun optStr(k: String) = if (d.has(k) && !d.isNull(k)) d.getString(k) else null
+        val r = txns.updateSale(
+            d.str("txnId"), optStr("status"), optStr("serverJson"), d.has("serverJson"), optStr("invoice"), d.has("invoice"),
+            optStr("message"), optStr("bodyJson"), optStr("evidenceJson"), if (d.has("payableMinor")) d.getLong("payableMinor") else null, d.optBoolean("attempt", false),
+        )
+        JSObject().put("sale", saleJson(r))
+    }
+    @PluginMethod fun listSales(call: PluginCall) = launch(call) {
+        val st = call.data.getJSONArray("statuses")
+        val rows = txns.listSales(List(st.length()) { st.getString(it) }, call.data.optInt("limit", 100))
+        JSObject().put("sales", JSArray().also { a -> rows.forEach { a.put(saleJson(it)) } })
+    }
+    @PluginMethod fun applyDelta(call: PluginCall) = launch(call) {
+        auth.requireWritable()
+        val up = call.data.getJSONArray("upserts")
+        val rm = call.data.getJSONArray("removed")
+        catalog.applyDelta(call.data.str("scopeId"), List(up.length()) { parseItem(up.getJSONObject(it)) }, List(rm.length()) { rm.getString(it) })
+        null
+    }
+    @PluginMethod fun codePage(call: PluginCall) = launch(call) {
+        val codes = catalog.codePage(call.data.str("scopeId"), call.data.getString("after"), call.data.optInt("limit", 2000))
+        JSObject().put("codes", JSArray().also { a -> codes.forEach { a.put(it) } })
     }
     @PluginMethod fun getReceipt(call: PluginCall) = launch(call) { JSObject().put("receipt", txns.receipt(call.data.str("clientTxnId"))?.let { JSONObject(it) } ?: JSONObject.NULL) }
     @PluginMethod fun outboxCounts(call: PluginCall) = launch(call) { JSObject().put("counts", JSONObject(txns.outboxCounts() as Map<*, *>)) }

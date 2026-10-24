@@ -24,7 +24,7 @@ async function onSecond(pin: string) {
 	}
 	busy.value = true;
 	try {
-		await getContainer().auth.enroll(state.pending!, pin);
+		await getContainer().auth.enroll(JSON.parse(JSON.stringify(state.pending)), pin);
 		await enrolled();
 	} catch (e) {
 		error.value = e instanceof Error ? e.message : "Could not save the PIN.";

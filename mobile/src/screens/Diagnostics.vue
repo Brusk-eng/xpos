@@ -24,8 +24,7 @@ const fingerprint = fingerprintOf(
 const c = getContainer();
 const scopes = ref<(CatalogScopeInfo & { stats: CatalogStats })[]>([]);
 const lease = ref<{ status: string; remainingMs: number } | null>(null);
-const outbox = ref<Record<string, number>>({});
-const sync = ref({ supported: false, reason: "", pending: 0 });
+const salesByStatus = ref<Record<string, number>>({});
 const storage = ref("unknown");
 const scanners = ref<ScannerCapabilities[]>([]);
 const printers = ref<PrinterCapabilities[]>([]);
@@ -36,8 +35,13 @@ async function refresh() {
 		list.map(async (s) => ({ ...s, stats: await c.catalog.stats(s.scopeId) })),
 	);
 	lease.value = await c.auth.leaseStatus();
-	outbox.value = await c.transactions.outboxCounts();
-	sync.value = await c.sync.status();
+	const counts: Record<string, number> = {};
+	for (const sale of await c.transactions.listSales(
+		["captured", "posting", "posted", "reprice", "uncertain", "held", "rejected", "fiscal_pending"],
+		200,
+	))
+		counts[sale.status] = (counts[sale.status] ?? 0) + 1;
+	salesByStatus.value = counts;
 	scanners.value = c.scanner.capabilities();
 	printers.value = c.printer.capabilities();
 	try {
@@ -76,8 +80,31 @@ const hours = (ms: number) => `${(ms / 3_600_000).toFixed(1)} h`;
 				<dd>{{ getLifecycle().isOnline() ? "online" : "offline" }}</dd>
 				<dt class="text-muted-foreground">Storage</dt>
 				<dd>{{ storage }}</dd>
-				<dt class="text-muted-foreground">Application ID</dt>
-				<dd>com.kodlyft.xpos.mobile.dev (provisional; finalize before Play)</dd>
+				<dt class="text-muted-foreground">Platform</dt>
+				<dd>
+					{{
+						state.kind === "native"
+							? "Android app (native SQLite, Keystore)"
+							: "Browser development (not Keystore-secured)"
+					}}
+				</dd>
+				<dt class="text-muted-foreground">ERPNext / Frappe</dt>
+				<dd>
+					{{ state.context.erpnextVersion ?? "ERPNext version not reported" }} /
+					{{ state.context.frappeVersion || "unknown" }}
+				</dd>
+				<dt class="text-muted-foreground">POS Profile</dt>
+				<dd>
+					{{ state.cashier?.profile }} · {{ state.context.company }} ·
+					{{ state.context.warehouse }} ·
+					{{ state.context.priceList ?? "no price list" }}
+				</dd>
+				<dt class="text-muted-foreground">Shift</dt>
+				<dd>{{ state.context.openShift ?? "none open" }}</dd>
+				<dt v-if="state.kind === 'native'" class="text-muted-foreground">Application ID</dt>
+				<dd v-if="state.kind === 'native'">
+					com.kodlyft.xpos.mobile.dev (provisional; finalize before Play)
+				</dd>
 			</dl>
 		</section>
 
@@ -105,12 +132,17 @@ const hours = (ms: number) => `${(ms / 3_600_000).toFixed(1)} h`;
 					{{ state.catalog.total.toLocaleString() }} items</template
 				>
 				<template v-else-if="state.catalog.syncedAt"
-					>Last downloaded {{ new Date(state.catalog.syncedAt).toLocaleString() }}</template
+					>Last successful refresh {{ new Date(state.catalog.syncedAt).toLocaleString() }} ({{
+						state.catalog.lastMode === "delta" ? "changes only" : "full download"
+					}})</template
 				>
-				<template v-else>Not downloaded in this session</template>
+				<template v-else>Not refreshed in this session</template>
+				<template v-if="state.catalog.unpriced">
+					· {{ state.catalog.unpriced }} items have no price and cannot be sold</template
+				>
 				<template v-if="state.catalog.skippedBarcodes">
 					· {{ state.catalog.skippedBarcodes }} barcodes skipped (sold in a unit the app cannot
-					price yet)</template
+					price yet; scanning them reports "not found")</template
 				>
 			</p>
 			<p v-if="state.catalog.message" class="mb-2 text-sm text-warning-soft-foreground">
@@ -139,18 +171,20 @@ const hours = (ms: number) => `${(ms / 3_600_000).toFixed(1)} h`;
 		</section>
 
 		<section class="rounded-2xl border border-border bg-card p-4 shadow-raised" aria-labelledby="d-queue">
-			<h2 id="d-queue" class="mb-2 font-semibold">Outbox &amp; synchronization</h2>
+			<h2 id="d-queue" class="mb-2 font-semibold">Sales &amp; synchronization</h2>
 			<p class="text-sm">
-				Queued commands:
+				Sales on this device by status:
 				{{
-					Object.entries(outbox)
-						.map(([k, v]) => `${v} ${k}`)
+					Object.entries(salesByStatus)
+						.map(([k, v]) => `${v} ${k.replace("_", " ")}`)
 						.join(", ") || "none"
 				}}
 			</p>
-			<p class="text-sm"><Badge variant="neutral">Sync not implemented</Badge> {{ sync.reason }}</p>
 			<p class="mt-1 text-xs text-muted-foreground">
-				Sample commands are blocked in the database and can never be posted to ERPNext.
+				Sales are sent to ERPNext when you charge, and again whenever the device is back online or the
+				app is reopened. Offline selling is switched off: stock, serial/batch and receipt checks still
+				need the server. Not implemented yet: background sending while the app is closed, offline
+				sales, returns, shift closing, printing.
 			</p>
 		</section>
 

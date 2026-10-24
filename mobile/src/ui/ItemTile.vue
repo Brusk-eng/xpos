@@ -15,7 +15,11 @@ defineEmits<{ pick: [item: CatalogItem] }>();
 		<button
 			type="button"
 			class="flex min-w-0 flex-1 select-none cursor-pointer flex-col rounded-2xl p-2 text-start motion-safe:active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-			:aria-label="`Add ${item.name}, ${currency} ${formatMinor(item.priceMinor, minorDigits)}`"
+			:aria-label="
+				item.priceMinor > 0
+					? `Add ${item.name}, ${currency} ${formatMinor(item.priceMinor, minorDigits)}`
+					: `${item.name}: no price in the price list, cannot be sold`
+			"
 			@click="$emit('pick', item)"
 		>
 			<span class="relative block aspect-4/3 w-full overflow-hidden rounded-xl bg-surface-sunken">
@@ -37,12 +41,17 @@ defineEmits<{ pick: [item: CatalogItem] }>();
 				<span class="mt-auto flex items-end justify-between gap-2 pt-2">
 					<span
 						class="block min-w-0 truncate text-base font-bold leading-tight text-foreground tabular-nums"
-						>{{ formatMinor(item.priceMinor, minorDigits)
-						}}<span class="ms-1 text-xs font-normal text-muted-foreground"
-							>/ {{ item.uom }}</span
+						><template v-if="item.priceMinor > 0"
+							>{{ formatMinor(item.priceMinor, minorDigits)
+							}}<span class="ms-1 text-xs font-normal text-muted-foreground"
+								>/ {{ item.uom }}</span
+							></template
+						><span v-else class="text-sm font-semibold text-warning-soft-foreground"
+							>No price</span
 						></span
 					>
 					<span
+						v-if="item.priceMinor > 0"
 						class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-primary"
 						aria-hidden="true"
 						><Plus class="size-4" stroke-width="2.5"
