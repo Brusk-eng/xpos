@@ -62,9 +62,13 @@ The app stores offline data in your browser with dedicated storage for:
 - Item groups filtering uses cached group data
 
 ### Barcode Scanning
-- Barcode lookups fall back to the cached item database
-- Supports item code matching and barcode field matching
-- Scale barcodes are parsed locally
+- The catalogue download carries every barcode of each item with the UOM it sells in, its conversion factor and its rate, so a scan works offline after the first download and after a reload
+- A box barcode adds a box line priced at the box rate (the price set for that UOM, else unit price x factor); stock is checked in stock units
+- A barcode wins over another item's code, as on the server
+- A barcode whose UOM has no conversion on the item, or one two cached items claim, is refused with the reason; it is never guessed
+- Barcode edits, moves and removals reach the till through the delta feed
+- **Scale, serial-number and batch-number scans work online only.** Offline they are not found; add the item by search instead
+- Tills with a catalogue downloaded before this change download it again once (the feed version is part of the scope hash)
 
 ### Customer Search
 - Customer search uses the cached customer list

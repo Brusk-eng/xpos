@@ -311,7 +311,7 @@ scheduler_events = {
 
 # Request Events
 # ----------------
-# before_request = ["xpos.utils.before_request"]
+before_request = ["xpos.reports.execute.guard_direct_request"]
 # after_request = ["xpos.utils.after_request"]
 
 # Job Events

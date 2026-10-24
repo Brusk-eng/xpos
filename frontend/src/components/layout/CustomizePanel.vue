@@ -5,7 +5,7 @@
 		aria-modal="false"
 		aria-labelledby="customize-title"
 		tabindex="-1"
-		class="flex max-h-full w-88 max-w-full shrink-0 flex-col overflow-hidden rounded-2xl border border-primary/40 bg-card shadow-raised focus:outline-none"
+		class="flex max-h-full w-88 max-w-full shrink-0 flex-col max-sm:w-full overflow-hidden rounded-2xl border border-primary/40 bg-card shadow-raised focus:outline-none"
 		data-testid="customize-panel"
 		@keydown.esc.stop="cancel"
 	>

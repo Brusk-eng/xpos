@@ -562,8 +562,13 @@ export const useCartStore = defineStore("cart", () => {
 			return { success: false, message: stockCheck.message };
 		}
 
+		const sellingUom = item.uom || item.stock_uom;
 		const existing = items.value.find(
-			(i: CartItem) => i.item_code === item.item_code && !i.serial_no && !i.batch_no,
+			(i: CartItem) =>
+				i.item_code === item.item_code &&
+				!i.serial_no &&
+				!i.batch_no &&
+				(i.uom || i.stock_uom) === sellingUom,
 		);
 
 		if (existing) {

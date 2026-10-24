@@ -42,9 +42,8 @@ class CatalogSyncTestCase(ERPNextTestSuite):
 		self.warehouse = f"{STORE} - {abbr}"
 		ensure("Warehouse", self.warehouse, {"warehouse_name": STORE, "company": company})
 		ensure("Price List", PRICE_LIST, {"price_list_name": PRICE_LIST, "selling": 1, "currency": "INR"})
-		for n in range(0, 12):
-			if frappe.db.exists("Item", code(n)):
-				frappe.delete_doc("Item", code(n), force=True, ignore_permissions=True)
+		for name in frappe.get_all("Item", filters={"name": ["like", f"{PREFIX}-%"]}, pluck="name"):
+			frappe.delete_doc("Item", name, force=True, ignore_permissions=True)
 		frappe.db.delete("User Permission", {"user": ["in", [CASHIER, SECOND, OUTSIDER]]})
 		for n in range(1, 6):
 			ensure(
@@ -125,7 +124,12 @@ class CatalogSyncTestCase(ERPNextTestSuite):
 
 	def test_keyset_pages_do_not_skip_when_rows_are_added_before_the_cursor(self):
 		started = self.begin()
-		first = catalog_sync.catalog_page(PROFILE, started["cursors"]["items"], 2)
+		# page until two of this test's own items are behind the cursor; other suites leave items too
+		first_items, cursor = [], started["cursors"]["items"]
+		while cursor and len(self.mine(first_items)) < 2:
+			page = catalog_sync.catalog_page(PROFILE, cursor, 2)
+			first_items += page["items"]
+			cursor = page["next_cursor"]
 		ensure(
 			"Item",
 			f"{PREFIX}-000",
@@ -138,12 +142,12 @@ class CatalogSyncTestCase(ERPNextTestSuite):
 				"is_sales_item": 1,
 			},
 		)
-		rest, cursor = [], first["next_cursor"]
+		rest = []
 		while cursor:
 			page = catalog_sync.catalog_page(PROFILE, cursor, 2)
 			rest += page["items"]
 			cursor = page["next_cursor"]
-		seen = self.mine(first["items"] + rest)
+		seen = self.mine(first_items + rest)
 		self.assertEqual(seen, [code(n) for n in range(1, 6)], "offset paging would have repeated a row here")
 		delta = catalog_sync.catalog_delta(PROFILE, started["cursors"]["delta"])
 		self.assertIn(f"{PREFIX}-000", self.mine(delta["upserts"]))
@@ -399,3 +403,137 @@ class CatalogSyncTestCase(ERPNextTestSuite):
 		add_catalog_change_log.execute()
 		add_catalog_change_log.execute()
 		self.assertTrue(frappe.db.table_exists(catalog_log.DOCTYPE))
+
+
+class TestCatalogBarcodes(CatalogSyncTestCase):
+	"""Barcodes reach the offline cache with their UOM, factor and rate, in snapshots and deltas alike."""
+
+	def set_barcodes(self, item, barcodes, uoms=()):
+		doc = frappe.get_doc("Item", item)
+		doc.set("barcodes", [{"barcode": b, "uom": u} for b, u in barcodes])
+		doc.set(
+			"uoms",
+			[{"uom": "Nos", "conversion_factor": 1}, *({"uom": u, "conversion_factor": f} for u, f in uoms)],
+		)
+		doc.save(ignore_permissions=True)
+
+	def row(self, rows, item):
+		return next(r for r in rows if r.item_code == item)
+
+	def barcodes_of(self, rows, item):
+		return {b["barcode"]: b for b in self.row(rows, item).barcodes}
+
+	def test_snapshot_rows_carry_every_barcode_with_uom_factor_and_rate(self):
+		self.set_barcodes(
+			code(1), [("590001", None), ("590002", "Box"), ("590003", "Pair")], uoms=[("Box", 12)]
+		)
+		frappe.get_doc(
+			{
+				"doctype": "Item Price",
+				"item_code": code(1),
+				"price_list": PRICE_LIST,
+				"price_list_rate": 100,
+				"selling": 1,
+				"uom": "Box",
+			}
+		).insert(ignore_permissions=True)
+		frappe.set_user(CASHIER)
+		rows = self.download(self.begin())
+		found = self.barcodes_of(rows, code(1))
+		self.assertEqual(set(found), {"590001", "590002", "590003"})
+		self.assertEqual(
+			(found["590001"]["uom"], found["590001"]["conversion_factor"], found["590001"]["rate"]),
+			("Nos", 1, 10),
+		)
+		self.assertEqual(
+			(found["590002"]["uom"], found["590002"]["conversion_factor"], found["590002"]["rate"]),
+			("Box", 12, 100),
+			"a price set for the UOM wins over unit price x factor",
+		)
+		self.assertIsNone(found["590003"]["conversion_factor"], "a UOM the item cannot convert is flagged")
+		self.assertEqual(self.barcodes_of(rows, code(2)), {})
+
+	def test_uom_without_its_own_price_is_the_unit_price_times_the_factor(self):
+		self.set_barcodes(code(2), [("590010", "Box")], uoms=[("Box", 6)])
+		frappe.set_user(CASHIER)
+		found = self.barcodes_of(self.download(self.begin()), code(2))
+		self.assertEqual(found["590010"]["rate"], 20 * 6)
+
+	def test_delta_carries_added_changed_and_removed_barcodes(self):
+		self.set_barcodes(code(1), [("590001", None)])
+		frappe.set_user(CASHIER)
+		started = self.begin()
+		frappe.set_user("Administrator")
+		self.set_barcodes(code(1), [("590001", None), ("590099", "Box")], uoms=[("Box", 4)])
+		frappe.set_user(CASHIER)
+		delta = catalog_sync.catalog_delta(PROFILE, started["cursors"]["delta"])
+		self.assertEqual(set(self.barcodes_of(delta["upserts"], code(1))), {"590001", "590099"})
+
+		frappe.set_user("Administrator")
+		self.set_barcodes(code(1), [("590777", None)])
+		frappe.set_user(CASHIER)
+		delta = catalog_sync.catalog_delta(PROFILE, delta["next_cursor"])
+		self.assertEqual(set(self.barcodes_of(delta["upserts"], code(1))), {"590777"})
+
+	def test_snapshot_and_delta_describe_a_barcode_identically(self):
+		self.set_barcodes(code(1), [("590002", "Box")], uoms=[("Box", 12)])
+		frappe.set_user(CASHIER)
+		snapshot = self.barcodes_of(self.download(self.begin()), code(1))
+		started = self.begin()
+		frappe.set_user("Administrator")
+		self.set_barcodes(code(1), [("590002", "Box")], uoms=[("Box", 12)])
+		frappe.set_user(CASHIER)
+		delta = catalog_sync.catalog_delta(PROFILE, started["cursors"]["delta"])
+		self.assertEqual(self.barcodes_of(delta["upserts"], code(1)), snapshot)
+
+	def test_a_renamed_item_drops_the_old_code_and_keeps_its_barcodes(self):
+		self.set_barcodes(code(5), [("590055", None)])
+		frappe.set_user(CASHIER)
+		started = self.begin()
+		frappe.set_user("Administrator")
+		renamed = frappe.rename_doc("Item", code(5), code(11), force=True)
+		self.addCleanup(frappe.delete_doc, "Item", renamed, force=True, ignore_permissions=True)
+		frappe.set_user(CASHIER)
+		delta = catalog_sync.catalog_delta(PROFILE, started["cursors"]["delta"])
+		self.assertIn(code(5), delta["removed"])
+		self.assertEqual(set(self.barcodes_of(delta["upserts"], renamed)), {"590055"})
+
+	def test_the_scope_hash_changes_with_the_feed_version_so_old_caches_resync(self):
+		pos = frappe.get_cached_doc("POS Profile", PROFILE)
+		scope = catalog_sync.build_scope(pos)
+		self.assertEqual(scope["feed"], catalog_sync.FEED_VERSION)
+		self.assertNotEqual(
+			catalog_sync.scope_hash(scope), catalog_sync.scope_hash({**scope, "feed": scope["feed"] - 1})
+		)
+
+
+class TestBarcodeScan(CatalogSyncTestCase):
+	"""The online scan sells a barcode in its own UOM, priced and converted the same way as the offline feed."""
+
+	def scan(self, barcode):
+		from xpos.api.items import search_barcode
+
+		frappe.set_user(CASHIER)
+		return search_barcode(barcode, PROFILE)
+
+	def test_a_unit_barcode_sells_one_unit_at_the_unit_price(self):
+		TestCatalogBarcodes.set_barcodes(self, code(1), [("590001", None)])
+		result = self.scan("590001")
+		self.assertEqual((result["uom"], result["conversion_factor"], result["rate"]), ("Nos", 1, 10))
+
+	def test_a_box_barcode_returns_the_box_uom_factor_and_rate(self):
+		TestCatalogBarcodes.set_barcodes(self, code(1), [("590002", "Box")], uoms=[("Box", 12)])
+		result = self.scan("590002")
+		self.assertEqual(
+			(result["item_code"], result["uom"], result["conversion_factor"], result["rate"]),
+			(code(1), "Box", 12, 120),
+		)
+
+	def test_a_barcode_whose_uom_has_no_conversion_is_refused(self):
+		TestCatalogBarcodes.set_barcodes(self, code(1), [("590003", "Pair")])
+		with self.assertRaises(frappe.ValidationError):
+			self.scan("590003")
+
+	def test_a_barcode_wins_over_another_items_code(self):
+		TestCatalogBarcodes.set_barcodes(self, code(1), [(code(2), None)])
+		self.assertEqual(self.scan(code(2))["item_code"], code(1))

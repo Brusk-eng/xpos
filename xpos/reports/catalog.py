@@ -22,7 +22,7 @@ from xpos.api.auth import (
 	get_user_pos_role,
 	is_superuser,
 )
-from xpos.reports import bundled
+from xpos.reports import bundled, scope
 from xpos.reports.filters import FilterError, build_filters
 
 CATEGORIES = ("Inventory", "Sales", "Purchasing", "Operations", "Accounting", "Other")
@@ -34,6 +34,7 @@ SETTING_FIELDS = (
 	"description",
 	"pos_permission",
 	"scope_mode",
+	"scope_verified",
 	"filter_provider",
 	"allow_export",
 	"thermal_print",
@@ -127,6 +128,17 @@ def assess(report, decl: dict) -> tuple[str, list[str], list[dict] | None]:
 		return state, [reason], None
 
 
+def scope_verified(report, decl: dict) -> bool:
+	"""Whether the report itself limits its rows and totals to the caller's scope.
+
+	Standard reports of the X POS module ship that guarantee in code; any other report has it only
+	when an administrator ticked ``scope_verified`` on its XPOS Report Setting. Never client-declared.
+	"""
+	if report.module == bundled.MODULE and report.is_standard == "Yes":
+		return True
+	return bool(decl.get("scope_verified"))
+
+
 def base_entry(name: str, decl: dict) -> dict | None:
 	if not frappe.db.exists("Report", name):
 		return None
@@ -148,7 +160,8 @@ def base_entry(name: str, decl: dict) -> dict | None:
 		"scope": {
 			"mode": decl.get("scope_mode")
 			if decl.get("scope_mode") in SCOPE_MODES
-			else "Company and Warehouse"
+			else "Company and Warehouse",
+			"verified": scope_verified(report, decl),
 		},
 		"execution": {
 			"prepared": "unsupported" if report.prepared_report else "none",
@@ -182,7 +195,7 @@ def user_can_see(entry: dict, user: str, permissions: dict) -> bool:
 	key = entry["permissions"]["pos_permission"]
 	if key and (key not in ALL_PERMISSION_KEYS or not permissions.get(key)):
 		return False
-	return True
+	return entry["scope"]["verified"] or not scope.get_scope(user).restricted
 
 
 def finish_entry(entry: dict, user: str) -> dict:
@@ -197,8 +210,9 @@ def finish_entry(entry: dict, user: str) -> dict:
 
 
 def user_key(user: str, permissions: dict) -> str:
+	restricted = scope.get_scope(user).restricted
 	fingerprint = json.dumps(
-		[user, sorted(frappe.get_roles(user)), sorted(k for k, v in permissions.items() if v)]
+		[user, sorted(frappe.get_roles(user)), sorted(k for k, v in permissions.items() if v), restricted]
 	)
 	return hashlib.sha1(fingerprint.encode()).hexdigest()
 

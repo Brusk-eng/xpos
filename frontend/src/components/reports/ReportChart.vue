@@ -8,8 +8,12 @@ const props = defineProps<{ chart: unknown }>();
 const MAX_POINTS = 40;
 const SERIES = ["var(--primary)", "var(--info)", "var(--success)", "var(--warning)"];
 
+const SUPPORTED = ["bar", "line"] as const;
+const DASH = ["", "6 3", "2 3", "8 3 2 3"];
+
 interface Parsed {
-	type: "bar" | "line";
+	type: (typeof SUPPORTED)[number];
+	totalSeries: number;
 	labels: string[];
 	total: number;
 	series: { name: string; values: number[] }[];
@@ -17,11 +21,18 @@ interface Parsed {
 	min: number;
 }
 
+type ChartInput = { type?: string; data?: { labels?: unknown[]; datasets?: unknown[] } } | null;
+
+const unsupportedType = computed<string | null>(() => {
+	const chart = props.chart as ChartInput;
+	if (!chart || typeof chart !== "object") return null;
+	const type = typeof chart.type === "string" && chart.type ? chart.type : "bar";
+	return (SUPPORTED as readonly string[]).includes(type) ? null : type;
+});
+
 const parsed = computed<Parsed | null>(() => {
-	const chart = props.chart as {
-		type?: string;
-		data?: { labels?: unknown[]; datasets?: unknown[] };
-	} | null;
+	const chart = props.chart as ChartInput;
+	if (unsupportedType.value) return null;
 	const labels = chart?.data?.labels;
 	const datasets = chart?.data?.datasets;
 	if (!Array.isArray(labels) || !Array.isArray(datasets) || labels.length === 0) return null;
@@ -41,6 +52,7 @@ const parsed = computed<Parsed | null>(() => {
 	const all = series.flatMap((set) => set.values);
 	return {
 		type: chart?.type === "line" ? "line" : "bar",
+		totalSeries: datasets.length,
 		labels: labels.slice(0, MAX_POINTS).map((label) => String(label)),
 		total: labels.length,
 		series,
@@ -84,7 +96,19 @@ const summary = computed(() =>
 </script>
 
 <template>
-	<figure v-if="parsed" class="rounded-2xl border border-border bg-card/50 p-3 shadow-raised">
+	<p
+		v-if="unsupportedType"
+		class="rounded-2xl border border-border bg-card/50 p-3 text-sm text-muted-foreground"
+		data-testid="chart-unsupported"
+		role="note"
+	>
+		{{
+			__("This report's {0} chart cannot be shown here. Its figures are in the table.", [
+				unsupportedType,
+			])
+		}}
+	</p>
+	<figure v-else-if="parsed" class="rounded-2xl border border-border bg-card/50 p-3 shadow-raised">
 		<svg
 			:viewBox="`0 0 ${W} ${H}`"
 			class="h-44 w-full"
@@ -93,6 +117,18 @@ const summary = computed(() =>
 			preserveAspectRatio="xMidYMid meet"
 		>
 			<line :x1="PAD" :x2="W - PAD" :y1="y(0, parsed)" :y2="y(0, parsed)" stroke="hsl(var(--border))" />
+			<text :x="PAD" :y="PAD + 8" font-size="11" fill="hsl(var(--muted-foreground))">
+				{{ formatFloat(parsed.max) }}
+			</text>
+			<text
+				v-if="parsed.min < 0"
+				:x="PAD"
+				:y="H - PAD"
+				font-size="11"
+				fill="hsl(var(--muted-foreground))"
+			>
+				{{ formatFloat(parsed.min) }}
+			</text>
 			<template v-for="(set, s) in parsed.series" :key="set.name || s">
 				<template v-if="parsed.type === 'bar'">
 					<rect
@@ -105,13 +141,25 @@ const summary = computed(() =>
 						:fill="`hsl(${SERIES[s]})`"
 					/>
 				</template>
-				<polyline
-					v-else
-					fill="none"
-					stroke-width="2"
-					:stroke="`hsl(${SERIES[s]})`"
-					:points="set.values.map((value, i) => `${x(i, parsed!)},${y(value, parsed!)}`).join(' ')"
-				/>
+				<template v-else>
+					<polyline
+						fill="none"
+						stroke-width="2"
+						:stroke="`hsl(${SERIES[s]})`"
+						:stroke-dasharray="DASH[s]"
+						:points="
+							set.values.map((value, i) => `${x(i, parsed!)},${y(value, parsed!)}`).join(' ')
+						"
+					/>
+					<circle
+						v-for="(value, i) in set.values"
+						:key="i"
+						:cx="x(i, parsed)"
+						:cy="y(value, parsed)"
+						r="3"
+						:fill="`hsl(${SERIES[s]})`"
+					/>
+				</template>
 			</template>
 		</svg>
 		<figcaption class="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
@@ -123,6 +171,14 @@ const summary = computed(() =>
 				/>
 				{{ set.name || __("Series {0}", [String(s + 1)]) }}
 			</span>
+			<span v-if="parsed.totalSeries > parsed.series.length">
+				{{
+					__("Showing the first {0} of {1} series.", [
+						String(parsed.series.length),
+						String(parsed.totalSeries),
+					])
+				}}
+			</span>
 			<span v-if="parsed.total > parsed.labels.length">
 				{{
 					__("Showing the first {0} of {1} points.", [
@@ -132,24 +188,29 @@ const summary = computed(() =>
 				}}
 			</span>
 		</figcaption>
-		<table class="sr-only">
-			<caption>
-				{{
-					summary
-				}}
-			</caption>
-			<thead>
-				<tr>
-					<th scope="col">{{ __("Label") }}</th>
-					<th v-for="(set, s) in parsed.series" :key="s" scope="col">{{ set.name }}</th>
-				</tr>
-			</thead>
-			<tbody>
-				<tr v-for="(label, i) in parsed.labels" :key="i">
-					<th scope="row">{{ label }}</th>
-					<td v-for="(set, s) in parsed.series" :key="s">{{ formatFloat(set.values[i] ?? 0) }}</td>
-				</tr>
-			</tbody>
-		</table>
+		<details class="mt-2 text-xs" data-testid="chart-values">
+			<summary class="cursor-pointer text-muted-foreground">{{ __("Show values") }}</summary>
+			<table class="mt-1 w-full text-start">
+				<caption class="sr-only">
+					{{
+						summary
+					}}
+				</caption>
+				<thead>
+					<tr>
+						<th scope="col">{{ __("Label") }}</th>
+						<th v-for="(set, s) in parsed.series" :key="s" scope="col">{{ set.name }}</th>
+					</tr>
+				</thead>
+				<tbody>
+					<tr v-for="(label, i) in parsed.labels" :key="i">
+						<th scope="row">{{ label }}</th>
+						<td v-for="(set, s) in parsed.series" :key="s">
+							{{ formatFloat(set.values[i] ?? 0) }}
+						</td>
+					</tr>
+				</tbody>
+			</table>
+		</details>
 	</figure>
 </template>

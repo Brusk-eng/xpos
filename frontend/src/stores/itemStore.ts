@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, shallowRef } from "vue";
 import { call, isNetworkError } from "@/services/api";
+import __ from "@/lib/translate";
 import { usePosStore } from "@/stores/posStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import {
@@ -8,7 +9,7 @@ import {
 	searchCachedItemsPage as idbSearchCachedItemsPage,
 	warmCatalogIndex,
 	getCachedStockForItems,
-	findCachedItem,
+	findCachedScan,
 	cacheItemGroups as idbCacheGroups,
 	getCachedItemGroups as idbGetCachedGroups,
 	getCachedItemByCode,
@@ -30,6 +31,9 @@ interface ItemGroupsResult {
 	groups: ItemGroup[];
 	parent_groups: ItemGroup[];
 }
+
+/** A scan the till refuses with a reason the cashier can act on. */
+export class BarcodeScanError extends Error {}
 
 export const useItemStore = defineStore("items", () => {
 	const items = shallowRef<POSItem[]>([]);
@@ -237,22 +241,49 @@ export const useItemStore = defineStore("items", () => {
 		}
 	}
 
-	async function searchByBarcode(barcode: string, _posProfile?: string): Promise<POSItem | null> {
-		try {
-			if (!isOnline()) {
-				return (await findCachedItem(barcode)) || null;
-			}
+	/** The offline answer for a scan: same item, UOM, factor and rate the server would give. */
+	async function scanFromCache(barcode: string): Promise<POSItem | null> {
+		const hit = await findCachedScan(barcode);
+		if (!hit) return null;
+		if (hit.kind === "ambiguous") {
+			throw new BarcodeScanError(
+				__("Barcode {0} matches more than one item: {1}.", [barcode, hit.codes.join(", ")]),
+			);
+		}
+		if (!hit.conversion_factor) {
+			throw new BarcodeScanError(
+				__("Barcode {0} is set to UOM {1}, which has no conversion factor on item {2}.", [
+					barcode,
+					hit.uom,
+					hit.item.item_code,
+				]),
+			);
+		}
+		return {
+			...hit.item,
+			barcode: hit.barcode,
+			uom: hit.uom,
+			conversion_factor: hit.conversion_factor,
+			rate: hit.rate,
+		} as POSItem;
+	}
 
-			const result = await call<POSItem | null>("xpos.api.items.search_barcode", {
+	async function searchByBarcode(barcode: string, _posProfile?: string): Promise<POSItem | null> {
+		if (!isOnline()) return scanFromCache(barcode);
+		try {
+			return await call<POSItem | null>("xpos.api.items.search_barcode", {
 				barcode: barcode,
 				pos_profile: _posProfile || "",
 			});
-			return result;
 		} catch (error) {
+			// the server answered and refused (for example an unconvertible UOM): that is final
+			if (!isNetworkError(error) && error instanceof Error && error.message) {
+				throw new BarcodeScanError(error.message);
+			}
 			try {
-				return (await findCachedItem(barcode)) || null;
-			} catch {
-				/* ignore */
+				return await scanFromCache(barcode);
+			} catch (cacheError) {
+				if (cacheError instanceof BarcodeScanError) throw cacheError;
 			}
 			console.error("Error searching barcode:", error);
 			return null;

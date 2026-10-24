@@ -477,6 +477,41 @@ export async function findCachedItem(value: string): Promise<POSItem | undefined
 	return code === undefined ? undefined : db.items.get(code);
 }
 
+export type CachedScan =
+	| {
+			kind: "item";
+			item: POSItem;
+			barcode: string;
+			uom: string;
+			conversion_factor: number | null;
+			rate: number;
+	  }
+	| { kind: "ambiguous"; codes: string[] };
+
+/**
+ * What an offline scan of ``value`` sells: the item with the UOM, factor and rate its barcode carries.
+ * A plain item-code scan sells one stock unit at the item's rate. ``conversion_factor`` is null when
+ * the barcode's UOM cannot be converted, and the caller must refuse the scan.
+ */
+export async function findCachedScan(value: string): Promise<CachedScan | undefined> {
+	const index = await ensureCatalogIndex();
+	const hit = index.resolve(value);
+	if (hit.kind === "none") return undefined;
+	if (hit.kind === "ambiguous") return { kind: "ambiguous", codes: hit.codes };
+	const item = await db.items.get(hit.code);
+	if (!item) return undefined;
+	const entry = hit.entry;
+	const stockRate = Number((item as { rate?: number }).rate) || 0;
+	return {
+		kind: "item",
+		item,
+		barcode: entry?.barcode ?? value,
+		uom: entry?.uom || (item as { stock_uom?: string }).stock_uom || "",
+		conversion_factor: entry ? (entry.conversion_factor ?? null) : 1,
+		rate: entry?.rate ?? stockRate,
+	};
+}
+
 export async function updateCachedItem(item: POSItem): Promise<void> {
 	await db.items.put(sanitizeForIdb(item));
 	invalidateCatalogIndex();

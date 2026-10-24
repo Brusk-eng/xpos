@@ -122,7 +122,7 @@
 							<Button
 								variant="outline"
 								size="icon"
-								class="hidden size-12 shrink-0 rounded-xl sm:inline-flex"
+								class="size-12 shrink-0 rounded-xl"
 								:class="layoutStore.customizing && 'border-primary text-primary'"
 								:aria-label="__('Customize view')"
 								:aria-pressed="layoutStore.customizing"
@@ -227,7 +227,7 @@
 
 			<div
 				v-if="layoutStore.customizing"
-				class="absolute inset-y-3 z-30 flex"
+				class="absolute inset-y-3 z-30 flex max-sm:inset-x-3"
 				:class="cartSide === 'left' ? 'inset-e-3' : 'inset-s-3'"
 			>
 				<CustomizePanel
@@ -258,7 +258,7 @@
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
-import { useItemStore } from "@/stores/itemStore";
+import { BarcodeScanError, useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showError, isNetworkError } from "@/services/api";
@@ -364,8 +364,16 @@ function syncDeviceClass() {
 }
 
 function startCustomizing() {
+	activeTab.value = "items";
 	layoutStore.startCustomize();
 }
+
+watch(
+	() => layoutStore.customizing,
+	(now, before) => {
+		if (before && !now) stopCustomizing();
+	},
+);
 
 function stopCustomizing() {
 	dragCartWidth.value = null;
@@ -586,6 +594,7 @@ async function onBarcodeScan(barcode: string, fallbackToSearch = false) {
 				rate: result.rate || 0,
 				stock_uom: result.stock_uom || result.uom,
 				uom: result.uom,
+				conversion_factor: (result as { conversion_factor?: number }).conversion_factor || 1,
 				image: result.image,
 				has_batch_no: result.has_batch_no,
 				has_serial_no: result.has_serial_no,
@@ -609,7 +618,10 @@ async function onBarcodeScan(barcode: string, fallbackToSearch = false) {
 			searchBarRef.value?.showError();
 		}
 	} catch (err) {
-		if (fallbackToSearch) {
+		if (err instanceof BarcodeScanError) {
+			showError(err.message);
+			searchBarRef.value?.showError();
+		} else if (fallbackToSearch) {
 			onSearch(barcode);
 		} else {
 			showError(__("Barcode lookup failed"));

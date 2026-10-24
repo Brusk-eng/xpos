@@ -95,10 +95,11 @@ BUNDLED = {
 	"Sales By Payment Mode": {
 		"category": "Sales",
 		"description": "Takings by mode of payment, net of change given, for cashing up.",
+		"pos_permission": "shift_report",
 	},
 	"Sales By Cashier": {
 		"category": "Sales",
-		"description": "Invoices, returns and sales total for each cashier.",
+		"description": "Invoices, returns and sales total for each cashier, per currency (the user whose till took the sale).",
 	},
 	"Low Stock Items": {
 		"category": "Inventory",

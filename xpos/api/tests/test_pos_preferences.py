@@ -297,10 +297,48 @@ class TestStoredLayouts(ERPNextTestSuite):
 		with self.assertRaises(frappe.PermissionError):
 			self.save(ALICE, {"shared": {"view": "list"}})
 
-	def test_reset_removes_only_the_callers_row(self):
+	def test_reset_clears_only_the_callers_layout(self):
 		self.save(ALICE, {"shared": {"view": "list"}})
 		self.save(BOB, {"shared": {"view": "list"}})
 		frappe.set_user(ALICE)
-		prefs.reset_layout(PROFILE)
-		self.assertFalse(frappe.db.exists("XPOS User Layout", {"user": ALICE}))
-		self.assertTrue(frappe.db.exists("XPOS User Layout", {"user": BOB}))
+		result = prefs.reset_layout(PROFILE)
+		self.assertEqual(result["layout"]["shared"]["view"], "grid")
+		self.assertEqual(result["personal"]["shared"], {})
+		frappe.set_user(BOB)
+		self.assertEqual(prefs.get_layout(PROFILE)["layout"]["shared"]["view"], "list")
+
+	def test_a_stale_save_after_reset_conflicts_instead_of_overwriting(self):
+		first = self.save(ALICE, {"shared": {"view": "list"}})
+		self.assertEqual(first["revision"], 1)
+		frappe.set_user(ALICE)
+		reset = prefs.reset_layout(PROFILE)
+		self.assertEqual(reset["revision"], 2)
+		stale = self.save(ALICE, {"shared": {"view": "list"}}, revision=1)
+		self.assertEqual(stale["status"], "conflict")
+		self.assertEqual(stale["revision"], 2)
+		self.assertEqual(self.save(ALICE, {"shared": {"view": "list"}}, revision=2)["revision"], 3)
+
+	def test_a_partial_profile_default_keeps_the_other_quick_action_row(self):
+		frappe.get_doc(
+			{
+				"doctype": "XPOS Layout Policy",
+				"pos_profile": PROFILE,
+				"default_layout": json.dumps(
+					{"version": 1, "shared": {"quickActions": {"footer": ["hold"]}}}
+				),
+			}
+		).insert(ignore_permissions=True)
+		frappe.set_user(ALICE)
+		result = prefs.get_layout(PROFILE)
+		actions = result["layout"]["shared"]["quickActions"]
+		self.assertEqual(actions["footer"][0], "hold")
+		self.assertTrue(actions["row"])
+		self.assertEqual(result["defaults"]["shared"]["quickActions"]["row"], actions["row"])
+
+		frappe.get_doc("XPOS Layout Policy", PROFILE).db_set(
+			"default_layout", json.dumps({"version": 1, "shared": {"quickActions": {"row": ["remove"]}}})
+		)
+		frappe.clear_cache(doctype="XPOS Layout Policy")
+		actions = prefs.get_layout(PROFILE)["layout"]["shared"]["quickActions"]
+		self.assertEqual(actions["row"][0], "remove")
+		self.assertTrue(actions["footer"])

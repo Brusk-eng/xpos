@@ -13,10 +13,26 @@
  * It does not import Vue, Dexie or any store, so it can run on the main thread or in a worker.
  */
 
+/** One barcode of an item: the UOM it sells in, how many stock units that is, and its rate. */
+export interface BarcodeEntry {
+	barcode: string;
+	uom?: string;
+	/** null: the item has no conversion for that UOM, so the scan must be refused. */
+	conversion_factor?: number | null;
+	rate?: number | null;
+}
+
+export type BarcodeResolution =
+	| { kind: "none" }
+	| { kind: "item"; code: string; entry?: BarcodeEntry }
+	/** Two items claim the value (for example while a barcode moves between items mid-sync). */
+	| { kind: "ambiguous"; codes: string[] };
+
 export interface CatalogRow {
 	item_code: string;
 	item_group?: string;
 	barcode?: string;
+	barcodes?: BarcodeEntry[];
 	[field: string]: unknown;
 }
 
@@ -35,6 +51,8 @@ export interface CatalogPage {
 export interface CatalogIndex {
 	readonly size: number;
 	lookup(value: string): string | undefined;
+	/** A scanned value: a barcode wins over an item code, as it does on the server. */
+	resolve(value: string): BarcodeResolution;
 	search(query: CatalogSearch): CatalogPage;
 }
 
@@ -51,6 +69,13 @@ export function buildCatalogIndex(rows: readonly CatalogRow[], fields: readonly 
 	const groups = new Array<string | undefined>(sorted.length);
 	const haystacks = new Array<string>(sorted.length);
 	const exact = new Map<string, number>();
+	const byBarcode = new Map<string, { at: number; entry?: BarcodeEntry }[]>();
+	const addBarcode = (value: string, at: number, entry?: BarcodeEntry) => {
+		const key = value.toLowerCase();
+		const hits = byBarcode.get(key) ?? [];
+		hits.push({ at, entry });
+		byBarcode.set(key, hits);
+	};
 
 	for (let i = 0; i < sorted.length; i++) {
 		const row = sorted[i];
@@ -62,16 +87,18 @@ export function buildCatalogIndex(rows: readonly CatalogRow[], fields: readonly 
 			const value = row[column];
 			parts.push(typeof value === "string" ? value.toLowerCase() : "");
 		}
-		parts.push(row.barcode ? row.barcode.toLowerCase() : "");
+		const entries = (row.barcodes ?? []).filter((entry) => entry && typeof entry.barcode === "string");
+		const barcodes = [...entries.map((entry) => entry.barcode), ...(row.barcode ? [row.barcode] : [])];
+		parts.push(barcodes.join(" ").toLowerCase());
 		haystacks[i] = parts.join(SEPARATOR);
+		for (const entry of entries) addBarcode(entry.barcode, i, entry);
+		if (row.barcode) addBarcode(row.barcode, i);
 
 		const code = row.item_code.toLowerCase();
 		if (!exact.has(code)) exact.set(code, i);
-		if (row.barcode) {
-			const barcode = row.barcode.toLowerCase();
-			if (!exact.has(barcode)) exact.set(barcode, i);
-		}
 	}
+	// every barcode, in item order, is exact-matchable after the item codes
+	for (const [barcode, hits] of byBarcode) if (!exact.has(barcode)) exact.set(barcode, hits[0].at);
 
 	return {
 		size: sorted.length,
@@ -79,6 +106,18 @@ export function buildCatalogIndex(rows: readonly CatalogRow[], fields: readonly 
 		lookup(value) {
 			const at = exact.get(value.toLowerCase());
 			return at === undefined ? undefined : codes[at];
+		},
+
+		resolve(value) {
+			const key = value.toLowerCase();
+			const hits = byBarcode.get(key);
+			if (hits) {
+				const owners = [...new Set(hits.map((hit) => codes[hit.at]))];
+				if (owners.length > 1) return { kind: "ambiguous", codes: owners };
+				return { kind: "item", code: owners[0], entry: hits[0].entry };
+			}
+			const at = exact.get(key);
+			return at === undefined ? { kind: "none" } : { kind: "item", code: codes[at] };
 		},
 
 		search({ term, group, offset = 0, limit }) {

@@ -38,6 +38,79 @@ export interface ReportViewStore {
 	saveView(reportId: string, view: Omit<ReportView, "id"> & { id?: string }): ReportView[];
 	deleteView(reportId: string, viewId: string): ReportView[];
 	setDefault(reportId: string, viewId: string | null): ReportView[];
+	durable(): boolean;
+}
+
+const unsaved = new Map<string, StoredState>();
+
+export function resetReportViewSession(): void {
+	unsaved.clear();
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isStringList = (value: unknown): value is string[] =>
+	Array.isArray(value) && value.every((entry) => typeof entry === "string");
+
+function validLayout(value: unknown): value is ReportLayout {
+	return (
+		isRecord(value) &&
+		isStringList(value.order) &&
+		isStringList(value.hidden) &&
+		isRecord(value.widths) &&
+		Object.values(value.widths).every((width) => typeof width === "number" && Number.isFinite(width)) &&
+		typeof value.frozen === "number" &&
+		Number.isFinite(value.frozen)
+	);
+}
+
+function validSort(value: unknown): value is ReportSort | null {
+	return (
+		value === null ||
+		(isRecord(value) &&
+			typeof value.fieldname === "string" &&
+			(value.direction === "asc" || value.direction === "desc"))
+	);
+}
+
+function validView(value: unknown): value is ReportView {
+	return (
+		isRecord(value) &&
+		typeof value.id === "string" &&
+		value.id !== "" &&
+		typeof value.name === "string" &&
+		validLayout(value.layout) &&
+		validSort(value.sort ?? null) &&
+		(value.filters === undefined || isRecord(value.filters))
+	);
+}
+
+/** Keep only well-formed entries; a damaged part of the stored state never reaches the UI. */
+export function validateStored(parsed: unknown): StoredState {
+	if (!isRecord(parsed)) return empty();
+	const views: Record<string, ReportView[]> = {};
+	if (isRecord(parsed.views)) {
+		for (const [reportId, list] of Object.entries(parsed.views)) {
+			if (Array.isArray(list))
+				views[reportId] = list.filter(validView).map((v) => ({ ...v, sort: v.sort ?? null }));
+		}
+	}
+	return {
+		favorites: Array.isArray(parsed.favorites)
+			? parsed.favorites.filter((id): id is string => typeof id === "string")
+			: [],
+		recents: Array.isArray(parsed.recents)
+			? parsed.recents.filter(
+					(entry): entry is { id: string; at: number } =>
+						isRecord(entry) &&
+						typeof entry.id === "string" &&
+						typeof entry.at === "number" &&
+						Number.isFinite(entry.at),
+				)
+			: [],
+		views,
+	};
 }
 
 export function createReportViewStore(
@@ -46,17 +119,11 @@ export function createReportViewStore(
 	now: () => number = Date.now,
 ): ReportViewStore {
 	function read(): StoredState {
+		const kept = unsaved.get(key);
+		if (kept) return structuredClone(kept);
 		try {
 			const raw = storage?.getItem(key);
-			if (!raw) return empty();
-			const parsed = JSON.parse(raw) as Partial<StoredState>;
-			return {
-				favorites: Array.isArray(parsed.favorites) ? parsed.favorites.map(String) : [],
-				recents: Array.isArray(parsed.recents)
-					? parsed.recents.filter((entry) => entry && typeof entry.id === "string")
-					: [],
-				views: parsed.views && typeof parsed.views === "object" ? parsed.views : {},
-			};
+			return raw ? validateStored(JSON.parse(raw)) : empty();
 		} catch {
 			return empty();
 		}
@@ -64,9 +131,11 @@ export function createReportViewStore(
 
 	function write(state: StoredState): void {
 		try {
-			storage?.setItem(key, JSON.stringify(state));
+			if (!storage) throw new Error("no storage");
+			storage.setItem(key, JSON.stringify(state));
+			unsaved.delete(key);
 		} catch {
-			// quota or blocked storage: the in-memory session still works
+			unsaved.set(key, structuredClone(state));
 		}
 	}
 
@@ -116,6 +185,7 @@ export function createReportViewStore(
 			write(state);
 			return state.views[reportId];
 		},
+		durable: () => !unsaved.has(key),
 		setDefault(reportId, viewId) {
 			const state = read();
 			state.views[reportId] = (state.views[reportId] ?? []).map((entry) => ({

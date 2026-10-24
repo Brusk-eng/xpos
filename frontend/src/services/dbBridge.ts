@@ -449,6 +449,11 @@ export async function findCachedItem(value: string): Promise<POSItem | undefined
 	return idb.findCachedItem(value);
 }
 
+export async function findCachedScan(value: string) {
+	const idb = await import("./idbService");
+	return idb.findCachedScan(value);
+}
+
 export async function warmCatalogIndex(searchFields?: string[]): Promise<void> {
 	const idb = await import("./idbService");
 	await idb.warmCatalogIndex(searchFields);

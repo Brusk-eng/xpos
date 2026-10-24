@@ -259,7 +259,9 @@ def load_policy(pos_profile: str) -> tuple[dict, dict]:
 			policy[key] = listed
 
 	profile_default = sanitize(row.default_layout, policy)
+	chosen_actions = profile_default["shared"].pop("quickActions", {})
 	defaults["shared"].update(profile_default["shared"])
+	defaults["shared"]["quickActions"] = {**defaults["shared"]["quickActions"], **chosen_actions}
 	for name, entry in profile_default["device"].items():
 		defaults["device"][name].update(entry)
 	defaults["shared"]["quickActions"] = {
@@ -364,8 +366,10 @@ def reset_layout(pos_profile: str):
 	read_latest_on_lock()
 	name = layout_name(user, pos.company, pos.name)
 	if name:
-		frappe.db.get_value("XPOS User Layout", name, "name", for_update=True)
-		frappe.delete_doc("XPOS User Layout", name, ignore_permissions=True, force=True)
+		revision = frappe.db.get_value("XPOS User Layout", name, "revision", for_update=True)
+		frappe.db.set_value(
+			"XPOS User Layout", name, {"data": "{}", "revision": cint(revision) + 1}, update_modified=True
+		)
 	return {"status": "reset", **payload(pos.name, user)}
 
 

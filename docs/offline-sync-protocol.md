@@ -108,7 +108,11 @@ Tested (automated):
 - Server: keyset paging, delta (price, new, disabled, deleted, group change), forged/foreign/expired cursors, access refusal, permission change, resets, overlap, pruning, offline payment mode validation, repeatable patch (`xpos.api.tests.test_catalog_sync`).
 - Browser, against a real IndexedDB implementation: v2 to v3 upgrade, newer-schema open, `versionchange`, durable save and read-back, quota and data-clone failures, claims and crash recovery, unopenable-database backup and refusal to delete, staged download, interrupted download and resume, stale job, delta, resync, digest mismatch, catch-up, stock reservations, session change, freshness, offline policy, retry and backoff, refusal handling, owner and hold gating, two tabs.
 
+Also tested: barcodes in snapshots and deltas (several per item, alternate UOM, UOM price, unconvertible UOM, change, removal, rename), the online scan's UOM, factor and rate (`test_catalog_sync`), and, in the browser, the local barcode index, ambiguous and refused scans, and unit-and-box cart lines (`offlineBarcodes.spec.ts`).
+
 Not tested, or unresolved:
+
+- Scale, serial and batch scans have no offline path. They need the server.
 
 - Real browser eviction, real quota exhaustion, and a real service-worker update across several tabs. These need manual checks on a till.
 - Writers whose transactions stay open longer than the 120 second overlap can be missed by a delta until the next full download.

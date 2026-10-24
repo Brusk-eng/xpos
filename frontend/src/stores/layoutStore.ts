@@ -50,6 +50,12 @@ export interface Scope {
 
 const AUTOSAVE_NOTE = "xpos-layout";
 
+interface Ctx {
+	epoch: number;
+	target: Scope;
+	key: string;
+}
+
 function host(): string {
 	return typeof location !== "undefined" ? location.host : "";
 }
@@ -94,36 +100,82 @@ export const useLayoutStore = defineStore("layout", () => {
 		return target ? layoutCacheKey(host(), target.user, target.company, target.profile) : "";
 	}
 
-	async function writeCache(): Promise<void> {
-		const key = cacheKey();
+	function ctx(): Ctx | null {
+		return scope.value ? { epoch: loadToken, target: scope.value, key: cacheKey() } : null;
+	}
+
+	/** False once the user, company or profile has changed since ``c`` was captured. */
+	function isCurrent(c: Ctx): boolean {
+		return c.epoch === loadToken;
+	}
+
+	/** Operations on the layout run one at a time, in the order they were asked for. */
+	let chain: Promise<unknown> = Promise.resolve();
+	let inflight = 0;
+
+	function enqueue<T>(task: () => Promise<T>): Promise<T> {
+		inflight++;
+		saving.value = true;
+		const run = chain.then(task, task);
+		chain = run.then(
+			() => undefined,
+			() => undefined,
+		);
+		return run.finally(() => {
+			if (--inflight === 0) saving.value = false;
+		});
+	}
+
+	/** Write a scope's cache entry; each field is only touched when given. */
+	async function persist(
+		key: string,
+		next: { payload?: LayoutPayload | null; pending?: Pending | null },
+	): Promise<void> {
 		if (!key) return;
 		try {
-			await setSyncMeta(`${AUTOSAVE_NOTE}:${key}`, JSON.stringify(payload.value));
-			await setSyncMeta(`${AUTOSAVE_NOTE}-pending:${key}`, JSON.stringify(pending.value));
+			if (next.payload !== undefined) {
+				await setSyncMeta(`${AUTOSAVE_NOTE}:${key}`, JSON.stringify(next.payload));
+			}
+			if (next.pending !== undefined) {
+				await setSyncMeta(`${AUTOSAVE_NOTE}-pending:${key}`, JSON.stringify(next.pending));
+			}
 		} catch {
 			/* the cache is a convenience; the server copy is the source of truth */
 		}
 	}
 
-	async function readCache(target: Scope): Promise<void> {
+	function writeCache(c: Ctx | null = ctx()): Promise<void> {
+		return c ? persist(c.key, { payload: payload.value, pending: pending.value }) : Promise.resolve();
+	}
+
+	async function readPending(key: string): Promise<Pending | null> {
+		try {
+			const raw = await getSyncMeta(`${AUTOSAVE_NOTE}-pending:${key}`);
+			const waiting = typeof raw === "string" ? (JSON.parse(raw) as Pending | null) : null;
+			return waiting && typeof waiting === "object" ? waiting : null;
+		} catch {
+			return null;
+		}
+	}
+
+	/** The cached copy of a scope, read without touching the live state. */
+	async function readCache(
+		target: Scope,
+	): Promise<{ payload: LayoutPayload | null; pending: Pending | null }> {
 		const key = cacheKey(target);
+		let cached: LayoutPayload | null = null;
 		try {
 			const raw = await getSyncMeta(`${AUTOSAVE_NOTE}:${key}`);
 			const parsed = typeof raw === "string" ? (JSON.parse(raw) as LayoutPayload | null) : null;
 			if (parsed && parsed.pos_profile === target.profile) {
 				const pol = { ...defaultPolicy(), ...parsed.policy };
 				const clean = sanitize(migrate(parsed.personal).layout, pol);
-				payload.value = { ...parsed, policy: pol, personal: clean };
+				cached = { ...parsed, policy: pol, personal: clean };
 			}
-			const rawPending = await getSyncMeta(`${AUTOSAVE_NOTE}-pending:${key}`);
-			const waiting =
-				typeof rawPending === "string" ? (JSON.parse(rawPending) as Pending | null) : null;
-			pending.value = waiting && typeof waiting === "object" ? waiting : null;
 		} catch {
 			/* corrupt cache: fall back to defaults until the server answers */
-			payload.value = null;
-			pending.value = null;
 		}
+		return { payload: cached, pending: await readPending(key) };
 	}
 
 	function adopt(next: LayoutPayload): void {
@@ -131,18 +183,24 @@ export const useLayoutStore = defineStore("layout", () => {
 		recovered.value = next.recovered;
 	}
 
+	/**
+	 * Pinned products come from the active catalogue: price and stock are never read from the layout
+	 * or from an earlier lookup. ``itemInfo`` only stands in for a just-picked item while customizing.
+	 */
 	async function resolvePinned(): Promise<void> {
+		const c = ctx();
+		if (!c) return;
 		const codes = (customizing.value && draft.value ? draft.value : saved.value).shared.pinnedItems;
 		if (!codes.length) {
 			pinnedItems.value = [];
 			return;
 		}
-		const found: POSItem[] = [];
 		if (isOnline() && !customizing.value) {
 			try {
 				const rows = await call<POSItem[]>("xpos.api.pos_preferences.get_pinned_items", {
-					pos_profile: scope.value?.profile,
+					pos_profile: c.target.profile,
 				});
+				if (!isCurrent(c)) return;
 				for (const row of rows) itemInfo.value[row.item_code] = row;
 				pinnedItems.value = rows;
 				return;
@@ -150,14 +208,14 @@ export const useLayoutStore = defineStore("layout", () => {
 				/* fall through to the offline catalogue */
 			}
 		}
+		const found: POSItem[] = [];
 		for (const code of codes) {
-			const row = itemInfo.value[code] ?? (await getCachedItemByCode(code).catch(() => undefined));
-			if (row) {
-				itemInfo.value[code] = row;
-				found.push(row);
-			}
+			const row =
+				(await getCachedItemByCode(code).catch(() => undefined)) ??
+				(customizing.value ? itemInfo.value[code] : undefined);
+			if (row) found.push(row);
 		}
-		pinnedItems.value = found;
+		if (isCurrent(c)) pinnedItems.value = found;
 	}
 
 	async function load(target: Scope): Promise<void> {
@@ -169,23 +227,29 @@ export const useLayoutStore = defineStore("layout", () => {
 		payload.value = null;
 		pending.value = null;
 		pinnedItems.value = [];
-		await readCache(target);
+		itemInfo.value = {};
+		const cached = await readCache(target);
 		if (token !== loadToken) return;
+		if (cached.payload) payload.value = cached.payload;
+		pending.value = cached.pending;
 		void resolvePinned();
 		if (!isOnline()) return;
+		const c = ctx();
 		try {
-			if (pending.value) await flush();
+			if (pending.value) await flush(c);
 			const fresh = await call<LayoutPayload>("xpos.api.pos_preferences.get_layout", {
 				pos_profile: target.profile,
 			});
 			if (token !== loadToken) return;
 			if (!pending.value) {
 				adopt(fresh);
-				await writeCache();
+				await writeCache(c);
 			}
 			await resolvePinned();
 		} catch (err) {
-			if (!isNetworkError(err)) error.value = err instanceof Error ? err.message : String(err);
+			if (token === loadToken && !isNetworkError(err)) {
+				error.value = err instanceof Error ? err.message : String(err);
+			}
 		}
 	}
 
@@ -224,32 +288,93 @@ export const useLayoutStore = defineStore("layout", () => {
 		payload.value = { ...payload.value, personal: next, layout: resolved, revision: baseRevision };
 	}
 
-	async function flush(): Promise<void> {
-		const waiting = pending.value;
-		const target = scope.value;
-		if (!waiting || !target || !isOnline()) return;
-		const result = waiting.reset
-			? await call<SaveResult>("xpos.api.pos_preferences.reset_layout", { pos_profile: target.profile })
-			: await call<SaveResult>("xpos.api.pos_preferences.save_layout", {
-					pos_profile: target.profile,
+	function send(profile: string, waiting: Pending): Promise<SaveResult> {
+		return waiting.reset
+			? call<SaveResult>("xpos.api.pos_preferences.reset_layout", { pos_profile: profile })
+			: call<SaveResult>("xpos.api.pos_preferences.save_layout", {
+					pos_profile: profile,
 					layout: JSON.stringify(waiting.personal),
 					base_revision: waiting.baseRevision,
 				});
-		if (result.status === "conflict") {
-			conflict.value = result;
-			return;
-		}
-		pending.value = null;
-		adopt(result);
-		await writeCache();
-		await resolvePinned();
+	}
+
+	/** Send the edit waiting for ``c``'s scope, once; a reconnect racing another send just queues behind it. */
+	function flush(c: Ctx | null = ctx()): Promise<void> {
+		if (!c) return Promise.resolve();
+		return enqueue(async () => {
+			if (!isOnline()) return;
+			const waiting = isCurrent(c) ? pending.value : await readPending(c.key);
+			if (!waiting) return;
+			const result = await send(c.target.profile, waiting);
+			if (!isCurrent(c)) {
+				/* the user moved on: keep the outcome for that scope only */
+				if (result.status !== "conflict") await persist(c.key, { payload: result, pending: null });
+				return;
+			}
+			if (result.status === "conflict") {
+				conflict.value = result;
+				return;
+			}
+			pending.value = null;
+			adopt(result);
+			await writeCache(c);
+			await resolvePinned();
+		});
+	}
+
+	/**
+	 * Run a save or reset for the scope it was started in. Returns false on a conflict or a server refusal.
+	 * Offline, or once the scope has changed, the edit is kept under its own scope and sent later.
+	 */
+	function commit(waiting: Pending, c: Ctx): Promise<boolean> {
+		return enqueue(async () => {
+			error.value = "";
+			const request: Pending = { ...waiting };
+			if (!isCurrent(c)) {
+				await persist(c.key, { pending: request });
+				return true;
+			}
+			if (payload.value) request.baseRevision = payload.value.revision;
+			try {
+				if (!isOnline()) throw new Error("__offline__");
+				const result = await send(c.target.profile, request);
+				if (!isCurrent(c)) {
+					if (result.status !== "conflict")
+						await persist(c.key, { payload: result, pending: null });
+					else await persist(c.key, { pending: request });
+					return true;
+				}
+				if (result.status === "conflict") {
+					pending.value = request;
+					conflict.value = result;
+					return false;
+				}
+				pending.value = null;
+				adopt(result);
+			} catch (err) {
+				if (!isNetworkError(err)) {
+					if (isCurrent(c)) error.value = err instanceof Error ? err.message : String(err);
+					return false;
+				}
+				if (!isCurrent(c)) {
+					await persist(c.key, { pending: request });
+					return true;
+				}
+				pending.value = request;
+				localApply(request.personal, request.baseRevision);
+			}
+			customizing.value = false;
+			draft.value = null;
+			await writeCache(c);
+			await resolvePinned();
+			return true;
+		});
 	}
 
 	/** Save the draft. Online it goes to the server; offline it is kept and sent on reconnect. */
 	async function save(): Promise<boolean> {
-		if (!draft.value || !payload.value || !scope.value) return false;
-		saving.value = true;
-		error.value = "";
+		const c = ctx();
+		if (!draft.value || !payload.value || !c) return false;
 		const next = personalFromEdit(
 			personal.value,
 			saved.value,
@@ -257,87 +382,38 @@ export const useLayoutStore = defineStore("layout", () => {
 			deviceClass.value,
 			policy.value,
 		);
-		const base = payload.value.revision;
-		try {
-			if (!isOnline()) throw new Error("__offline__");
-			const result = await call<SaveResult>("xpos.api.pos_preferences.save_layout", {
-				pos_profile: scope.value.profile,
-				layout: JSON.stringify(next),
-				base_revision: base,
-			});
-			if (result.status === "conflict") {
-				pending.value = { personal: next, baseRevision: base, reset: false };
-				conflict.value = result;
-				return false;
-			}
-			pending.value = null;
-			adopt(result);
-		} catch (err) {
-			if (!isNetworkError(err)) {
-				error.value = err instanceof Error ? err.message : String(err);
-				return false;
-			}
-			pending.value = { personal: next, baseRevision: base, reset: false };
-			localApply(next, base);
-		} finally {
-			saving.value = false;
-		}
-		customizing.value = false;
-		draft.value = null;
-		await writeCache();
-		await resolvePinned();
-		return true;
+		return commit({ personal: next, baseRevision: payload.value.revision, reset: false }, c);
 	}
 
 	async function reset(): Promise<boolean> {
-		if (!scope.value || !payload.value) return false;
-		saving.value = true;
-		error.value = "";
-		try {
-			if (!isOnline()) throw new Error("__offline__");
-			const result = await call<SaveResult>("xpos.api.pos_preferences.reset_layout", {
-				pos_profile: scope.value.profile,
-			});
-			pending.value = null;
-			adopt(result);
-		} catch (err) {
-			if (!isNetworkError(err)) {
-				error.value = err instanceof Error ? err.message : String(err);
-				return false;
-			}
-			pending.value = { personal: emptyPersonal(), baseRevision: payload.value.revision, reset: true };
-			localApply(emptyPersonal(), payload.value.revision);
-		} finally {
-			saving.value = false;
-		}
-		customizing.value = false;
-		draft.value = null;
-		await writeCache();
-		await resolvePinned();
-		return true;
+		const c = ctx();
+		if (!c || !payload.value) return false;
+		return commit({ personal: emptyPersonal(), baseRevision: payload.value.revision, reset: true }, c);
 	}
 
 	/** Conflict answer "keep mine": resend my edit on top of the server's newer revision. */
 	async function keepMine(): Promise<void> {
 		const theirs = conflict.value;
 		const mine = pending.value;
-		if (!theirs || !mine) return;
+		const c = ctx();
+		if (!theirs || !mine || !c) return;
 		conflict.value = null;
 		pending.value = { ...mine, baseRevision: theirs.revision };
 		payload.value = theirs;
-		await flush();
+		await flush(c);
 	}
 
 	/** Conflict answer "use theirs": drop my edit and take what the server has. */
 	async function useTheirs(): Promise<void> {
 		const theirs = conflict.value;
-		if (!theirs) return;
+		const c = ctx();
+		if (!theirs || !c) return;
 		conflict.value = null;
 		pending.value = null;
 		adopt(theirs);
 		customizing.value = false;
 		draft.value = null;
-		await writeCache();
+		await writeCache(c);
 		await resolvePinned();
 	}
 

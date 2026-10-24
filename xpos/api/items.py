@@ -4,6 +4,7 @@
 import json
 
 import frappe
+from frappe import _
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count, Max, Sum
 from frappe.utils import cint, flt, getdate, nowdate
@@ -423,6 +424,56 @@ def get_item_groups(pos_profile: str | None = None):
 	return {"groups": groups, "parent_groups": parent_groups}
 
 
+def uom_conversion_map(item_codes: list[str]) -> dict[tuple[str, str], float]:
+	"""(item, UOM) -> units of the stock UOM in one of that UOM, from the item's conversion table."""
+	if not item_codes:
+		return {}
+	rows = frappe.get_all(
+		"UOM Conversion Detail",
+		filters={"parent": ["in", item_codes], "parenttype": "Item"},
+		fields=["parent", "uom", "conversion_factor"],
+	)
+	return {(row.parent, row.uom): flt(row.conversion_factor) for row in rows}
+
+
+def uom_price_map(item_codes: list[str], price_list: str | None) -> dict[tuple[str, str], float]:
+	"""(item, UOM) -> the selling price set specifically for that UOM on the price list."""
+	if not item_codes or not price_list:
+		return {}
+	rows = frappe.get_all(
+		"Item Price",
+		filters={
+			"item_code": ["in", item_codes],
+			"price_list": price_list,
+			"selling": 1,
+			"uom": ["is", "set"],
+		},
+		fields=["item_code", "uom", "price_list_rate"],
+	)
+	return {(row.item_code, row.uom): flt(row.price_list_rate) for row in rows}
+
+
+def barcode_pricing(
+	item_code: str,
+	stock_uom: str,
+	uom: str | None,
+	base_rate: float,
+	factors: dict[tuple[str, str], float],
+	prices: dict[tuple[str, str], float],
+) -> dict:
+	"""The UOM a barcode sells in, its conversion factor and rate.
+
+	The factor is None when the item has no conversion for that UOM; the caller must refuse the scan
+	rather than sell a box at the price of a unit.
+	"""
+	uom = uom or stock_uom
+	factor = 1.0 if uom == stock_uom else factors.get((item_code, uom)) or None
+	rate = prices.get((item_code, uom))
+	if rate is None:
+		rate = flt(base_rate) * factor if factor else None
+	return {"uom": uom, "conversion_factor": factor, "rate": rate}
+
+
 @frappe.whitelist()
 def search_barcode(barcode: str, pos_profile: str | None = None):
 	"""Search item by barcode.
@@ -457,21 +508,36 @@ def search_barcode(barcode: str, pos_profile: str | None = None):
 
 	barcode_data = frappe.db.get_value(
 		"Item Barcode",
-		{"barcode": barcode},
+		{"barcode": barcode, "parenttype": "Item"},
 		["parent as item_code", "barcode", "uom"],
 		as_dict=True,
 	)
 
 	if barcode_data:
 		item = frappe.get_cached_doc("Item", barcode_data.item_code)
+		pricing = barcode_pricing(
+			item.name,
+			item.stock_uom,
+			barcode_data.uom,
+			get_item_rate(item.name),
+			uom_conversion_map([item.name]),
+			uom_price_map([item.name], price_list),
+		)
+		if not pricing["conversion_factor"]:
+			frappe.throw(
+				_("Barcode {0} is set to UOM {1}, which has no conversion factor on item {2}.").format(
+					barcode, pricing["uom"], item.name
+				)
+			)
 		return {
 			"item_code": item.name,
 			"item_name": item.item_name,
 			"local_item_name": item.get("local_item_name"),
 			"barcode": barcode_data.barcode,
-			"uom": barcode_data.uom or item.stock_uom,
+			"uom": pricing["uom"],
+			"conversion_factor": pricing["conversion_factor"],
 			"stock_uom": item.stock_uom,
-			"rate": get_item_rate(item.name),
+			"rate": pricing["rate"],
 			"has_batch_no": item.has_batch_no,
 			"has_serial_no": item.has_serial_no,
 			"is_stock_item": item.is_stock_item,

@@ -545,19 +545,13 @@ class TestBlindClosing(unittest.TestCase):
 		self.assertEqual(appended[0]["difference"], -150)
 
 	def test_reconciliation_report_blocked_for_blind_profiles(self):
-		from xpos.x_pos.report.pos_shift_reconciliation import pos_shift_reconciliation as report
+		from xpos.reports import policy
 
-		with (
-			patch.object(report.frappe, "has_permission", return_value=False),
-			patch.object(report, "is_blind_closing", return_value=True),
-		):
+		with patch.object(policy, "is_blind_closing", return_value=True):
 			with self.assertRaises(frappe.PermissionError):
-				report.ensure_not_blind({"POS-1"})
-		with (
-			patch.object(report.frappe, "has_permission", return_value=True),
-			patch.object(report, "is_blind_closing", return_value=True),
-		):
-			report.ensure_not_blind({"POS-1"})
+				policy.ensure_not_blind({"POS-1"})
+		with patch.object(policy, "is_blind_closing", return_value=False):
+			policy.ensure_not_blind({"POS-1"})
 
 
 class TestSaleDiscountAuthority(unittest.TestCase):

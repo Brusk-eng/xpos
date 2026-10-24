@@ -19,17 +19,21 @@ from xpos.api import catalog_log
 from xpos.api.items import (
 	ITEM_PAGE_FIELDS,
 	MAX_PAGE_LENGTH,
+	barcode_pricing,
 	build_item_filters,
 	check_pos_profile_access,
 	get_price_map,
 	get_stock_qty_map,
 	item_query,
+	uom_conversion_map,
+	uom_price_map,
 )
 
 OVERLAP_SECONDS = 120
 DEFAULT_PAGE = 200
 STOCK_PAGE_MAX = 2000
 TOKEN_VERSION = 1
+FEED_VERSION = 2
 
 
 class Crc32(Function):
@@ -77,6 +81,7 @@ def build_scope(pos) -> dict:
 		"templates": [cint(pos.get("show_template_items")), cint(pos.get("hide_variants_items"))],
 		"roles": sorted(frappe.get_roles(user)),
 		"permissions": digest_of(permissions),
+		"feed": FEED_VERSION,
 	}
 
 
@@ -135,6 +140,35 @@ def attach_rates(pos, items: list) -> None:
 	prices = get_price_map([item.item_code for item in items], price_list_of(pos))
 	for item in items:
 		item.rate = prices.get(item.item_code, 0)
+
+
+def attach_barcodes(pos, items: list) -> None:
+	"""Every barcode of each item with the UOM it sells in, its factor and its rate.
+
+	``conversion_factor`` is None for a barcode whose UOM the item cannot convert; the till refuses
+	that scan instead of guessing. Barcode edits touch the parent Item, so the delta feed carries them.
+	"""
+	codes = [item.item_code for item in items]
+	for item in items:
+		item.barcodes = []
+	if not codes:
+		return
+	rows = frappe.get_all(
+		"Item Barcode",
+		filters={"parent": ["in", codes], "parenttype": "Item"},
+		fields=["parent", "barcode", "uom"],
+		order_by="parent asc, idx asc",
+	)
+	by_item: dict[str, list] = {}
+	for row in rows:
+		if row.barcode:
+			by_item.setdefault(row.parent, []).append(row)
+	factors = uom_conversion_map(codes)
+	prices = uom_price_map(codes, price_list_of(pos))
+	for item in items:
+		for row in by_item.get(item.item_code, []):
+			priced = barcode_pricing(item.item_code, item.stock_uom, row.uom, flt(item.rate), factors, prices)
+			item.barcodes.append({"barcode": row.barcode, **priced})
 
 
 def overlap_from(moment: str | None = None) -> str:
@@ -198,6 +232,7 @@ def catalog_page(pos_profile: str, cursor: str, limit: int = DEFAULT_PAGE):
 	limit = clamp_limit(limit)
 	items, more = next_keyset_page(pos, state.get("lk") or "", limit, ITEM_PAGE_FIELDS)
 	attach_rates(pos, items)
+	attach_barcodes(pos, items)
 	next_cursor = issue(digest, "items", lk=items[-1].item_code, wm=state["wm"]) if more and items else None
 	return {"items": items, "next_cursor": next_cursor}
 
@@ -306,6 +341,7 @@ def catalog_delta(pos_profile: str, cursor: str, limit: int = DEFAULT_PAGE):
 			limit_page_length=len(codes),
 		).run(as_dict=True)
 		attach_rates(pos, upserts)
+		attach_barcodes(pos, upserts)
 	present = {item.item_code for item in upserts}
 	removed = [code for code in codes if code not in present]
 

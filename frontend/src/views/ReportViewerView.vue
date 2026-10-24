@@ -29,7 +29,7 @@ import ReportChart from "@/components/reports/ReportChart.vue";
 import ReportColumnsMenu from "@/components/reports/ReportColumnsMenu.vue";
 import ReportViewsMenu from "@/components/reports/ReportViewsMenu.vue";
 import __ from "@/lib/translate";
-import { showError, showSuccess } from "@/services/api";
+import { showError, showInfo, showSuccess } from "@/services/api";
 import { useAuthStore } from "@/stores/authStore";
 import { usePosStore } from "@/stores/posStore";
 import { extractErrorMessage, isOnline } from "@/utils";
@@ -443,6 +443,7 @@ function toggleFavorite() {
 	if (!report) return;
 	viewStore.value.toggleFavorite(report.id);
 	favorites.value = viewStore.value.favorites();
+	if (!viewStore.value.durable()) warnSessionOnly();
 }
 
 function saveView(name: string, withFilters: boolean) {
@@ -458,7 +459,12 @@ function saveView(name: string, withFilters: boolean) {
 				)
 			: undefined,
 	});
-	showSuccess(__("View saved."));
+	if (viewStore.value.durable()) showSuccess(__("View saved."));
+	else warnSessionOnly();
+}
+
+function warnSessionOnly() {
+	showInfo(__("This browser would not store it, so it lasts only until you close or reload this page."));
 }
 
 function applyView(view: ReportView) {

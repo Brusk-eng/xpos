@@ -139,6 +139,7 @@ function boot(
 	options: {
 		theme?: "dark";
 		viewport?: [number, number];
+		skipCustomer?: boolean;
 		profile?: Record<string, unknown>;
 		extraRoutes?: Record<string, unknown>;
 	} = {},
@@ -155,6 +156,7 @@ function boot(
 			...(options.extraRoutes || {}),
 		},
 		readyItem: ITEM_A.item_name,
+		skipCustomer: options.skipCustomer,
 		beforeLoad: (win) => {
 			if (options.theme) win.localStorage.setItem("xpos-theme", options.theme);
 		},
@@ -466,8 +468,65 @@ describe("POS view customizer", () => {
 
 	it("phone layout still shows customize mode and the cart actions", () => {
 		const server = layoutServer();
-		boot(server, { viewport: [390, 844] });
+		boot(server, { viewport: [390, 844], skipCustomer: true });
 		cy.get("#pos-products [data-testid='item-add']").first().should("be.visible");
 		shot("390-default");
+	});
+});
+
+describe("POS view customizer on phones", () => {
+	for (const [width, height] of [
+		[320, 640],
+		[390, 844],
+	] as const) {
+		it(`opens, previews, saves and returns to the search at ${width}px`, () => {
+			const server = layoutServer();
+			boot(server, { viewport: [width, height], skipCustomer: true });
+			cy.get("#pos-products [data-testid='item-add']").first().should("be.visible");
+
+			cy.get("[data-testid='customize-open']").should("be.visible").click();
+			panel().should("be.visible");
+			panel().then(($panel) => {
+				const box = $panel[0].getBoundingClientRect();
+				expect(box.left, "left edge").to.be.at.least(0);
+				expect(box.right, "right edge").to.be.at.most(width);
+			});
+			cy.get("[data-testid='customize-save']").scrollIntoView().should("be.visible");
+			cy.get("[data-testid='customize-cancel']").scrollIntoView().should("be.visible");
+			cy.get("[data-testid='view-list']").click();
+			cy.get("[data-testid='customize-save']").click();
+			panel().should("not.exist");
+			cy.focused().should("have.attr", "data-testid", "barcode-input");
+			cy.then(() => expect(saveCalls()).to.have.length(1));
+		});
+	}
+
+	it("cancels and resets from the phone panel", () => {
+		const server = layoutServer();
+		boot(server, { viewport: [390, 844], skipCustomer: true });
+		cy.get("[data-testid='customize-open']").click();
+		cy.get("[data-testid='view-list']").click();
+		cy.get("[data-testid='customize-cancel']").click();
+		panel().should("not.exist");
+		cy.then(() => expect(saveCalls()).to.have.length(0));
+		cy.get("[data-testid='customize-open']").click();
+		cy.get("[data-testid='customize-reset']").scrollIntoView().click();
+		cy.get("[data-testid='customize-reset-confirm']").click();
+		cy.then(() => expect(callsTo(`${API}.reset_layout`)).to.have.length(1));
+	});
+
+	it("is reachable from the cart tab and in RTL dark", () => {
+		const server = layoutServer();
+		boot(server, { viewport: [390, 844], theme: "dark", skipCustomer: true });
+		cy.document().then((doc) => doc.documentElement.setAttribute("dir", "rtl"));
+		cy.get("#pos-tab-cart").click();
+		cy.get("#pos-tab-items").click();
+		cy.get("[data-testid='customize-open']").click();
+		panel().should("be.visible");
+		panel().then(($panel) => {
+			const box = $panel[0].getBoundingClientRect();
+			expect(box.left).to.be.at.least(0);
+			expect(box.right).to.be.at.most(390);
+		});
 	});
 });

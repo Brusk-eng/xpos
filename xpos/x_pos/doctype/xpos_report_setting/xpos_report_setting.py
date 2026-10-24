@@ -28,6 +28,7 @@ class XPOSReportSetting(Document):
 		filter_provider: DF.Data | None
 		pos_permission: DF.Link | None
 		report: DF.Link
+		scope_verified: DF.Check
 		scope_mode: DF.Literal["Company and Warehouse", "Company", "None"]
 		summary: DF.Literal["runtime", "yes", "no"]
 		thermal_print: DF.Check

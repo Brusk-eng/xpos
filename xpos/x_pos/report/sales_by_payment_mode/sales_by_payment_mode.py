@@ -8,6 +8,7 @@ from frappe import _
 from frappe.utils import flt
 
 from xpos.api.shifts import get_shift_payment_totals, resolve_cash_mode_of_payment
+from xpos.reports.policy import ensure_not_blind, requested_profiles
 from xpos.reports.sales import pos_invoices
 
 
@@ -16,6 +17,7 @@ def execute(filters=None):
 	doctype, invoices = pos_invoices(
 		filters, ["name", "currency", "grand_total", "change_amount", "is_return"]
 	)
+	ensure_not_blind(requested_profiles(filters) | {inv["pos_profile"] for inv in invoices})
 	return get_columns(), get_data(doctype, invoices)
 
 

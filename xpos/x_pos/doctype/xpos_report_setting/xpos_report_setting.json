@@ -12,6 +12,7 @@
   "access_section",
   "pos_permission",
   "scope_mode",
+  "scope_verified",
   "column_break_access",
   "allow_export",
   "thermal_print",
@@ -75,7 +76,13 @@
    "label": "Scope",
    "options": "Company and Warehouse\nCompany\nNone",
    "default": "Company and Warehouse",
-   "description": "What the report's filters are checked against the user's company and warehouse access."
+   "description": "Which of the user's company and warehouse limits are enforced on this report's filters. None declares the report holds no company or warehouse data."
+  },
+  {
+   "fieldname": "scope_verified",
+   "fieldtype": "Check",
+   "label": "Report Applies Scope Itself",
+   "description": "Tick only after confirming the report's own query limits rows and totals to the user's companies and warehouses (for example through xpos.reports.scope). Users restricted to a company or warehouse cannot run a report that is not ticked."
   },
   {
    "fieldname": "column_break_access",
