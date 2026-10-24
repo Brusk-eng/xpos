@@ -120,9 +120,12 @@ export function settleTenders(
 	const cash = tenders.filter((t) => t.type === "Cash").reduce((s, t) => s + t.amountMinor, 0);
 	if (over > cash)
 		return { ok: false, reason: "Only cash can be over the amount due (that is the change)." };
-	for (const t of tenders)
+	for (const t of tenders) {
 		if (t.type !== "Cash" && !t.terminalConfirmed)
-			return { ok: false, reason: `Confirm that ${t.mode} was approved on the terminal.` };
+			return { ok: false, reason: `Confirm that you saw ${t.mode} approved on the terminal or slip.` };
+		if (t.requiresReference && !t.reference?.trim())
+			return { ok: false, reason: `${t.mode} needs the terminal or transfer reference.` };
+	}
 	return { ok: true, changeMinor: over };
 }
 
@@ -137,8 +140,22 @@ export interface CaptureInput {
 	now?: number;
 }
 
+/** A sale whose invoice exists in ERPNext but whose fiscal step is unfinished. Another sale cannot start until it is. */
+export async function fiscalPendingSale(
+	store: TransactionStore,
+	scopeId: string,
+): Promise<SaleRecord | null> {
+	return (await store.listSales(["fiscal_pending"], 50)).find((s) => s.scopeId === scopeId) ?? null;
+}
+
+export function fiscalPendingMessage(sale: SaleRecord): string {
+	return `Sale ${sale.invoice ?? sale.txnId} is not fiscally complete. Finish it in the web POS before starting another sale.`;
+}
+
 /** Writes the sale durably. Resolves only after the row (with tender/receipt evidence) is committed. */
 export async function captureSale(store: TransactionStore, c: CaptureInput): Promise<SaleRecord> {
+	const blocking = await fiscalPendingSale(store, c.scopeId);
+	if (blocking && blocking.txnId !== c.txnId) throw new Error(fiscalPendingMessage(blocking));
 	const settled = settleTenders(c.quote.payableMinor, c.tenders);
 	if (!settled.ok) throw new Error(settled.reason);
 	const rates = new Map(c.quote.lines.map((q) => [q.rowId, q]));

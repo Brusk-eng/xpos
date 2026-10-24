@@ -153,6 +153,7 @@ describe("catalog semantics (host SQLite double)", () => {
 			itemGroup: "G",
 			uom: "Nos",
 			priceMinor: 1,
+			priced: true,
 			attrs: {},
 			barcodes: [items[0].barcodes[0]],
 		};

@@ -20,7 +20,7 @@ class CatalogStore(private val db: SQLiteDatabase) {
     private fun scalarStr(sql: String, vararg args: Any?): String? = q(sql, *args).use { if (it.moveToFirst() && !it.isNull(0)) it.getString(0) else null }
 
     private fun scope(c: Cursor) = CatalogScope(c.str("scope_id"), c.str("site"), c.strOrNull("company"), c.strOrNull("warehouse"), c.strOrNull("price_list"), c.str("currency"), c.int("minor_digits"), c.intOrNull("active_gen"), c.long("created_at"))
-    private fun itemRow(c: Cursor) = ItemRow(c.str("scope_id"), c.int("gen"), c.str("item_code"), c.strOrNull("variant_of"), c.str("name"), c.str("name_norm"), c.str("code_norm"), c.str("item_group"), c.str("uom"), c.long("price_minor"), c.strOrNull("brand"))
+    private fun itemRow(c: Cursor) = ItemRow(c.str("scope_id"), c.int("gen"), c.str("item_code"), c.strOrNull("variant_of"), c.str("name"), c.str("name_norm"), c.str("code_norm"), c.str("item_group"), c.str("uom"), c.long("price_minor"), c.long("priced") == 1L, c.strOrNull("brand"))
 
     fun insertScope(s: CatalogScope) {
         db.execSQL(
@@ -55,8 +55,8 @@ class CatalogStore(private val db: SQLiteDatabase) {
 
     fun insertItems(rows: List<ItemRow>) = rows.forEach { r ->
         db.execSQL(
-            "INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-            arrayOf<Any?>(r.scopeId, r.gen, r.itemCode, r.variantOf, r.name, r.nameNorm, r.codeNorm, r.itemGroup, r.uom, r.priceMinor, r.brand),
+            "INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,priced,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            arrayOf<Any?>(r.scopeId, r.gen, r.itemCode, r.variantOf, r.name, r.nameNorm, r.codeNorm, r.itemGroup, r.uom, r.priceMinor, if (r.priced) 1 else 0, r.brand),
         )
     }
     fun insertBarcodes(rows: List<ItemBarcode>) = rows.forEach {

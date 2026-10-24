@@ -55,7 +55,7 @@ function localFonts() {
 			for (const file of Object.values(bundle)) {
 				if (file.type !== "asset" || typeof file.source !== "string") continue;
 				file.source = file.source.replace(
-					/@import\s*(?:url\()?["']?https:\/\/fonts\.googleapis\.com[^;]*;/g,
+					/@import\s*(?:url\(\s*)?["']?https:\/\/fonts\.googleapis\.com[^)"']*["']?\s*\)?\s*;/g, // the URL itself contains ";" (wght@300;400)
 					"",
 				);
 			}

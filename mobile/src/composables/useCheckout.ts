@@ -3,6 +3,8 @@ import { OfflineError, SessionExpiredError } from "@mobile/adapters/frappeHttp";
 import {
 	acceptReprice,
 	captureSale,
+	fiscalPendingMessage,
+	fiscalPendingSale,
 	quoteCart,
 	QuoteError,
 	repriceOf,
@@ -70,6 +72,12 @@ export function useCheckout() {
 		flow.step = "quoting";
 		try {
 			const c = getContainer();
+			const blocking = await fiscalPendingSale(c.transactions, scopeIdFor(state.cashier!));
+			if (blocking) {
+				flow.step = "idle";
+				flow.error = fiscalPendingMessage(blocking);
+				return;
+			}
 			const api = await c.session(state.cashier!.site);
 			flow.quote = await quoteCart(api, context(), cart.lines.map(toInput));
 			flow.step = "paying";

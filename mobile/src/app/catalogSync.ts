@@ -46,6 +46,7 @@ export interface ServerItem {
 	brand?: string | null;
 	variant_of?: string | null;
 	rate?: number | null;
+	price_missing?: number;
 	barcodes?: ServerBarcode[];
 	attributes?: Record<string, string>;
 }
@@ -100,6 +101,7 @@ export function toCatalogItem(row: ServerItem, minorDigits: number): { item: Cat
 			itemGroup: row.item_group || "",
 			uom: stockUom,
 			priceMinor: fromRate(Number(row.rate ?? 0), minorDigits),
+			priced: row.price_missing === undefined ? Number(row.rate ?? 0) > 0 : !row.price_missing,
 			brand: row.brand || null,
 			attrs: row.attributes ?? {},
 			barcodes: usable.map((b) => b.barcode),
@@ -265,7 +267,7 @@ export async function downloadCatalog(input: SyncOptions): Promise<SyncResult> {
 				);
 				for (const r of page.items) sum += crc32(r.item_code);
 				skipped += mapped.reduce((n, m) => n + m.skipped, 0);
-				unpriced += mapped.filter((m) => m.item.priceMinor <= 0).length;
+				unpriced += mapped.filter((m) => !m.item.priced).length;
 				downloaded += page.items.length;
 				cursor = page.next_cursor;
 				opts.onProgress?.({ downloaded, total: Math.max(begin.total, downloaded) });

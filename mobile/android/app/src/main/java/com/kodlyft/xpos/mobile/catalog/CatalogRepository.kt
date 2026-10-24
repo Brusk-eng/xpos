@@ -16,6 +16,7 @@ data class Item(
     val itemGroup: String,
     val uom: String,
     val priceMinor: Long,
+    val priced: Boolean,
     val brand: String?,
     val attrs: Map<String, String>,
     val barcodes: List<String>,
@@ -33,7 +34,7 @@ class CatalogRepository(private val db: XposDb, private val now: () -> Long = Sy
     private val dao: CatalogStore get() = db.catalog()
     private suspend fun <T> io(block: () -> T): T = withContext(Dispatchers.IO) { block() }
 
-    suspend fun createScope(s: CatalogScope) = io { dao.insertScope(s.copy(activeGen = null, createdAt = now())) }
+    suspend fun createScope(s: CatalogScope) = io { db.write { dao.insertScope(s.copy(activeGen = null, createdAt = now())) } }
     suspend fun listScopes(): List<CatalogScope> = io { dao.scopes() }
 
     suspend fun dropScope(scopeId: String) = io { db.write { dao.deleteScopeData(scopeId) } }
@@ -52,7 +53,7 @@ class CatalogRepository(private val db: XposDb, private val now: () -> Long = Sy
             db.write {
                 check(dao.genState(scopeId, gen) == "staging") { "generation $gen is not staging" }
                 dao.insertItems(items.map {
-                    ItemRow(scopeId, gen, it.itemCode, it.variantOf, it.name, Text.normalize(it.name), Text.normalize(it.itemCode), it.itemGroup, it.uom, it.priceMinor, it.brand)
+                    ItemRow(scopeId, gen, it.itemCode, it.variantOf, it.name, Text.normalize(it.name), Text.normalize(it.itemCode), it.itemGroup, it.uom, it.priceMinor, it.priced, it.brand)
                 })
                 dao.insertBarcodes(items.flatMap { i -> i.barcodes.toSet().map { ItemBarcode(scopeId, gen, it, i.itemCode, i.uom) } })
                 dao.insertAttrs(items.flatMap { i -> i.attrs.map { (k, v) -> ItemAttr(scopeId, gen, i.itemCode, k, v) } })
@@ -69,7 +70,7 @@ class CatalogRepository(private val db: XposDb, private val now: () -> Long = Sy
                 val gen = checkNotNull(activeGen(scopeId)) { "no active catalog to update" }
                 (removed + upserts.map { it.itemCode }).forEach { dao.deleteItem(scopeId, gen, it) }
                 dao.insertItems(upserts.map {
-                    ItemRow(scopeId, gen, it.itemCode, it.variantOf, it.name, Text.normalize(it.name), Text.normalize(it.itemCode), it.itemGroup, it.uom, it.priceMinor, it.brand)
+                    ItemRow(scopeId, gen, it.itemCode, it.variantOf, it.name, Text.normalize(it.name), Text.normalize(it.itemCode), it.itemGroup, it.uom, it.priceMinor, it.priced, it.brand)
                 })
                 dao.insertBarcodes(upserts.flatMap { i -> i.barcodes.toSet().map { ItemBarcode(scopeId, gen, it, i.itemCode, i.uom) } })
                 dao.insertAttrs(upserts.flatMap { i -> i.attrs.map { (k, v) -> ItemAttr(scopeId, gen, i.itemCode, k, v) } })
@@ -112,7 +113,7 @@ class CatalogRepository(private val db: XposDb, private val now: () -> Long = Sy
         val barcodes = dao.barcodesFor(scopeId, gen, codes).groupBy({ it.itemCode }, { it.barcode })
         val attrs = dao.attrsFor(scopeId, gen, codes).groupBy { it.itemCode }
         return rows.map { r ->
-            Item(r.itemCode, r.variantOf, r.name, r.itemGroup, r.uom, r.priceMinor, r.brand,
+            Item(r.itemCode, r.variantOf, r.name, r.itemGroup, r.uom, r.priceMinor, r.priced, r.brand,
                 attrs[r.itemCode].orEmpty().associate { it.attr to it.value }, barcodes[r.itemCode].orEmpty())
         }
     }

@@ -18,11 +18,12 @@ from frappe.utils import cint, flt, nowdate
 
 from xpos.api.auth import get_my_pos_permissions
 from xpos.api.customers import require_customer_access
-from xpos.api.profile_rules import get_line_rate, resolve_selling_price_list
+from xpos.api.profile_rules import check_zero_payable, get_line_rate, resolve_selling_price_list
 from xpos.api.profiles import resolve_pos_profile
 from xpos.api.shifts import get_open_shift_rows
 from xpos.api.taxes import get_item_tax_template
 from xpos.api.utilities import get_invoice_type
+from xpos.x_pos.doctype.pos_closing_shift.closing_processing.reclass import reference_required_modes
 
 SUPPORTED_MAJOR = 16
 # Longest the app may accept offline unlock before it must reach the server again.
@@ -82,9 +83,12 @@ def payment_modes_for(profile_name: str) -> list[dict]:
 		fields=["mode_of_payment", "default"],
 		order_by="idx",
 	)
+	company = frappe.get_cached_value("POS Profile", profile_name, "company")
+	needs_reference = reference_required_modes(company)
 	for row in rows:
 		row["type"] = frappe.get_cached_value("Mode of Payment", row["mode_of_payment"], "type")
 		row["default"] = bool(row["default"])
+		row["requires_reference"] = row["mode_of_payment"] in needs_reference
 	return rows
 
 
@@ -182,7 +186,14 @@ def quote_sale(pos_profile: str, items: str | list, customer: str | None = None)
 		if not item_code or not frappe.db.exists("Item", item_code):
 			frappe.throw(_("Item {0} not found").format(item_code))
 		qty = flt(line.get("qty"), 3)
-		uom = line.get("uom") or frappe.get_cached_value("Item", item_code, "stock_uom")
+		stock_uom, has_serial, has_batch = frappe.get_cached_value(
+			"Item", item_code, ["stock_uom", "has_serial_no", "has_batch_no"]
+		)
+		uom = line.get("uom") or stock_uom
+		if uom != stock_uom:
+			frappe.throw(_("{0}: selling in {1} is not supported on mobile yet.").format(item_code, uom))
+		if cint(has_serial) or cint(has_batch) or line.get("serial_no") or line.get("batch_no"):
+			frappe.throw(_("{0}: serial and batch items are not supported on mobile yet.").format(item_code))
 		rate = get_line_rate(price_list, item_code, uom, customer, qty, doc.posting_date)
 		row_id = line.get("row_id") or index
 		if rate is None:
@@ -232,6 +243,7 @@ def quote_sale(pos_profile: str, items: str | list, customer: str | None = None)
 				},
 			)
 	doc.calculate_taxes_and_totals()
+	check_zero_payable(pos, doc, doc.items)
 
 	rounded = cint(not cint(doc.get("disable_rounded_total"))) and flt(doc.get("rounded_total"))
 	return {

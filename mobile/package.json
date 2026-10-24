@@ -14,7 +14,9 @@
     "cap:sync": "yarn build && cap sync android",
     "android:open": "node scripts/android.mjs open",
     "android:build": "node scripts/android.mjs debug",
-    "android:dev": "node scripts/android.mjs dev",
+    "android:release": "node scripts/android.mjs release",
+		"android:release-guard": "node scripts/release-guard.mjs",
+		"android:dev": "node scripts/android.mjs dev",
     "android:bundle": "node scripts/android.mjs bundle",
     "android:test": "node scripts/android-test.mjs",
     "check": "yarn typecheck && yarn test && yarn build"

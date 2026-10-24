@@ -92,12 +92,12 @@ class XposNativePlugin : Plugin() {
     private fun JSObject.str(k: String): String = getString(k) ?: throw IllegalArgumentException("missing $k")
     private fun itemJson(i: Item) = JSObject()
         .put("itemCode", i.itemCode).put("variantOf", i.variantOf ?: JSONObject.NULL).put("name", i.name).put("itemGroup", i.itemGroup)
-        .put("uom", i.uom).put("priceMinor", i.priceMinor).put("brand", i.brand ?: JSONObject.NULL)
+        .put("uom", i.uom).put("priceMinor", i.priceMinor).put("priced", i.priced).put("brand", i.brand ?: JSONObject.NULL)
         .put("attrs", JSONObject(i.attrs)).put("barcodes", JSONArray(i.barcodes))
     private fun pageJson(p: ItemPage) = JSObject().put("items", JSArray().also { a -> p.items.forEach { a.put(itemJson(it)) } }).also { if (p.next != null) it.put("next", p.next) }
     private fun parseItem(o: JSONObject) = Item(
         o.getString("itemCode"), o.optString("variantOf").takeIf { it.isNotEmpty() && it != "null" }, o.getString("name"), o.getString("itemGroup"),
-        o.getString("uom"), o.getLong("priceMinor"), o.optString("brand").takeIf { it.isNotEmpty() && it != "null" },
+        o.getString("uom"), o.getLong("priceMinor"), o.getBoolean("priced"), o.optString("brand").takeIf { it.isNotEmpty() && it != "null" },
         o.optJSONObject("attrs")?.let { a -> a.keys().asSequence().associateWith { a.getString(it) } } ?: emptyMap(),
         o.optJSONArray("barcodes")?.let { a -> List(a.length()) { a.getString(it) } } ?: emptyList(),
     )

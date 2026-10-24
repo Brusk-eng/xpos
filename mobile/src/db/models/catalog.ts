@@ -41,6 +41,7 @@ export class Item extends Model {
 		t.text("item_group").notNull();
 		t.text("uom").notNull();
 		t.integer("price_minor").notNull();
+		t.integer("priced").notNull().default(0); // 1 = the price list has a price (0.00 included); 0 = no price
 		t.text("brand");
 		t.primaryKey("scope_id", "gen", "item_code").withoutRowId();
 	}

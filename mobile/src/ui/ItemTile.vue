@@ -16,7 +16,7 @@ defineEmits<{ pick: [item: CatalogItem] }>();
 			type="button"
 			class="flex min-w-0 flex-1 select-none cursor-pointer flex-col rounded-2xl p-2 text-start motion-safe:active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-background"
 			:aria-label="
-				item.priceMinor > 0
+				item.priced
 					? `Add ${item.name}, ${currency} ${formatMinor(item.priceMinor, minorDigits)}`
 					: `${item.name}: no price in the price list, cannot be sold`
 			"
@@ -41,7 +41,7 @@ defineEmits<{ pick: [item: CatalogItem] }>();
 				<span class="mt-auto flex items-end justify-between gap-2 pt-2">
 					<span
 						class="block min-w-0 truncate text-base font-bold leading-tight text-foreground tabular-nums"
-						><template v-if="item.priceMinor > 0"
+						><template v-if="item.priced"
 							>{{ formatMinor(item.priceMinor, minorDigits)
 							}}<span class="ms-1 text-xs font-normal text-muted-foreground"
 								>/ {{ item.uom }}</span
@@ -51,7 +51,7 @@ defineEmits<{ pick: [item: CatalogItem] }>();
 						></span
 					>
 					<span
-						v-if="item.priceMinor > 0"
+						v-if="item.priced"
 						class="inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-primary"
 						aria-hidden="true"
 						><Plus class="size-4" stroke-width="2.5"

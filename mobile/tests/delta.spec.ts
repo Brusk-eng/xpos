@@ -173,6 +173,7 @@ describe("100,000 sellable records", () => {
 						itemGroup: "G",
 						uom: "Nos",
 						priceMinor: 1000,
+						priced: true,
 						attrs: {},
 						barcodes: [`89${String(n).padStart(10, "0")}`],
 					};

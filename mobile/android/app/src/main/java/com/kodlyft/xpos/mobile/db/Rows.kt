@@ -24,6 +24,7 @@ data class ItemRow(
     val itemGroup: String,
     val uom: String,
     val priceMinor: Long,
+    val priced: Boolean,
     val brand: String?,
 )
 

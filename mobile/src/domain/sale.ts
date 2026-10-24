@@ -40,8 +40,10 @@ export interface TenderEvidence {
 	amountMinor: number;
 	/** Reference typed by the cashier from the card terminal / transfer slip. */
 	reference?: string;
-	/** The cashier states the terminal approved it. The app cannot verify this. */
+	/** The cashier states the terminal approved it. XPOS cannot verify this. */
 	terminalConfirmed?: boolean;
+	/** The mode needs a reference (company setting); ERPNext enforces the same rule when posting. */
+	requiresReference?: boolean;
 }
 
 export interface ReceiptLine {

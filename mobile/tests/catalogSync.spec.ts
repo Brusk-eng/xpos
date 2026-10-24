@@ -229,4 +229,17 @@ describe("catalog helpers", () => {
 			variantOf: null,
 		});
 	});
+
+	it("keeps a missing price apart from an explicit zero price", () => {
+		const base = { item_code: "P", stock_uom: "Nos" };
+		const missing = toCatalogItem({ ...base, rate: 0, price_missing: 1 }, 2).item;
+		const zero = toCatalogItem({ ...base, rate: 0, price_missing: 0 }, 2).item;
+		const positive = toCatalogItem({ ...base, rate: 12.5, price_missing: 0 }, 2).item;
+		expect([missing.priced, missing.priceMinor]).toEqual([false, 0]);
+		expect([zero.priced, zero.priceMinor]).toEqual([true, 0]);
+		expect([positive.priced, positive.priceMinor]).toEqual([true, 1250]);
+		// an older server that does not send price_missing: 0 means no price, a positive rate is a price
+		expect(toCatalogItem({ ...base, rate: 0 }, 2).item.priced).toBe(false);
+		expect(toCatalogItem({ ...base, rate: 3 }, 2).item.priced).toBe(true);
+	});
 });

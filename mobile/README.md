@@ -5,13 +5,25 @@ Vue + Capacitor app (Android) that sells against a real ERPNext 16 site with XPO
 ## What works
 
 - Real login, authorized POS Profile choice, company/warehouse/currency/payment methods/open shift from `xpos.api.mobile.bootstrap`.
-- Real catalog (tested with 72,611 items): staged download, atomic activation, changes-only refresh (`catalog_delta`), digest check, scope-change and expired-cursor restarts. Items without a price are listed but cannot be sold.
+- Real catalog (tested with 72,611 items): staged download, atomic activation, changes-only refresh (`catalog_delta`), digest check, scope-change and expired-cursor restarts. Items with no price in the price list are listed but cannot be sold; an item priced 0.00 is a different thing: the server flags a missing price (`price_missing`) and the POS Profile setting "allow zero rated items" decides whether a free sale is accepted (`quote_sale` refuses it with the same rule `create_invoice` uses).
 - Connected checkout: `xpos.api.mobile.quote_sale` (ERPNext's prices, taxes, rounded amount due) -> payments -> the sale is written to the device with its tender and receipt evidence -> `xpos.api.invoices.create_invoice` with a stable sale id. A lost reply is retried with the same id and returns the existing invoice. Server repricing, validation refusals, session expiry and connection loss each have their own state (Sales tab).
 - Three layouts (Catalog, Scan Counter, Fashion Assist) sharing one cart; light and dark; phone and tablet.
 
 ## Not implemented yet (be aware)
 
-Offline selling (charging is switched off offline: stock, serial/batch and receipt checks need the server), background sending while the app is closed, returns, shift closing, printing, camera scanning, customer selection (the profile's default customer is used), serial/batch items, MFA/SSO accounts, barcodes sold in another unit (reported "not found"), Urdu Nastaliq font. Card/transfer payments are recorded as the cashier states them; the app cannot verify them. Fiscal (FBR) sales that need a local step are shown as "fiscal pending" and must be finished in the web POS.
+Offline selling (charging is switched off offline: stock, serial/batch and receipt checks need the server), background sending while the app is closed, returns, shift closing, printing, camera scanning, customer selection (the profile's default customer is used), serial/batch items, MFA/SSO accounts, barcodes sold in another unit (reported "not found"), Urdu Nastaliq font. Card/transfer payments are labelled "cashier-confirmed": XPOS records what the cashier entered and does not check it with the terminal or bank (a reference is required where the company marks the mode as reference-required). Fiscal (FBR) sales that need a local step are shown as "fiscal pending", are kept on the device with their invoice and sale id, block any new sale until finished in the web POS, and are never shown as completed. A sale re-priced by the server stays on the device as one held sale (not put back in the live cart, so it cannot be sold twice). Offline checkout is switched off; the agreed 24-hour offline requirement is NOT implemented.
+
+## Verification status (2026-10-24)
+
+| Status | What |
+|---|---|
+| Browser verified | `yarn dev` flow (reported by the project owner; not re-run in this pass). `yarn typecheck`, `yarn test` (93), `yarn build` re-run and green. |
+| Android compiled | Debug APK, unsigned release APK, release AAB, `lintRelease` not run; Kotlin 2.3.10, AGP 8.13.0, Gradle 8.14.3, JDK 21, compileSdk 36. 15 JVM unit tests pass. |
+| Emulator verified | Windows emulator, Android 16 (API 36) x86_64, WHPX. 18 instrumented tests pass: fresh schema, upgrade keeps rows, `priced` column upgrade, downgrade opens read-only and every catalog/transaction/outbox write path refuses, catalog paging/barcode/staging/activation, sale commit atomicity, real Android Keystore sealing, PIN throttle surviving restart, restart starts locked, one cashier per device, 24 h lease cap, expired lease unlocks but refuses writes. The release-style debug app launches and renders styled with the bundled Inter font. |
+| Physical-device verified | Nothing. |
+| Not verified or blocked | Real connected checkout and duplicate-safe recovery from the app (needs a disposable ERPNext site and an agreed cleanup policy; none run); native cookie jar / session handling against a real server; real catalog download and delta on the device; reboot behaviour of the lease (only the JVM vectors cover it); background auto-lock timing; Kotlin vs TypeScript SchemaSync parity beyond the shared schema JSON; signed release; physical-device performance. |
+
+Defects found by compiling and running on the emulator and fixed: three Kotlin compile errors in `SchemaSync.kt` (`arrayOf` of mixed types), an unclosed KDoc comment and a stale call in the instrumented test, `createScope` writing without the read-only guard, and the release web build losing all CSS (the font-stripping regex cut at the first `;` of the Google Fonts URL and left garbage at the top of the stylesheet; `yarn dev` never ran that step, so the browser looked fine).
 
 ## Prerequisites
 
@@ -23,6 +35,8 @@ Offline selling (charging is switched off offline: stock, serial/batch and recei
 | Android Studio | current stable (Otter or newer) | includes the SDK manager |
 | Android SDK | Platform **36**, Build-Tools 36.x, Platform-Tools | `compileSdk`/`targetSdk` 36, `minSdk` 24 |
 | Server | ERPNext **16** + Frappe 16 + XPOS from this repository | the app refuses other versions, and a server that does not report its ERPNext version |
+
+Verified toolchain: Temurin JDK 21 and Android SDK Platform 36 / Build-Tools 36.0.0 (command-line tools, no Android Studio needed). On Windows with WSL: install the JDK and SDK on Windows (`winget install EclipseAdoptium.Temurin.21.JDK`, command-line tools into `C:\Android\Sdk`, `sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0" "emulator" "system-images;android-36;google_apis;x86_64"`) for the emulator and `adb.exe`; to build from WSL you also need Linux builds of the JDK and SDK (aapt2 is a platform binary), for example under `~/android-toolchain`. Run `adb.exe install` and `adb.exe shell am instrument` from WSL against the Windows emulator (do not expose the adb server on the network). Under WSL, set `COREPACK_ENABLE_STRICT=0` so `yarn` 1 runs inside this repository, whose root declares yarn 4.
 
 Set `ANDROID_HOME` (Linux/macOS `~/Android/Sdk`, Windows `%LOCALAPPDATA%\Android\Sdk`) and add `platform-tools` to `PATH` so `adb` works. Enable *USB debugging* on a phone, or create an emulator (API 34+). Gradle needs `JAVA_HOME` pointing at JDK 21.
 
@@ -59,10 +73,11 @@ yarn test          # vitest: catalog, delta, checkout, schema safety, login, sea
 yarn build         # writes xpos-schema.json (generated, gitignored) and dist/
 yarn schema        # only regenerate xpos-schema.json
 yarn check         # all of the above
-yarn android:test  # schema + Android JVM unit tests (needs JDK/SDK); add --device for instrumented tests
+yarn android:test  # schema + Android JVM unit tests (needs JDK/SDK); --device adds connectedDebugAndroidTest; other arguments go to Gradle
+yarn android:release-guard  # fails if a dev server url, cleartext or dev marker is in the release inputs
 ```
 
-Server tests (run from the bench): `bench --site <site> run-tests --app xpos --module xpos.api.tests.test_mobile_bootstrap` (also `test_endpoint_exposure`, `test_catalog_sync`).
+Server tests (mock based, no database writes): `test_mobile_bootstrap`, `test_mobile_quote` (authorization, missing/zero/positive price, unsupported UOM/serial/batch, no writes), `test_endpoint_exposure`. They passed on `site.local` through a plain unittest runner with `frappe.init`/`connect` (the ERPNext test bootstrap does not run on that site).
 
 The schema is never edited by hand: each table is a model class in `src/db/models`; `yarn build` exports them to `android/app/src/main/assets/xpos-schema.json`, which the Kotlin `SchemaSync` applies when the database opens. Additive changes (new table, nullable or defaulted column, index) are automatic. Renames, drops, type/NOT NULL/default/CHECK/foreign-key changes are refused with a message until you add a step in `src/db/steps.ts`; a step flagged `breaksOlderWriters` raises the device's *writer level*, and an older app build then opens that database read-only instead of writing to it.
 
@@ -73,10 +88,12 @@ yarn cap:sync            # yarn build + cap sync android
 yarn android:open        # open the project in Android Studio
 yarn android:build       # debug APK (web build + sync + gradlew assembleDebug)
 adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+yarn android:release     # unsigned release APK + release guard (also on the merged manifest)
 yarn android:bundle      # release App Bundle (https servers only)
 ```
 
 - Debug APK: `android/app/build/outputs/apk/debug/app-debug.apk`.
+- Release APK (unsigned): `android/app/build/outputs/apk/release/app-release-unsigned.apk`.
 - Release bundle: `android/app/build/outputs/bundle/release/app-release.aab`.
 - Signing (release): create `android/keystore.properties` (git-ignored) with `storeFile`, `storePassword`, `keyAlias`, `keyPassword`, or set `XPOS_KEYSTORE_FILE`, `XPOS_KEYSTORE_PASSWORD`, `XPOS_KEY_ALIAS`, `XPOS_KEY_PASSWORD`. Without them the bundle is unsigned and cannot be uploaded. Never commit a keystore or its passwords.
 - Windows: the commands are the same in PowerShell (`gradlew.bat` is chosen automatically). Keep the repository on the Windows drive, not under `\\wsl$`, for Gradle.

@@ -131,7 +131,7 @@ class SchemaSync(private val db: SQLiteDatabase, private val doc: SchemaDoc, pri
         return plan
     }
 
-    private fun log(change: String) = db.execSQL("INSERT INTO schema_log (at, change) VALUES (?, ?)", arrayOf(now(), change))
+    private fun log(change: String) = db.execSQL("INSERT INTO schema_log (at, change) VALUES (?, ?)", arrayOf<Any?>(now(), change))
 
     private inline fun <T> tx(block: () -> T): T {
         db.beginTransaction() // IMMEDIATE in WAL mode, like BEGIN IMMEDIATE on the host
@@ -152,7 +152,7 @@ class SchemaSync(private val db: SQLiteDatabase, private val doc: SchemaDoc, pri
         for (s in pending) {
             tx {
                 s.statements.forEach(db::execSQL)
-                db.execSQL("INSERT INTO schema_steps (id, name, applied_at) VALUES (?, ?, ?)", arrayOf(s.id, s.name, now()))
+                db.execSQL("INSERT INTO schema_steps (id, name, applied_at) VALUES (?, ?, ?)", arrayOf<Any?>(s.id, s.name, now()))
                 log("step ${s.id}: ${s.name}")
             }
             stepsRun += s.id
@@ -163,7 +163,7 @@ class SchemaSync(private val db: SQLiteDatabase, private val doc: SchemaDoc, pri
             plan.createTables.forEach { db.execSQL(it.createSql); log("create table ${it.table}") }
             plan.addColumns.forEach { (t, c, sql) -> db.execSQL(sql); log("add column $t.$c") }
             plan.createIndexes.forEach { (ix, recreate) -> if (recreate) db.execSQL("DROP INDEX IF EXISTS ${ix.name}"); db.execSQL(ix.sql) }
-            db.execSQL("INSERT OR REPLACE INTO schema_state (id, fingerprint, updated_at, writer_level) VALUES (1, ?, ?, ?)", arrayOf(doc.fingerprint, now(), maxOf(ownLevel, deviceLevel)))
+            db.execSQL("INSERT OR REPLACE INTO schema_state (id, fingerprint, updated_at, writer_level) VALUES (1, ?, ?, ?)", arrayOf<Any?>(doc.fingerprint, now(), maxOf(ownLevel, deviceLevel)))
         }
         return Report(
             plan.createTables.isNotEmpty() || plan.addColumns.isNotEmpty() || plan.createIndexes.isNotEmpty() || stepsRun.isNotEmpty(), false, maxOf(ownLevel, deviceLevel),

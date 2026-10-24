@@ -48,6 +48,7 @@ function tenders(): TenderEvidence[] | null {
 			type: typeOf(r.mode),
 			amountMinor: toMinor(r.amount || "0", digits.value),
 			reference: r.reference.trim() || undefined,
+			requiresReference: modes.value.find((m) => m.mode_of_payment === r.mode)?.requires_reference,
 			terminalConfirmed: typeOf(r.mode) === "Cash" ? undefined : r.confirmed,
 		}));
 	} catch {
@@ -202,12 +203,17 @@ const problem = computed(
 							<Input
 								v-model="r.reference"
 								class="h-11 text-base"
-								placeholder="Terminal / transfer reference"
+								:placeholder="
+									modes.find((m) => m.mode_of_payment === r.mode)?.requires_reference
+										? 'Reference (required)'
+										: 'Terminal / transfer reference'
+								"
 								:aria-label="`Reference ${i + 1}`"
 							/>
 							<label class="flex min-h-11 items-center gap-2 text-sm">
 								<input v-model="r.confirmed" type="checkbox" class="size-5" />
-								The terminal approved this payment (confirmed by me, not verified by the app)
+								Cashier-confirmed: I saw this payment approved. XPOS does not check it with
+								the terminal or bank.
 							</label>
 						</div>
 					</li>
@@ -269,7 +275,10 @@ const problem = computed(
 							:key="t.mode"
 							class="flex justify-between text-muted-foreground"
 						>
-							<dt>{{ t.mode }}{{ t.reference ? ` · ${t.reference}` : "" }}</dt>
+							<dt>
+								{{ t.mode }}{{ t.reference ? ` · ${t.reference}` : ""
+								}}{{ t.terminalConfirmed ? " (cashier-confirmed)" : "" }}
+							</dt>
 							<dd>{{ money(t.amountMinor) }}</dd>
 						</div>
 						<div v-if="evidence.changeMinor" class="flex justify-between">

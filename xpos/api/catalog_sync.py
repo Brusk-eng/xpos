@@ -140,6 +140,7 @@ def attach_rates(pos, items: list) -> None:
 	prices = get_price_map([item.item_code for item in items], price_list_of(pos))
 	for item in items:
 		item.rate = prices.get(item.item_code, 0)
+		item.price_missing = int(item.item_code not in prices)
 
 
 def attach_barcodes(pos, items: list) -> None:

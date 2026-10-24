@@ -20,8 +20,8 @@ const cart = reactive({
 	error: "",
 });
 
-/** A price of 0 means the price list has no price for the item: it is never sold for nothing. */
-export const sellable = (item: CatalogItem) => item.priceMinor > 0;
+/** Only an item with no price is blocked here. A priced 0.00 is allowed or refused by the POS Profile on the server. */
+export const sellable = (item: CatalogItem) => item.priced;
 
 export function useCart(currency = { code: "PKR", minorDigits: 2 }) {
 	const total = computed(() =>

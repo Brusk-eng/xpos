@@ -7,6 +7,8 @@ import {
 	QuoteError,
 	repriceOf,
 	sendSale,
+	fiscalPendingMessage,
+	fiscalPendingSale,
 	settleTenders,
 } from "../src/app/checkout";
 import { OfflineError, ServerError, SessionExpiredError } from "../src/adapters/frappeHttp";
@@ -60,6 +62,23 @@ describe("tender rules", () => {
 		expect(settleTenders(2100, [card(2100, false)])).toMatchObject({ ok: false });
 		expect(settleTenders(2100, [card(2100)])).toEqual({ ok: true, changeMinor: 0 });
 		expect(settleTenders(2100, [card(1100), cash(1500)])).toEqual({ ok: true, changeMinor: 500 });
+	});
+
+	it("asks for a reference only where the company requires one, and calls the card check cashier-confirmed", () => {
+		const need = { ...card(2100), requiresReference: true };
+		expect(settleTenders(2100, [need])).toEqual({ ok: true, changeMinor: 0 });
+		expect(settleTenders(2100, [{ ...need, reference: "  " }])).toMatchObject({
+			ok: false,
+			reason: "Card needs the terminal or transfer reference.",
+		});
+		expect(settleTenders(2100, [{ ...card(2100), reference: undefined }])).toEqual({
+			ok: true,
+			changeMinor: 0,
+		});
+		expect(settleTenders(2100, [card(2100, false)])).toMatchObject({
+			ok: false,
+			reason: expect.stringContaining("you saw Card approved"),
+		});
 	});
 });
 
@@ -211,6 +230,26 @@ describe("capture and send", () => {
 			"mob-1",
 		);
 		expect(r).toMatchObject({ status: "fiscal_pending", invoice: "SINV-2" });
+	});
+
+	it("a fiscal-pending sale survives and blocks any second sale or payment until it is finished", async () => {
+		const store = new HostSqlite();
+		await input(store);
+		await sendSale(
+			store,
+			api({ create_invoice: () => ({ name: "SINV-9", status: "fbr_local_required" }) }),
+			"mob-1",
+		);
+		const kept = await fiscalPendingSale(store, "s");
+		expect(kept).toMatchObject({ txnId: "mob-1", invoice: "SINV-9", status: "fiscal_pending" });
+		expect(fiscalPendingMessage(kept!)).toContain("SINV-9");
+		await expect(input(store, "mob-2")).rejects.toThrow(/not fiscally complete/);
+		expect(await store.getSale("mob-2")).toBeNull();
+		// another cashier scope is not blocked
+		expect(await fiscalPendingSale(store, "other")).toBeNull();
+		// once the web POS finishes it and the sale is posted, selling resumes
+		await store.updateSale("mob-1", { status: "posted", invoice: "SINV-9", message: "" });
+		await expect(input(store, "mob-2")).resolves.toMatchObject({ status: "captured" });
 	});
 
 	it("server repricing: new prices wait for the cashier, then the same sale id is re-sent", async () => {

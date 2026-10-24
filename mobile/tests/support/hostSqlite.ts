@@ -173,7 +173,7 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 			) as Row | undefined;
 			if (!g || g.state !== "staging") throw new Error(`generation ${gen} is not staging`);
 			const ii = this.q(
-				"INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+				"INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,priced,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
 			);
 			const ib = this.q(
 				"INSERT OR IGNORE INTO item_barcode (scope_id,gen,barcode,item_code,uom) VALUES (?,?,?,?,?)",
@@ -191,6 +191,7 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 					it.itemGroup,
 					it.uom,
 					it.priceMinor,
+					it.priced ? 1 : 0,
 					it.brand ?? null,
 				);
 				for (const b of it.barcodes) ib.run(scopeId, gen, b, it.itemCode, it.uom);
@@ -272,6 +273,7 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 			itemGroup: String(r.item_group),
 			uom: String(r.uom),
 			priceMinor: Number(r.price_minor),
+			priced: Number(r.priced) === 1,
 			brand: (r.brand as string | null) ?? null,
 			attrs: Object.fromEntries(
 				(aq.all(scopeId, gen, r.item_code as string) as Row[]).map((a) => [
@@ -554,7 +556,7 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 					);
 			}
 			const ii = this.q(
-				"INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+				"INSERT INTO item (scope_id,gen,item_code,variant_of,name,name_norm,code_norm,item_group,uom,price_minor,priced,brand) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
 			);
 			const ib = this.q(
 				"INSERT OR IGNORE INTO item_barcode (scope_id,gen,barcode,item_code,uom) VALUES (?,?,?,?,?)",
@@ -572,6 +574,7 @@ export class HostSqlite implements CatalogRepository, TransactionStore {
 					it.itemGroup,
 					it.uom,
 					it.priceMinor,
+					it.priced ? 1 : 0,
 					it.brand ?? null,
 				);
 				for (const b of it.barcodes) ib.run(scopeId, gen, b, it.itemCode, it.uom);

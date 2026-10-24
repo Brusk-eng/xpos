@@ -15,6 +15,7 @@ export interface CatalogItem {
 	itemGroup: string;
 	uom: string;
 	priceMinor: number;
+	priced: boolean;
 	brand?: string | null;
 	attrs: Record<string, string>;
 	barcodes: string[];
@@ -121,6 +122,7 @@ export interface PaymentMode {
 	mode_of_payment: string;
 	default: boolean;
 	type: string | null;
+	requires_reference?: boolean;
 }
 
 export interface ProfileChoice {
