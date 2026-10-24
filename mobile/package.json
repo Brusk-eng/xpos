@@ -1,0 +1,40 @@
+{
+  "name": "xpos-mobile",
+  "version": "0.0.1",
+  "private": true,
+  "description": "XPOS Mobile (Android) foundation: Capacitor shell, native catalog, Pearl mobile UI",
+  "type": "module",
+  "scripts": {
+    "build": "node --experimental-transform-types --no-warnings scripts/export-schema.ts && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "cap:sync": "yarn build && cap sync android",
+    "schema": "node --experimental-transform-types --no-warnings scripts/export-schema.ts"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/core": "8.5.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "pinia": "^2.1.7",
+    "radix-vue": "^1.9.17",
+    "tailwind-merge": "^3.5.0",
+    "vue": "3.5.30",
+    "@lucide/vue": "^1.61.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.3",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "tailwindcss": "^4.3.3",
+    "typescript": "5.9.3",
+    "vite": "^8.2.4",
+    "vitest": "^4.1.11",
+    "vue-tsc": "^3.3.6"
+  },
+  "resolutions": {
+    "@capacitor/cli/xcode/uuid": "^11.1.0"
+  }
+}

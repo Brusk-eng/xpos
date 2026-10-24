@@ -108,3 +108,18 @@ class TestGiftCardHelpersAreNotExposed(unittest.TestCase):
 	def test_gated_endpoints_remain_public(self):
 		for name in ("check_gift_card", "claim_issued_gift_cards", "adjust_gift_card"):
 			self.assertTrue(is_whitelisted("xpos.api.gift_cards", name), name)
+
+
+class TestMobileBootstrapExposure(unittest.TestCase):
+	"""The mobile bootstrap is the only mobile endpoint, and its helpers stay server-side."""
+
+	def test_bootstrap_is_whitelisted_without_guest_access(self):
+		self.assertTrue(is_whitelisted("xpos.api.mobile", "bootstrap"))
+		from xpos.api.mobile import bootstrap
+
+		self.assertNotIn(bootstrap, frappe.guest_methods)
+
+	def test_helpers_are_not_endpoints(self):
+		for name in ("minor_digits_for", "erpnext_version", "major_version"):
+			self.assertTrue(function_exists("xpos.api.mobile", name))
+			self.assertFalse(is_whitelisted("xpos.api.mobile", name))

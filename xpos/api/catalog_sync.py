@@ -171,6 +171,28 @@ def attach_barcodes(pos, items: list) -> None:
 			item.barcodes.append({"barcode": row.barcode, **priced})
 
 
+def attach_attributes(items: list) -> None:
+	"""Variant attributes of each variant item as {attribute: value}, e.g. {"Colour": "Red", "Size": "M"}.
+
+	Plain items and templates get {}. Lets a client offer explicit colour/size selection without guessing
+	from item names. Additive: clients that do not know the field ignore it.
+	"""
+	for item in items:
+		item.attributes = {}
+	by_code = {item.item_code: item for item in items if item.get("variant_of")}
+	if not by_code:
+		return
+	rows = frappe.get_all(
+		"Item Variant Attribute",
+		filters={"parent": ["in", list(by_code)], "parenttype": "Item"},
+		fields=["parent", "attribute", "attribute_value"],
+		order_by="parent asc, idx asc",
+	)
+	for row in rows:
+		if row.attribute and row.attribute_value is not None:
+			by_code[row.parent].attributes[row.attribute] = row.attribute_value
+
+
 def overlap_from(moment: str | None = None) -> str:
 	return str(add_to_date(moment or now_datetime(), seconds=-OVERLAP_SECONDS, as_string=False))
 
@@ -233,6 +255,7 @@ def catalog_page(pos_profile: str, cursor: str, limit: int = DEFAULT_PAGE):
 	items, more = next_keyset_page(pos, state.get("lk") or "", limit, ITEM_PAGE_FIELDS)
 	attach_rates(pos, items)
 	attach_barcodes(pos, items)
+	attach_attributes(items)
 	next_cursor = issue(digest, "items", lk=items[-1].item_code, wm=state["wm"]) if more and items else None
 	return {"items": items, "next_cursor": next_cursor}
 
@@ -342,6 +365,7 @@ def catalog_delta(pos_profile: str, cursor: str, limit: int = DEFAULT_PAGE):
 		).run(as_dict=True)
 		attach_rates(pos, upserts)
 		attach_barcodes(pos, upserts)
+		attach_attributes(upserts)
 	present = {item.item_code for item in upserts}
 	removed = [code for code in codes if code not in present]
 

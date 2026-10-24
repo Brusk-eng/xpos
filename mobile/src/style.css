@@ -1,0 +1,35 @@
+/* Pearl tokens, shadows and base styles are shared with the browser POS (nothing is redefined here). */
+@import "../../frontend/src/style.css";
+/* The shared stylesheet only scans ../frontend/src; add the mobile sources. */
+@source "./";
+
+@layer base {
+	html,
+	body,
+	#app {
+		height: 100%;
+	}
+	body {
+		overscroll-behavior: none;
+		-webkit-tap-highlight-color: transparent;
+	}
+}
+
+/* Android safe areas (edge-to-edge) and on-screen keyboard (visualViewport sets --kb). */
+.pad-safe-top {
+	padding-top: env(safe-area-inset-top);
+}
+.pad-safe-bottom {
+	padding-bottom: calc(env(safe-area-inset-bottom) + var(--kb, 0px));
+}
+.pad-safe-x {
+	padding-left: max(0.75rem, env(safe-area-inset-left));
+	padding-right: max(0.75rem, env(safe-area-inset-right));
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* {
+		transition-duration: 0.01ms !important;
+		animation-duration: 0.01ms !important;
+	}
+}
