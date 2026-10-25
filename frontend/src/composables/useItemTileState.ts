@@ -99,6 +99,6 @@ export const STOCK_TONE_CLASS = {
 /** Column template shared by the dense list rows and their header. */
 export function itemRowGrid(withThumb: boolean): string {
 	return withThumb
-		? "grid-cols-[2.25rem_minmax(0,1fr)_auto_6.5rem] xl:grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,12rem)_auto_7rem]"
-		: "grid-cols-[minmax(0,1fr)_auto_6.5rem] xl:grid-cols-[minmax(0,1fr)_minmax(0,12rem)_auto_7rem]";
+		? "grid-cols-[2.25rem_minmax(0,1fr)_7.5rem_6.5rem] xl:grid-cols-[2.25rem_minmax(0,1fr)_minmax(0,12rem)_7.5rem_7rem]"
+		: "grid-cols-[minmax(0,1fr)_7.5rem_6.5rem] xl:grid-cols-[minmax(0,1fr)_minmax(0,12rem)_7.5rem_7rem]";
 }
