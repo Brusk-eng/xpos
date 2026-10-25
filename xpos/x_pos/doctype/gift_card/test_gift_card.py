@@ -48,6 +48,7 @@ def setup_gift_cards(company=COMPANY, profile=PROFILE):
 		{
 			"account_name": "_Test Gift Card Liability",
 			"parent_account": "Current Liabilities - _TC",
+			"account_type": "Bank",
 			"company": COMPANY,
 		},
 	)

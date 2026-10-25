@@ -176,6 +176,7 @@ def setup_gift_cards():
 		{
 			"account_name": "MP Gift Liability",
 			"parent_account": "Current Liabilities - _TC",
+			"account_type": "Bank",
 			"company": COMPANY,
 		},
 	)

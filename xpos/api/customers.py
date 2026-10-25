@@ -93,7 +93,7 @@ def get_customers(search_term: str = "", limit: int = 20, pos_profile: str | Non
 		as_dict=True,
 	)
 
-	customers = [c for c in customers if user_may_see(c.name)]
+	customers = [c for c in customers if user_may_see(c["name"])]
 	if customers:
 		set_pos_price_lists(customers, pos.name)
 
