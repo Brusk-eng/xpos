@@ -176,3 +176,31 @@ describe("posLayout helpers", () => {
 		expect(moveItem(["a", "b"], 5, 0)).toEqual(["a", "b"]);
 	});
 });
+
+describe("posLayout cart tabs placement", () => {
+	it("defaults to the top and accepts only top or bottom, never hidden", () => {
+		expect(builtinLayout().device.phone.cartTabs).toBe("top");
+		const clean = sanitize(
+			{ device: { desktop: { cartTabs: "bottom" }, tablet: { cartTabs: "hidden" } } },
+			policy(),
+		);
+		expect(clean.device.desktop).toEqual({ cartTabs: "bottom" });
+		expect(clean.device.tablet).toBeUndefined();
+	});
+
+	it("follows the profile default when locked and the personal choice otherwise", () => {
+		const personal = sanitize({ device: { desktop: { cartTabs: "bottom" } } }, policy());
+		const defaults = builtinLayout();
+		expect(effectiveLayout(personal, defaults, policy()).device.desktop.cartTabs).toBe("bottom");
+		const locked = { ...policy(), locks: { ...policy().locks, cart_layout: true } };
+		expect(effectiveLayout(personal, defaults, locked).device.desktop.cartTabs).toBe("top");
+	});
+
+	it("stores a change to the placement on the current device only", () => {
+		const before = builtinLayout();
+		const after = JSON.parse(JSON.stringify(before));
+		after.device.tablet.cartTabs = "bottom";
+		const next = personalFromEdit(emptyPersonal(), before, after, "tablet", policy());
+		expect(next.device).toEqual({ tablet: { cartTabs: "bottom" } });
+	});
+});

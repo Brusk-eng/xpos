@@ -210,6 +210,28 @@
 							{{ side === "left" ? __("Start") : __("End") }}
 						</Button>
 					</div>
+					<p class="mt-2 text-xs text-muted-foreground">
+						{{ __("Open carts bar on small screens") }}
+					</p>
+					<div
+						class="mt-1 grid grid-cols-2 gap-1.5"
+						role="radiogroup"
+						:aria-label="__('Open carts bar')"
+						data-testid="cz-cart-tabs"
+					>
+						<Button
+							v-for="place in CART_TAB_PLACEMENTS"
+							:key="place"
+							:variant="draft.device[deviceClass].cartTabs === place ? 'default' : 'outline'"
+							size="sm"
+							role="radio"
+							:aria-checked="draft.device[deviceClass].cartTabs === place"
+							:data-testid="`cart-tabs-${place}`"
+							@click="draft!.device[deviceClass].cartTabs = place"
+						>
+							{{ place === "top" ? __("Top") : __("Bottom") }}
+						</Button>
+					</div>
 					<div class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
 						<span class="shrink-0">{{ __("Width (px)") }}</span>
 						<NumberInput
@@ -313,7 +335,7 @@ import { NumberInput } from "@/components/ui/number-input";
 import { Select } from "@/components/ui/select";
 import ReorderList from "@/components/core/ReorderList.vue";
 import { call } from "@/services/api";
-import { CART_SIDES, DENSITIES, VIEWS, visibleActionCount } from "@/services/posLayout";
+import { CART_SIDES, CART_TAB_PLACEMENTS, DENSITIES, VIEWS, visibleActionCount } from "@/services/posLayout";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useItemStore } from "@/stores/itemStore";
 import { usePosStore } from "@/stores/posStore";

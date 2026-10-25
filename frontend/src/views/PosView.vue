@@ -1,5 +1,6 @@
 <template>
 	<div class="flex h-full flex-col overflow-hidden">
+		<CartTabs v-if="!tabsInPanel && cartTabsPlacement === 'top'" class="pt-2" placement="top" />
 		<div
 			class="mx-3 mt-2 flex shrink-0 items-center gap-1 rounded-xl border border-border bg-surface-sunken p-1 shadow-inset lg:hidden"
 			role="tablist"
@@ -70,6 +71,7 @@
 				@focusin="activeZone = 'items'"
 				@click="activeZone = 'items'"
 			>
+				<CartTabs v-if="tabsInPanel" class="px-2 pt-2" placement="top" />
 				<div class="shrink-0 space-y-1.5 p-3 pb-1.5">
 					<div class="flex items-center gap-2">
 						<SearchBar
@@ -251,6 +253,7 @@
 				@select-item="handleAddItem"
 			/>
 		</div>
+		<CartTabs v-if="!tabsInPanel && cartTabsPlacement === 'bottom'" class="pb-2" placement="bottom" />
 	</div>
 </template>
 
@@ -260,6 +263,7 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { BarcodeScanError, useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showError, isNetworkError } from "@/services/api";
 import { cacheItemTax, getCachedItemTax } from "@/services/dbBridge";
@@ -278,6 +282,7 @@ import CustomizePanel from "@/components/layout/CustomizePanel.vue";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useAuthStore } from "@/stores/authStore";
 import { deviceClassFor } from "@/services/posLayout";
+import CartTabs from "@/components/cart/CartTabs.vue";
 
 import { useEverTrue } from "@/composables/useEverTrue";
 import type { POSItem } from "@/types/pos.types";
@@ -291,6 +296,7 @@ const posStore = usePosStore();
 const { money } = useMoney();
 const itemStore = useItemStore();
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const offerStore = useOfferStore();
 const layoutStore = useLayoutStore();
 const authStore = useAuthStore();
@@ -349,6 +355,11 @@ const cartWidth = computed({
 	},
 });
 const cartSide = computed(() => layoutStore.device.cartSide);
+
+const tabsInPanel = computed(() => layoutStore.deviceClass === "desktop");
+const cartTabsPlacement = computed(() =>
+	layoutStore.deviceClass === "phone" ? "top" : layoutStore.device.cartTabs,
+);
 
 let rowObserver: ResizeObserver | null = null;
 
@@ -585,8 +596,14 @@ async function onBarcodeScan(barcode: string, fallbackToSearch = false) {
 	if (!barcode) return;
 
 	searchBarRef.value?.setScanning(true);
+	const token = cartStore.captureCart();
 	try {
 		const result = await itemStore.searchByBarcode(barcode, posStore.profileName);
+		if (!cartStore.isCurrentCart(token)) {
+			// The cashier moved to another cart while the lookup ran; it must not land there.
+			showError(__("Scan ignored because the cart changed. Scan it again."));
+			return;
+		}
 		if (result && result.item_code) {
 			const item = {
 				item_code: result.item_code,
@@ -738,7 +755,8 @@ function handleAddItem(item: POSItem) {
 		showError(result.message || __("Cannot add item to cart"));
 		return;
 	}
-	fetchAndApplyItemTax(item);
+	const token = cartStore.captureCart();
+	fetchAndApplyItemTax(item, token.cartId);
 
 	if (posStore.fetchCoupon) {
 		offerStore
@@ -748,6 +766,7 @@ function handleAddItem(item: POSItem) {
 				cartStore.customer?.name || "",
 			)
 			.then((offers) => {
+				if (!cartStore.isCurrentCart(token)) return;
 				if (offers && offers.length > 0) {
 					for (const offer of offers) {
 						if ((offer as Record<string, unknown>).auto) {
@@ -762,7 +781,22 @@ function handleAddItem(item: POSItem) {
 	}
 }
 
-async function fetchAndApplyItemTax(item: POSItem) {
+/** Tax lands on the cart the item was added to, even if the cashier has since switched. */
+function setTaxOn(cartId: string, itemCode: string, template: string, map: Record<string, number>) {
+	if (cartStore.cartId === cartId) {
+		cartStore.setItemTax(itemCode, template, map);
+		return;
+	}
+	cartSessions.applyToCart(cartId, (snapshot) => {
+		const line = snapshot.items.find((i) => i.item_code === itemCode);
+		if (line) {
+			line.item_tax_template = template;
+			line.item_tax_map = map;
+		}
+	});
+}
+
+async function fetchAndApplyItemTax(item: POSItem, cartId: string = cartStore.cartId) {
 	try {
 		const taxData = await call<{
 			item_tax_template: string | null;
@@ -773,7 +807,7 @@ async function fetchAndApplyItemTax(item: POSItem) {
 			tax_category: "",
 		});
 		if (taxData && taxData.item_tax_template) {
-			cartStore.setItemTax(item.item_code, taxData.item_tax_template, taxData.item_tax_map || {});
+			setTaxOn(cartId, item.item_code, taxData.item_tax_template, taxData.item_tax_map || {});
 
 			cacheItemTax(item.item_code, posStore.companyName, {
 				item_tax_template: taxData.item_tax_template,
@@ -785,7 +819,7 @@ async function fetchAndApplyItemTax(item: POSItem) {
 			try {
 				const cached = await getCachedItemTax(item.item_code, posStore.companyName);
 				if (cached && cached.item_tax_template) {
-					cartStore.setItemTax(item.item_code, cached.item_tax_template, cached.item_tax_map || {});
+					setTaxOn(cartId, item.item_code, cached.item_tax_template, cached.item_tax_map || {});
 					return;
 				}
 			} catch {

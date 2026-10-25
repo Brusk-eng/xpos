@@ -281,15 +281,15 @@
 			</PopoverAnchor>
 			<PopoverContentStyled
 				:class="moreView === 'menu' ? 'w-64 p-1.5' : 'w-80 space-y-3'"
-				align="center"
+				:align="moreView === 'menu' ? 'end' : 'center'"
 				side="top"
 				:role="moreView === 'menu' ? 'menu' : undefined"
 				@interact-outside="keepOpenOnActions"
 			>
 				<template v-if="moreView === 'menu'">
-					<template v-for="action in overflowActions" :key="action.id">
+					<template v-for="(action, index) in overflowActions" :key="action.id">
 						<div
-							v-if="action.id === 'clear_cart'"
+							v-if="action.id === 'clear_cart' && index > 0"
 							class="my-1.5 h-px bg-border"
 							role="separator"
 						/>
@@ -416,6 +416,7 @@ import { ref, computed, watch, nextTick, onMounted, onUnmounted, type Component 
 import { usePosStore } from "@/stores/posStore";
 import { hasPermission } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showSuccess, showError, showInfo } from "@/services/api";
 import { __ } from "@/lib/translate";
@@ -458,6 +459,7 @@ import SalesOrderDialog from "@/components/dialogs/SalesOrderDialog.vue";
 const posStore = usePosStore();
 const { money, moneyPrecision, percent } = useMoney();
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const offerStore = useOfferStore();
 const offlineStore = useOfflineStore();
 const { printInvoice } = usePrintInvoice();
@@ -899,7 +901,9 @@ async function syncAutoDeliveryCharge() {
 		return;
 	}
 
+	const token = cartStore.captureCart();
 	const charges = await loadDeliveryCharges();
+	if (!cartStore.isCurrentCart(token)) return;
 	syncSelectedDeliveryCharge(charges);
 }
 
@@ -953,6 +957,7 @@ async function applyCouponCode() {
 	if (!couponInput.value) return;
 	isApplyingCoupon.value = true;
 	couponError.value = "";
+	const token = cartStore.captureCart();
 
 	try {
 		if (offerStore.offers.length === 0) {
@@ -968,6 +973,7 @@ async function applyCouponCode() {
 			cartStore.customer?.name || "",
 			posStore.companyName,
 		);
+		if (!cartStore.isCurrentCart(token)) return;
 		if (cartStore.appliedCoupon) cartStore.removeCoupon();
 		if (result.coupon) {
 			const posOfferName = (result.coupon as Record<string, unknown>).pos_offer as string | undefined;
@@ -1060,12 +1066,13 @@ async function holdOrder() {
 			return;
 		}
 
+		const origin = { cartId: cartStore.cartId, localId: data.local_id };
 		const serverData = { ...data };
 		if (offlineStore.isOnline) {
 			await call("xpos.api.invoices.save_draft_invoice", {
 				data: JSON.stringify(serverData),
 			});
-			cartStore.clearAll();
+			cartSessions.finish(origin);
 			showSuccess(__("Order saved as draft"));
 		} else {
 			await offlineStore.saveOffline(
@@ -1073,7 +1080,7 @@ async function holdOrder() {
 				cartStore.customerName || data.customer,
 				cartStore.grandTotal || 0,
 			);
-			cartStore.clearAll();
+			cartSessions.finish(origin);
 			showSuccess(__("No connection – draft saved offline"));
 		}
 	} catch (error: unknown) {
@@ -1127,6 +1134,7 @@ async function sendToCashier() {
 			return;
 		}
 
+		const origin = { cartId: cartStore.cartId, localId: data.local_id };
 		const serverData = { ...data };
 		if (offlineStore.isOnline) {
 			const result = await call<{ name: string }>("xpos.api.invoices.save_draft_invoice", {
@@ -1135,7 +1143,7 @@ async function sendToCashier() {
 			if (posStore.printBackupReceipt && result?.name) {
 				await printInvoice(result.name);
 			}
-			cartStore.clearAll();
+			cartSessions.finish(origin);
 			showSuccess(__("Sent to cashier"));
 		} else {
 			await offlineStore.saveOffline(
@@ -1143,7 +1151,7 @@ async function sendToCashier() {
 				cartStore.customerName || data.customer,
 				cartStore.grandTotal || 0,
 			);
-			cartStore.clearAll();
+			cartSessions.finish(origin);
 			showSuccess(__("No connection – will sync to cashier when back online"));
 		}
 	} catch (error: unknown) {

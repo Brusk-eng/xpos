@@ -264,9 +264,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
-import { call, showSuccess, showError } from "@/services/api";
+import { call, showSuccess, showError, showInfo } from "@/services/api";
 import {
 	Dialog,
 	DialogContent,
@@ -299,6 +300,7 @@ type Scope = "shift" | "profile";
 type Tab = "tabs" | "unpaid";
 
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const posStore = usePosStore();
 const { money } = useMoney();
 
@@ -415,7 +417,19 @@ async function fetchOutstanding() {
 
 async function selectDraft(draft: OpenTab) {
 	try {
-		const success = await cartStore.loadDraftInvoice(draft.name);
+		const open = cartSessions.findByDraft(draft.name);
+		if (open) {
+			cartSessions.switchTo(open);
+			showInfo(__("That order is already open in a cart."));
+			close();
+			return;
+		}
+		const loadedInto = await cartSessions.loadIntoCart(() => cartStore.loadDraftInvoice(draft.name));
+		if (loadedInto.reason) {
+			showError(loadedInto.reason);
+			return;
+		}
+		const success = loadedInto.loaded;
 		if (success) {
 			showSuccess(__("Draft invoice restored to cart"));
 			close();

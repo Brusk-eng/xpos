@@ -31,6 +31,7 @@ FOOTER_ACTIONS = (
 	"quotation",
 	"clear_cart",
 )
+CART_TABS = ("top", "bottom")
 ROW_ACTIONS = ("uom", "tracking", "item_discount", "remove")
 DISPLAY_FIELDS = ("image", "item_code", "stock", "uom")
 DEFAULT_DISPLAY = ("image", "item_code", "stock")
@@ -67,7 +68,7 @@ def builtin_layout(view: str = "grid", display: list[str] | None = None) -> dict
 			"view": view,
 		},
 		"device": {
-			name: {"density": "comfortable", "cartSide": "right", "cartWidth": None}
+			name: {"density": "comfortable", "cartSide": "right", "cartWidth": None, "cartTabs": "top"}
 			for name in DEVICE_CLASSES
 		},
 	}
@@ -161,6 +162,8 @@ def sanitize(data, policy: dict) -> dict:
 			clean["density"] = entry["density"]
 		if entry.get("cartSide") in CART_SIDES:
 			clean["cartSide"] = entry["cartSide"]
+		if entry.get("cartTabs") in CART_TABS:
+			clean["cartTabs"] = entry["cartTabs"]
 		width = entry.get("cartWidth")
 		if isinstance(width, (int, float)) and not isinstance(width, bool):
 			clean["cartWidth"] = int(min(max(width, CART_WIDTH_RANGE[0]), CART_WIDTH_RANGE[1]))
@@ -225,6 +228,9 @@ def effective_layout(personal: dict, defaults: dict, policy: dict) -> dict:
 			"cartWidth": default["cartWidth"]
 			if locks["cart_layout"]
 			else mine.get("cartWidth", default["cartWidth"]),
+			"cartTabs": default["cartTabs"]
+			if locks["cart_layout"]
+			else mine.get("cartTabs", default["cartTabs"]),
 		}
 	return {"version": SCHEMA_VERSION, "shared": shared, "device": device}
 

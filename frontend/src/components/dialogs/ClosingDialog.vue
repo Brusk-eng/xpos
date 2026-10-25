@@ -256,8 +256,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { useMoney } from "@/composables/useMoney";
-import { showSuccess, showError } from "@/services/api";
+import { showSuccess, showError, showInfo } from "@/services/api";
 import { hasPermission } from "@/services/userRights";
 import { formatFor, precisionFor, roundFor } from "@/composables/useCurrency";
 import type { ShiftModeTotal } from "@/types/pos.types";
@@ -297,6 +298,7 @@ interface ClosingDetail {
 }
 
 const posStore = usePosStore();
+const cartSessions = useCartSessionStore();
 const { money } = useMoney();
 
 const isLoading = ref(true);
@@ -384,6 +386,12 @@ async function handleCloseShift() {
 		showError(__("Only a Supervisor can close a shift."));
 		return;
 	}
+	const unconfirmed = cartSessions.shiftCloseBlocker();
+	if (unconfirmed) {
+		showError(unconfirmed);
+		return;
+	}
+	const unfinished = cartSessions.unfinishedCount();
 	isClosing.value = true;
 
 	try {
@@ -391,6 +399,13 @@ async function handleCloseShift() {
 		closedShiftName.value = result?.name || "";
 		shiftClosed.value = true;
 		showSuccess(__("Shift closed successfully!"));
+		if (unfinished) {
+			showInfo(
+				__("{0} unfinished cart(s) were kept. They are offered again when the next shift opens.", [
+					String(unfinished),
+				]),
+			);
+		}
 	} catch (error: unknown) {
 		showError("Failed to close shift: " + ((error as Error)?.message || error));
 	} finally {

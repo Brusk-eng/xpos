@@ -167,9 +167,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
-import { call } from "@/services/api";
+import { call, showError } from "@/services/api";
 import {
 	Dialog,
 	DialogContent,
@@ -189,6 +190,7 @@ const props = defineProps<{ open: boolean }>();
 const emit = defineEmits<{ (e: "close"): void }>();
 
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const posStore = usePosStore();
 const { money } = useMoney();
 
@@ -307,9 +309,14 @@ async function selectInvoice(invoiceName: string) {
 	}
 }
 
-function processReturn() {
+async function processReturn() {
 	if (!selectedInvoice.value || !hasReturnItems.value) return;
 
+	const prepared = cartSessions.prepareForLoad();
+	if (!prepared.ok) {
+		showError(prepared.reason || "");
+		return;
+	}
 	cartStore.clearCart();
 	const allowedItemCodes = returnItems.value.map((i) => i.item_code);
 	cartStore.enterReturnMode(selectedInvoice.value.name, allowedItemCodes);

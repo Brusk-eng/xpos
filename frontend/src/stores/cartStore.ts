@@ -1,6 +1,6 @@
 import { newInvoiceId } from "@/services/invoiceSubmission";
 import { defineStore } from "pinia";
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import { call } from "@/services/api";
 import { usePosStore } from "./posStore";
 import { useSettingsStore } from "./settingsStore";
@@ -40,6 +40,80 @@ import {
 import type { CartPricingLine, FreeItemLine } from "@/services/pricingEngine";
 import { nowDate, toDateOrNow } from "@/utils/datetime";
 import { debounce, isOnline } from "@/utils";
+
+export interface CartSnapshot {
+	v: 1;
+	cartId: string;
+	localId: string;
+	pricingDirty: boolean;
+	items: CartItem[];
+	selectedCartIndex: number;
+	customer: { name: string; customer_name?: string; [key: string]: unknown } | null;
+	discountPercentage: number;
+	discountAmount: number;
+	ruleDiscountPercentage: number;
+	ruleDiscountAmount: number;
+	customerDiscountPercentage: number;
+	applyDiscountOn: string;
+	appliedOffers: POSOffer[];
+	appliedCoupon: POSCoupon | null;
+	couponCode: string;
+	redeemLoyaltyPoints: boolean;
+	loyaltyPoints: number;
+	loyaltyAmount: number;
+	orderNotes: string;
+	deliveryDate: string;
+	postingDate: string;
+	salesPerson: string;
+	writeOffAmount: number;
+	selectedDeliveryCharge: DeliveryCharge | null;
+	currency: string;
+	conversionRate: number;
+	isReturnMode: boolean;
+	returnAgainst: string;
+	returnItemCodes: string[];
+	returnGiftCards: GiftCardRefund[];
+	giftCardTender: boolean;
+	sourceOrder: { name: string; deposit: number } | null;
+	sourceQuotation: string;
+	currentDraftName: string;
+	currentDraftModified: string;
+	payments: InvoicePayment[];
+	changeLegs: InvoiceChangeLeg[];
+	changeAmount: number;
+	effectivePriceList: string;
+	pricingSource: PricingSource;
+	repriceReview: RepriceResponse | null;
+	offerConflict: boolean;
+}
+
+export interface CartToken {
+	cartId: string;
+	epoch: number;
+}
+
+/** What other open carts hold, so one serial or batch is not promised to two customers. */
+export interface ForeignClaims {
+	serialCart(serial: string): string;
+	batchQty(itemCode: string, batchNo: string): number;
+}
+
+const EMPTY_CLAIMS: ForeignClaims = { serialCart: () => "", batchQty: () => 0 };
+
+export function splitSerials(value: string | undefined): string[] {
+	return (value || "")
+		.split(/[\n,]+/)
+		.map((serial) => serial.trim())
+		.filter(Boolean);
+}
+
+export function newCartId(): string {
+	const rand =
+		typeof crypto !== "undefined" && "randomUUID" in crypto
+			? crypto.randomUUID().replace(/-/g, "")
+			: `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+	return `cart_${rand}`;
+}
 
 let cartRowSeq = 0;
 
@@ -394,13 +468,23 @@ export const useCartStore = defineStore("cart", () => {
 			.map(([item_code, stock_qty]) => ({ item_code, stock_qty }));
 	}
 
+	/** What the other open carts hold. Set by the session store; empty with a single cart. */
+	let foreignClaimsProvider: () => ForeignClaims = () => EMPTY_CLAIMS;
+	function setForeignClaims(provider: (() => ForeignClaims) | null): void {
+		foreignClaimsProvider = provider ?? (() => EMPTY_CLAIMS);
+	}
+
 	function committedStockQty(itemCode: string, batchNo?: string): number {
-		return items.value
-			.filter((i: CartItem) => {
-				if (i.item_code !== itemCode) return false;
-				return batchNo ? i.batch_no === batchNo : true;
-			})
-			.reduce((sum: number, i: CartItem) => sum + stockQtyOf(i), 0);
+		const elsewhere = batchNo ? foreignClaimsProvider().batchQty(itemCode, batchNo) : 0;
+		return (
+			elsewhere +
+			items.value
+				.filter((i: CartItem) => {
+					if (i.item_code !== itemCode) return false;
+					return batchNo ? i.batch_no === batchNo : true;
+				})
+				.reduce((sum: number, i: CartItem) => sum + stockQtyOf(i), 0)
+		);
 	}
 
 	function checkAvailability(
@@ -485,8 +569,15 @@ export const useCartStore = defineStore("cart", () => {
 			return { valid: true, messages: [] };
 		}
 
+		const token = captureCart();
 		const itemCodes = [...new Set(stockItems.map((i: CartItem) => i.item_code))];
 		const freshMap = await fetchAvailability(itemCodes, warehouse, posStore.profileName);
+		if (!isCurrentCart(token)) {
+			return {
+				valid: false,
+				messages: [__("The cart changed while stock was being checked. Try again.")],
+			};
+		}
 
 		if (freshMap.size === 0) {
 			return { valid: true, messages: [] };
@@ -648,9 +739,7 @@ export const useCartStore = defineStore("cart", () => {
 		issuedGiftCards.value = cards;
 	}
 
-	function dismissIssuedGiftCards(): void {
-		issuedGiftCards.value = [];
-	}
+	function dismissIssuedGiftCards(): void {}
 
 	function canAddItemWithDetails(
 		item: POSItem,
@@ -676,6 +765,19 @@ export const useCartStore = defineStore("cart", () => {
 			!returnItemCodes.value.includes(item.item_code)
 		) {
 			return { success: false, message: __("This item is not in the original invoice") };
+		}
+
+		if (!isReturnMode.value) {
+			const taken = splitSerials(serialNo).find((serial) => foreignClaimsProvider().serialCart(serial));
+			if (taken) {
+				return {
+					success: false,
+					message: __("Serial {0} is already in {1}", [
+						taken,
+						foreignClaimsProvider().serialCart(taken),
+					]),
+				};
+			}
 		}
 
 		if (!isReturnMode.value) {
@@ -1067,6 +1169,10 @@ export const useCartStore = defineStore("cart", () => {
 		ruleDiscountAmount.value = 0;
 	}
 
+	/** True while hydrate() assigns a snapshot: its values are already priced, so the watchers stay quiet. */
+	let hydrating = false;
+	/** A repricing was scheduled or in flight when the cart left the screen. */
+	let pricingPending = false;
 	let pricingRequestId = 0;
 
 	/**
@@ -1125,6 +1231,7 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	const schedulePricingRules = debounce(() => {
+		pricingPending = false;
 		applyPricingRules().catch((error) => {
 			console.error("Pricing rule reconciliation failed:", error);
 		});
@@ -1145,7 +1252,11 @@ export const useCartStore = defineStore("cart", () => {
 					)
 					.join("|"),
 			].join("~"),
-		() => schedulePricingRules(),
+		() => {
+			if (hydrating) return;
+			pricingPending = true;
+			schedulePricingRules();
+		},
 	);
 
 	const effectivePriceList = ref("");
@@ -1201,6 +1312,7 @@ export const useCartStore = defineStore("cart", () => {
 				const profilePriced =
 					!key || !cachedCustomerList || cachedCustomerList === posStore.sellingPriceList;
 				const cachedItem = profilePriced ? await getCachedItemByCode(line.item_code) : null;
+				if (requestId !== priceListRequestId) return;
 				if (cachedItem && (line.uom || line.stock_uom) === cachedItem.stock_uom) {
 					line.rate = normalizeItemRate(cachedItem.rate);
 					line.pos_price_unavailable = false;
@@ -1300,7 +1412,11 @@ export const useCartStore = defineStore("cart", () => {
 					.map((i) => `${i.uid}:${i.uom}:${linePriceKey(i)}`)
 					.join("|"),
 			].join("~"),
-		() => scheduleCustomerPriceList(),
+		() => {
+			if (hydrating) return;
+			pricingPending = true;
+			scheduleCustomerPriceList();
+		},
 	);
 
 	function customerDiscountRate(): number {
@@ -1361,7 +1477,10 @@ export const useCartStore = defineStore("cart", () => {
 				discountAmount.value,
 				isReturnMode.value,
 			].join("~"),
-		() => syncCustomerDiscount(),
+		() => {
+			if (hydrating) return;
+			syncCustomerDiscount();
+		},
 	);
 
 	/** Lines checkout must refuse: unresolved prices, and zero-price lines the profile does not allow. */
@@ -1450,8 +1569,22 @@ export const useCartStore = defineStore("cart", () => {
 	});
 
 	/** Everything that stops this sale being paid: pricing issues plus missing serial numbers. */
+	/** Serial numbers this cart shares with another open cart: only one of them can sell it. */
+	const serialConflicts = computed<string[]>(() => {
+		const claims = foreignClaimsProvider();
+		const out: string[] = [];
+		for (const line of items.value) {
+			for (const serial of splitSerials(line.serial_no)) {
+				const cart = claims.serialCart(serial);
+				if (cart) out.push(__("Serial {0} is already in {1}", [serial, cart]));
+			}
+		}
+		return out;
+	});
+
 	const checkoutBlockers = computed<string[]>(() => [
 		...pricingIssues.value,
+		...serialConflicts.value,
 		...pendingRequirements.value.filter((r) => r.blocking).map((r) => r.message),
 	]);
 
@@ -1463,6 +1596,16 @@ export const useCartStore = defineStore("cart", () => {
 		const line = items.value[index];
 		if (!line) return { success: false, message: __("Item not found") };
 		const serials = tracking.serials || [];
+		const taken = serials.find((serial) => foreignClaimsProvider().serialCart(serial));
+		if (taken) {
+			return {
+				success: false,
+				message: __("Serial {0} is already in {1}", [
+					taken,
+					foreignClaimsProvider().serialCart(taken),
+				]),
+			};
+		}
 		const lineQty = Math.abs(line.qty);
 		const needsSerials = !!line.has_serial_no && !line.serial_no;
 		if (needsSerials && serials.length !== lineQty) {
@@ -1560,7 +1703,28 @@ export const useCartStore = defineStore("cart", () => {
 		conversionRate.value = rate;
 	}
 
+	/** Stable identity of the cart on screen. Async work captures it before it awaits. */
+	const cartId = ref(newCartId());
+	/** Bumped whenever the cart's contents are replaced, so a late response can tell it is stale. */
+	const cartEpoch = ref(0);
+
+	function captureCart(): CartToken {
+		return { cartId: cartId.value, epoch: cartEpoch.value };
+	}
+
+	function isCurrentCart(token: CartToken | null | undefined): boolean {
+		return !!token && token.cartId === cartId.value && token.epoch === cartEpoch.value;
+	}
+
+	function invalidateInFlight(): void {
+		cartEpoch.value += 1;
+		pricingRequestId += 1;
+		priceListRequestId += 1;
+		isPricingCart.value = false;
+	}
+
 	function clearCart(): void {
+		invalidateInFlight();
 		invoiceLocalId = "";
 		items.value = [];
 		effectivePriceList.value = "";
@@ -1654,6 +1818,7 @@ export const useCartStore = defineStore("cart", () => {
 			}
 
 			clearCart();
+			const token = captureCart();
 
 			postingDate.value = posStore.allowChangePostingDate
 				? toDateOrNow(result.posting_date)
@@ -1672,10 +1837,12 @@ export const useCartStore = defineStore("cart", () => {
 
 				const { useItemStore } = await import("@/stores/itemStore");
 				const itemStore = useItemStore();
+				if (!isCurrentCart(token)) return false;
 				const inMemoryMap = new Map<string, number>(
 					itemStore.items.map((i: POSItem) => [i.item_code, i.actual_qty ?? 0]),
 				);
 
+				const loaded: CartItem[] = [];
 				for (const item of result.items) {
 					let actualQty: number = inMemoryMap.get(item.item_code) ?? -1;
 
@@ -1693,7 +1860,7 @@ export const useCartStore = defineStore("cart", () => {
 						}
 					}
 
-					items.value.push({
+					loaded.push({
 						uid: nextRowId(),
 						item_code: item.item_code,
 						item_name: item.item_name,
@@ -1719,6 +1886,8 @@ export const useCartStore = defineStore("cart", () => {
 						pos_pricing_rules: parsePricingRules(item.pricing_rules),
 					} as CartItem);
 				}
+				if (!isCurrentCart(token)) return false;
+				items.value.push(...loaded);
 			}
 
 			if (result.additional_discount_percentage) {
@@ -1843,6 +2012,128 @@ export const useCartStore = defineStore("cart", () => {
 	function loadQuotation(quotation: OrderForCart): void {
 		loadOrderLines(quotation);
 		sourceQuotation.value = quotation.name;
+	}
+
+	/** The idempotency identity of this cart's sale, or "" before checkout has started. */
+	function currentLocalId(): string {
+		return invoiceLocalId;
+	}
+
+	/**
+	 * Everything a cart owns, as plain data. An allow-list: computed caches, the one-shot gift
+	 * card codes and dialog flags are deliberately left out.
+	 */
+	function snapshot(): CartSnapshot {
+		const copy = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+		return {
+			v: 1,
+			cartId: cartId.value,
+			localId: invoiceLocalId,
+			pricingDirty: pricingPending || isPricingCart.value,
+			items: copy(items.value),
+			selectedCartIndex: selectedCartIndex.value,
+			customer: copy(customer.value),
+			discountPercentage: discountPercentage.value,
+			discountAmount: discountAmount.value,
+			ruleDiscountPercentage: ruleDiscountPercentage.value,
+			ruleDiscountAmount: ruleDiscountAmount.value,
+			customerDiscountPercentage: customerDiscountPercentage.value,
+			applyDiscountOn: applyDiscountOn.value,
+			appliedOffers: copy(appliedOffers.value),
+			appliedCoupon: copy(appliedCoupon.value),
+			couponCode: couponCode.value,
+			redeemLoyaltyPoints: redeemLoyaltyPoints.value,
+			loyaltyPoints: loyaltyPoints.value,
+			loyaltyAmount: loyaltyAmount.value,
+			orderNotes: orderNotes.value,
+			deliveryDate: deliveryDate.value,
+			postingDate: postingDate.value,
+			salesPerson: salesPerson.value,
+			writeOffAmount: writeOffAmount.value,
+			selectedDeliveryCharge: copy(selectedDeliveryCharge.value),
+			currency: currency.value,
+			conversionRate: conversionRate.value,
+			isReturnMode: isReturnMode.value,
+			returnAgainst: returnAgainst.value,
+			returnItemCodes: copy(returnItemCodes.value),
+			returnGiftCards: copy(returnGiftCards.value),
+			giftCardTender: giftCardTender.value,
+			sourceOrder: copy(sourceOrder.value),
+			sourceQuotation: sourceQuotation.value,
+			currentDraftName: currentDraftName.value,
+			currentDraftModified: currentDraftModified.value,
+			payments: copy(payments.value),
+			changeLegs: copy(changeLegs.value),
+			changeAmount: changeAmount.value,
+			effectivePriceList: effectivePriceList.value,
+			pricingSource: pricingSource.value,
+			repriceReview: copy(repriceReview.value),
+			offerConflict: offerConflict.value,
+		};
+	}
+
+	/** Put a snapshot on screen. Cancels in-flight work for the cart it replaces. */
+	function hydrate(snap: CartSnapshot): void {
+		hydrating = true;
+		invalidateInFlight();
+		cartId.value = snap.cartId;
+		invoiceLocalId = snap.localId || "";
+		items.value = snap.items;
+		selectedCartIndex.value = snap.selectedCartIndex;
+		customer.value = snap.customer;
+		discountPercentage.value = snap.discountPercentage;
+		discountAmount.value = snap.discountAmount;
+		ruleDiscountPercentage.value = snap.ruleDiscountPercentage;
+		ruleDiscountAmount.value = snap.ruleDiscountAmount;
+		customerDiscountPercentage.value = snap.customerDiscountPercentage;
+		applyDiscountOn.value = snap.applyDiscountOn;
+		appliedOffers.value = snap.appliedOffers;
+		appliedCoupon.value = snap.appliedCoupon;
+		couponCode.value = snap.couponCode;
+		redeemLoyaltyPoints.value = snap.redeemLoyaltyPoints;
+		loyaltyPoints.value = snap.loyaltyPoints;
+		loyaltyAmount.value = snap.loyaltyAmount;
+		orderNotes.value = snap.orderNotes;
+		deliveryDate.value = snap.deliveryDate;
+		postingDate.value = snap.postingDate;
+		salesPerson.value = snap.salesPerson;
+		writeOffAmount.value = snap.writeOffAmount;
+		selectedDeliveryCharge.value = snap.selectedDeliveryCharge;
+		currency.value = snap.currency;
+		conversionRate.value = snap.conversionRate;
+		isReturnMode.value = snap.isReturnMode;
+		returnAgainst.value = snap.returnAgainst;
+		returnItemCodes.value = snap.returnItemCodes;
+		returnGiftCards.value = snap.returnGiftCards;
+		giftCardTender.value = snap.giftCardTender;
+		sourceOrder.value = snap.sourceOrder;
+		sourceQuotation.value = snap.sourceQuotation;
+		currentDraftName.value = snap.currentDraftName;
+		currentDraftModified.value = snap.currentDraftModified;
+		payments.value = snap.payments;
+		changeLegs.value = snap.changeLegs;
+		changeAmount.value = snap.changeAmount;
+		effectivePriceList.value = snap.effectivePriceList;
+		pricingSource.value = snap.pricingSource;
+		repriceReview.value = snap.repriceReview;
+		offerConflict.value = snap.offerConflict;
+		showPaymentDialog.value = false;
+		pricingPending = false;
+		// Watchers run before the next tick; once it has passed, real edits count again.
+		void nextTick().then(() => {
+			hydrating = false;
+			if (snap.pricingDirty) {
+				pricingPending = true;
+				schedulePricingRules();
+				scheduleCustomerPriceList();
+			}
+		});
+	}
+
+	/** A cart with a different identity and nothing in it, with the default customer seeded. */
+	function startNewCart(id: string = newCartId()): void {
+		clearAll();
+		cartId.value = id;
 	}
 
 	let invoiceLocalId = "";
@@ -2071,6 +2362,17 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	return {
+		serialCartElsewhere: (serial: string) => foreignClaimsProvider().serialCart(serial),
+		setForeignClaims,
+		serialConflicts,
+		cartId,
+		cartEpoch,
+		captureCart,
+		isCurrentCart,
+		snapshot,
+		hydrate,
+		startNewCart,
+		currentLocalId,
 		items,
 		customer,
 		returnGiftCards,

@@ -82,6 +82,23 @@ class TestRules(unittest.TestCase):
 		self.assertNotIn("rate", clean["shared"])
 		self.assertEqual(clean["device"], {"desktop": {"cartSide": "left", "cartWidth": 900}})
 
+	def test_cart_tabs_placement_is_top_or_bottom_only(self):
+		self.assertEqual(prefs.builtin_layout("grid")["device"]["phone"]["cartTabs"], "top")
+		clean = prefs.sanitize(
+			{"device": {"desktop": {"cartTabs": "bottom"}, "tablet": {"cartTabs": "hidden"}}}, policy()
+		)
+		self.assertEqual(clean["device"], {"desktop": {"cartTabs": "bottom"}})
+
+		defaults = prefs.builtin_layout("grid")
+		open_policy = policy()
+		self.assertEqual(
+			prefs.effective_layout(clean, defaults, open_policy)["device"]["desktop"]["cartTabs"], "bottom"
+		)
+		locked = policy(locks={**open_policy["locks"], "cart_layout": True})
+		self.assertEqual(
+			prefs.effective_layout(clean, defaults, locked)["device"]["desktop"]["cartTabs"], "top"
+		)
+
 	def test_no_prices_stock_or_permissions_survive(self):
 		clean = prefs.sanitize(
 			{"shared": {"pinnedItems": ["A"], "prices": {"A": 1}, "stock": 5, "permissions": ["x"]}},

@@ -313,6 +313,7 @@ import { useOfflineStore } from "@/stores/offlineStore";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { showSuccess, showError } from "@/services/api";
 import { hasPermission } from "@/services/userRights";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -355,6 +356,7 @@ function resolveFiscal(id: number | undefined, recorded: boolean) {
 const posStore = usePosStore();
 const { money } = useMoney();
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 
 onMounted(() => {
 	offlineStore.loadPendingInvoices();
@@ -375,6 +377,8 @@ function isDraft(inv: (typeof offlineStore.pendingInvoices)[number]): boolean {
 }
 
 async function loadToCart(inv: (typeof offlineStore.pendingInvoices)[number]) {
+	// A queued sale is never put back into an editable cart; only held drafts come back.
+	if (!isDraft(inv)) return;
 	try {
 		const data = inv.data as {
 			customer: string;
@@ -393,11 +397,17 @@ async function loadToCart(inv: (typeof offlineStore.pendingInvoices)[number]) {
 				batch_no?: string;
 			}>;
 		};
-		cartStore.loadFromInvoice({
-			customer: data.customer,
-			customer_name: data.customer_name || data.customer,
-			items: data.items || [],
-		});
+		const target = await cartSessions.loadIntoCart(() =>
+			cartStore.loadFromInvoice({
+				customer: data.customer,
+				customer_name: data.customer_name || data.customer,
+				items: data.items || [],
+			}),
+		);
+		if (!target.ok) {
+			showError(target.reason || "");
+			return;
+		}
 		if (inv.id) await offlineStore.consumePending(inv.id);
 		showSuccess(__("Draft loaded into cart"));
 		emit("close");

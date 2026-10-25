@@ -10,6 +10,7 @@ export const DEVICE_CLASSES = ["desktop", "tablet", "phone"] as const;
 export const DENSITIES = ["compact", "comfortable", "touch"] as const;
 export const VIEWS = ["grid", "list"] as const;
 export const CART_SIDES = ["left", "right"] as const;
+export const CART_TAB_PLACEMENTS = ["top", "bottom"] as const;
 export const CART_WIDTH_RANGE: [number, number] = [320, 900];
 export const MIN_VISIBLE_ACTIONS = 5;
 
@@ -33,6 +34,7 @@ export type DeviceClass = (typeof DEVICE_CLASSES)[number];
 export type Density = (typeof DENSITIES)[number];
 export type ViewMode = (typeof VIEWS)[number];
 export type CartSide = (typeof CART_SIDES)[number];
+export type CartTabPlacement = (typeof CART_TAB_PLACEMENTS)[number];
 export type Section =
 	| "pinned_items"
 	| "favorite_categories"
@@ -73,6 +75,7 @@ export interface DeviceLayout {
 	density: Density;
 	cartSide: CartSide;
 	cartWidth: number | null;
+	cartTabs: CartTabPlacement;
 }
 
 export interface Layout {
@@ -106,7 +109,7 @@ export function defaultPolicy(): LayoutPolicy {
 export function builtinLayout(view: ViewMode = "grid", display?: string[]): Layout {
 	const device = {} as Record<DeviceClass, DeviceLayout>;
 	for (const name of DEVICE_CLASSES)
-		device[name] = { density: "comfortable", cartSide: "right", cartWidth: null };
+		device[name] = { density: "comfortable", cartSide: "right", cartWidth: null, cartTabs: "top" };
 	return {
 		version: SCHEMA_VERSION,
 		shared: {
@@ -211,6 +214,8 @@ export function sanitize(data: unknown, policy: LayoutPolicy): PersonalLayout {
 			clean.density = entry.density as Density;
 		if ((CART_SIDES as readonly unknown[]).includes(entry.cartSide))
 			clean.cartSide = entry.cartSide as CartSide;
+		if ((CART_TAB_PLACEMENTS as readonly unknown[]).includes(entry.cartTabs))
+			clean.cartTabs = entry.cartTabs as CartTabPlacement;
 		if (typeof entry.cartWidth === "number" && Number.isFinite(entry.cartWidth)) {
 			clean.cartWidth = Math.trunc(
 				Math.min(Math.max(entry.cartWidth, CART_WIDTH_RANGE[0]), CART_WIDTH_RANGE[1]),
@@ -272,6 +277,7 @@ export function effectiveLayout(personal: PersonalLayout, defaults: Layout, poli
 			density: locks.view_and_density ? fallback.density : (own.density ?? fallback.density),
 			cartSide: locks.cart_layout ? fallback.cartSide : (own.cartSide ?? fallback.cartSide),
 			cartWidth: locks.cart_layout ? fallback.cartWidth : (own.cartWidth ?? fallback.cartWidth),
+			cartTabs: locks.cart_layout ? fallback.cartTabs : (own.cartTabs ?? fallback.cartTabs),
 		};
 	}
 	return { version: SCHEMA_VERSION, shared, device };
@@ -328,6 +334,7 @@ export function personalFromEdit(
 	if (!locks.cart_layout) {
 		if (was.cartSide !== now.cartSide) entry.cartSide = now.cartSide;
 		if (was.cartWidth !== now.cartWidth && now.cartWidth !== null) entry.cartWidth = now.cartWidth;
+		if (was.cartTabs !== now.cartTabs) entry.cartTabs = now.cartTabs;
 	}
 	if (Object.keys(entry).length) next.device[deviceClass] = entry;
 	return next;

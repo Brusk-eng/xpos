@@ -102,6 +102,7 @@ import { ref, watch, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { usePosStore } from "@/stores/posStore";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { useMoney } from "@/composables/useMoney";
 import { call, showError } from "@/services/api";
 import { extractErrorMessage } from "@/utils";
@@ -129,6 +130,7 @@ interface Row {
 const router = useRouter();
 const posStore = usePosStore();
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const { money, percent } = useMoney();
 
 const tabs: { value: Tab; label: string }[] = [
@@ -199,9 +201,13 @@ async function load(name: string) {
 				? { sales_order: name, pos_profile: posStore.profileName }
 				: { quotation: name, pos_profile: posStore.profileName },
 		);
-		if (cartStore.isReturnMode) cartStore.clearAll();
-		if (isOrder) cartStore.loadSalesOrder(doc);
-		else cartStore.loadQuotation(doc);
+		const target = await cartSessions.loadIntoCart(() =>
+			isOrder ? cartStore.loadSalesOrder(doc) : cartStore.loadQuotation(doc),
+		);
+		if (!target.ok) {
+			showError(target.reason || "");
+			return;
+		}
 		await router.push("/pos");
 	} catch (error: unknown) {
 		showError(extractErrorMessage(error));

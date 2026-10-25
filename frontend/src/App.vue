@@ -109,6 +109,7 @@ import { useRoute } from "vue-router";
 import { Toaster } from "vue-sonner";
 import { usePosStore } from "@/stores/posStore";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useItemStore } from "@/stores/itemStore";
 import { usePaymentStore } from "@/stores/paymentStore";
@@ -133,6 +134,7 @@ const route = useRoute();
 const posStore = usePosStore();
 const { openInvoicePrintView } = usePrintInvoice();
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const customerStore = useCustomerStore();
 const itemStore = useItemStore();
 const paymentStore = usePaymentStore();
@@ -179,6 +181,11 @@ const isFullScreen = computed(() => route.meta.fullScreen === true);
 const showClearCartConfirm = ref(false);
 
 function handleClearCart() {
+	const allowed = cartSessions.canDiscard(cartSessions.activeId);
+	if (!allowed.ok) {
+		showError(allowed.reason || "");
+		return;
+	}
 	if (!cartStore.isEmpty) {
 		showClearCartConfirm.value = true;
 		return;
@@ -340,7 +347,7 @@ function handleSystemThemeChange(e: MediaQueryListEvent) {
 }
 
 function guardUnsavedCart(event: BeforeUnloadEvent) {
-	if (cartStore.isEmpty) return;
+	if (cartSessions.unfinishedCount() === 0) return;
 	event.preventDefault();
 	event.returnValue = "";
 }
@@ -408,14 +415,24 @@ watch(
 	() => posStore.isReady,
 	async (ready, wasReady) => {
 		if (wasReady && !ready) {
+			const saved = cartSessions.onShiftEnded();
 			cartStore.clearAll();
+			await saved;
 		}
 		if (ready && !wasReady) {
+			await cartSessions.sync(true);
 			if (!cartStore.customer && posStore.defaultCustomer) {
 				const customer = await getCustomer(posStore.defaultCustomer);
 				cartStore.setCustomer(customer as any);
 			}
 		}
+	},
+);
+
+watch(
+	() => [posStore.profileName, authStore.userName, posStore.posOpeningShift?.name],
+	() => {
+		if (posStore.isReady) void cartSessions.sync(true);
 	},
 );
 

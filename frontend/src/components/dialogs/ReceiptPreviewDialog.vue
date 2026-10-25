@@ -313,6 +313,7 @@ import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useCartStore } from "@/stores/cartStore";
+import { useCartSessionStore } from "@/stores/cartSessionStore";
 import __ from "@/lib/translate";
 import { ref } from "vue";
 import { Invoice } from "@/types/pos.types";
@@ -331,6 +332,7 @@ const posStore = usePosStore();
 const { openInvoicePrintView } = usePrintInvoice();
 const { money, amount, qty, percent } = useMoney();
 const cartStore = useCartStore();
+const cartSessions = useCartSessionStore();
 const router = useRouter();
 
 const isRepeatLoading = ref(false);
@@ -389,11 +391,17 @@ async function repeatFromOrder(order: Invoice) {
 			return;
 		}
 
-		cartStore.loadFromInvoice({
-			customer: result.customer,
-			customer_name: result.customer_name,
-			items: result.items,
-		});
+		const target = await cartSessions.loadIntoCart(() =>
+			cartStore.loadFromInvoice({
+				customer: result.customer,
+				customer_name: result.customer_name,
+				items: result.items,
+			}),
+		);
+		if (!target.ok) {
+			showError(target.reason || "");
+			return;
+		}
 
 		emit("close");
 		router.push("/pos");
@@ -426,6 +434,11 @@ async function returnFromOrder(order: Invoice) {
 			invoice_name: order.name,
 		});
 
+		const prepared = cartSessions.prepareForLoad();
+		if (!prepared.ok) {
+			showError(prepared.reason || "");
+			return;
+		}
 		cartStore.clearCart();
 		const allowedItemCodes = (details?.items || []).map((i) => i.item_code);
 		cartStore.enterReturnMode(order.name, allowedItemCodes);
