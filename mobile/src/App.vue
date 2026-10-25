@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
-import { Receipt, ShoppingBag, Stethoscope } from "@lucide/vue";
+import { Receipt, ShoppingBag, Stethoscope, UserRound } from "@lucide/vue";
 import { XposLogo } from "@/components/ui/brand";
 import AppBar from "@mobile/ui/AppBar.vue";
 import MobileShell from "@mobile/ui/MobileShell.vue";
@@ -14,6 +14,7 @@ import PaymentSheet from "@mobile/ui/PaymentSheet.vue";
 import ReSignIn from "@mobile/ui/ReSignIn.vue";
 import Sell from "@mobile/screens/Sell.vue";
 import Diagnostics from "@mobile/screens/Diagnostics.vue";
+import Account from "@mobile/screens/Account.vue";
 import Toaster from "@mobile/ui/Toaster.vue";
 import { toastOn } from "@mobile/composables/useToast";
 import { boot, selectTab, useApp, type Tab } from "@mobile/composables/useApp";
@@ -28,6 +29,7 @@ onMounted(async () => {
 const tabs: { id: Tab; label: string; title: string; icon: unknown }[] = [
 	{ id: "sell", label: "Sell", title: "Sell", icon: ShoppingBag },
 	{ id: "sales", label: "Sales", title: "Sales", icon: Receipt },
+	{ id: "account", label: "Account", title: "Account", icon: UserRound },
 	{ id: "diagnostics", label: "Device", title: "Device & storage", icon: Stethoscope },
 ];
 const screen = computed(
@@ -40,7 +42,7 @@ const screen = computed(
 			locked: Unlock,
 			booting: null,
 			unsupported: null,
-			unlocked: { sell: Sell, sales: Sales, diagnostics: Diagnostics }[state.tab],
+			unlocked: { sell: Sell, sales: Sales, account: Account, diagnostics: Diagnostics }[state.tab],
 		})[state.phase],
 );
 </script>

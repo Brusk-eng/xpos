@@ -5,11 +5,14 @@ import json
 
 import frappe
 from frappe import _
+from frappe.permissions import has_user_permission
 from frappe.utils import cint, flt
 
 from xpos.api.profile_rules import resolve_selling_price_list
 from xpos.api.profiles import resolve_pos_profile
 from xpos.utils import read_latest_on_lock, row_value
+
+MAX_CUSTOMER_SEARCH = 50
 
 
 def allowed_customer_groups(pos) -> list[str]:
@@ -18,6 +21,11 @@ def allowed_customer_groups(pos) -> list[str]:
 	for row in pos.get("customer_groups") or []:
 		groups.update(get_child_groups("Customer Group", row_value(row, "customer_group")))
 	return sorted(groups)
+
+
+def user_may_see(customer: str) -> bool:
+	"""Whether the caller's User Permissions allow this customer, whatever their role permissions say."""
+	return has_user_permission(frappe.get_cached_doc("Customer", customer))
 
 
 def require_customer_access(customer: str, ptype: str = "read", pos_profile: str | None = None) -> None:
@@ -31,6 +39,10 @@ def require_customer_access(customer: str, ptype: str = "read", pos_profile: str
 		frappe.throw(
 			_("You are not permitted to access customer {0}.").format(customer), frappe.PermissionError
 		)
+	if not user_may_see(customer):
+		frappe.throw(
+			_("You are not permitted to access customer {0}.").format(customer), frappe.PermissionError
+		)
 
 
 @frappe.whitelist()
@@ -38,7 +50,7 @@ def get_customers(search_term: str = "", limit: int = 20, pos_profile: str | Non
 	"""Search customers by name, mobile, email, or tax ID within the POS Profile's customer groups."""
 	pos = resolve_pos_profile(pos_profile)
 	conditions = "c.disabled = 0"
-	values = {"limit": cint(limit)}
+	values = {"limit": min(max(cint(limit), 1), MAX_CUSTOMER_SEARCH)}
 
 	allowed_groups = allowed_customer_groups(pos)
 	if allowed_groups:
@@ -81,6 +93,7 @@ def get_customers(search_term: str = "", limit: int = 20, pos_profile: str | Non
 		as_dict=True,
 	)
 
+	customers = [c for c in customers if user_may_see(c.name)]
 	if customers:
 		set_pos_price_lists(customers, pos.name)
 
@@ -241,6 +254,16 @@ def create_customer(
 
 	if not territory:
 		territory = frappe.db.get_single_value("Selling Settings", "territory") or "All Territories"
+
+	if pos_profile:
+		allowed = allowed_customer_groups(resolve_pos_profile(pos_profile))
+		if allowed and customer_group not in allowed:
+			frappe.throw(
+				_("Customer group {0} is not allowed on POS Profile {1}.").format(
+					customer_group, pos_profile
+				),
+				frappe.PermissionError,
+			)
 
 	customer = frappe.get_doc(
 		{
@@ -407,6 +430,14 @@ def update_customer(customer: str, data: str | dict, pos_profile: str | None = N
 		"tax_id",
 	]
 
+	if data.get("customer_group") and data["customer_group"] != doc.customer_group:
+		allowed = allowed_customer_groups(resolve_pos_profile(pos_profile))
+		if allowed and data["customer_group"] not in allowed:
+			frappe.throw(
+				_("Customer group {0} is not allowed on this POS Profile.").format(data["customer_group"]),
+				frappe.PermissionError,
+			)
+
 	for field in updatable_fields:
 		if field in data:
 			doc.set(field, data[field])
@@ -427,6 +458,117 @@ def update_customer(customer: str, data: str | dict, pos_profile: str | None = N
 		"mobile_no": doc.mobile_no,
 		"email_id": doc.email_id,
 	}
+
+
+SEARCH_FIELDS = ("name", "customer_name", "mobile_no", "email_id", "tax_id")
+
+
+def customer_summary(row, pos) -> dict:
+	"""What a cashier needs to sell to a customer; the price list is the one this profile resolves for them."""
+	return {
+		"name": row.name,
+		"customer_name": row.customer_name,
+		"mobile_no": row.mobile_no,
+		"customer_group": row.customer_group,
+		"discount": flt(row.get("discount")),
+		"price_list": resolve_selling_price_list(pos, row.name),
+	}
+
+
+@frappe.whitelist(methods=["POST"])
+def search_customers_mobile(pos_profile: str, term: str = "", limit: int = 20) -> list[dict]:
+	"""Customers the caller may sell to, matching ``term``; never more than a page.
+
+	Candidates come from the profile's customer groups and are then cut down by the caller's User
+	Permissions, so a customer outside either boundary is never listed.
+	"""
+	pos = resolve_pos_profile(pos_profile)
+	term = (term or "").strip()
+	filters = {"disabled": 0}
+	allowed = allowed_customer_groups(pos)
+	if allowed:
+		filters["customer_group"] = ["in", allowed]
+	or_filters = [[field, "like", f"%{term}%"] for field in SEARCH_FIELDS] if term else None
+	rows = frappe.get_all(
+		"Customer",
+		filters=filters,
+		or_filters=or_filters,
+		fields=["name", "customer_name", "mobile_no", "customer_group", "discount"],
+		order_by="customer_name asc",
+		limit=min(max(cint(limit), 1), MAX_CUSTOMER_SEARCH) * 2,
+	)
+	rows = [r for r in rows if user_may_see(r.name)]
+	return [customer_summary(r, pos) for r in rows[: min(max(cint(limit), 1), MAX_CUSTOMER_SEARCH)]]
+
+
+@frappe.whitelist(methods=["POST"])
+def get_customer_for_sale(pos_profile: str, customer: str) -> dict:
+	"""One customer's selling context: summary plus credit limit, balance and loyalty points."""
+	pos = resolve_pos_profile(pos_profile)
+	require_customer_access(customer, "read", pos.name)
+	info = get_customer_info(customer, pos.name)
+	return {
+		**customer_summary(frappe._dict(info), pos),
+		"email_id": info.get("email_id"),
+		"balance": info.get("balance"),
+		"credit_limit": info.get("credit_limit"),
+		"loyalty_points": info.get("loyalty_points"),
+		"loyalty_program": info.get("loyalty_program"),
+	}
+
+
+def can_manage_customers(ptype: str) -> bool:
+	return bool(frappe.has_permission("Customer", ptype))
+
+
+@frappe.whitelist(methods=["POST"])
+def create_customer_mobile(
+	pos_profile: str,
+	customer_name: str,
+	mobile_no: str = "",
+	customer_group: str | None = None,
+	email_id: str = "",
+) -> dict:
+	"""Create a customer from the phone: needs Customer create rights, stays inside the profile's groups.
+
+	A retry returns the customer the same user already created with the same name and mobile number;
+	any other customer on that mobile number is refused.
+	"""
+	pos = resolve_pos_profile(pos_profile)
+	if not can_manage_customers("create"):
+		frappe.throw(_("You are not permitted to create customers."), frappe.PermissionError)
+	mobile_no = (mobile_no or "").strip()
+	if mobile_no:
+		twin = frappe.db.get_value(
+			"Customer",
+			{"mobile_no": mobile_no},
+			["name", "customer_name", "owner"],
+			as_dict=True,
+		)
+		if twin:
+			if twin.owner == frappe.session.user and twin.customer_name == customer_name.strip():
+				return get_customer_for_sale(pos.name, twin.name)
+			frappe.throw(_("A customer with mobile number {0} already exists.").format(mobile_no))
+	created = create_customer(
+		customer_name=customer_name.strip(),
+		mobile_no=mobile_no,
+		email_id=email_id,
+		customer_group=customer_group,
+		pos_profile=pos.name,
+	)
+	return get_customer_for_sale(pos.name, created["name"])
+
+
+@frappe.whitelist(methods=["POST"])
+def update_customer_mobile(pos_profile: str, customer: str, data: str | dict) -> dict:
+	"""Edit name, mobile or email; needs Customer write rights. Group and discount are not editable here."""
+	pos = resolve_pos_profile(pos_profile)
+	data = frappe.parse_json(data) if isinstance(data, str) else data
+	if not can_manage_customers("write"):
+		frappe.throw(_("You are not permitted to edit customers."), frappe.PermissionError)
+	allowed = {key: data[key] for key in ("customer_name", "mobile_no", "email_id") if key in data}
+	update_customer(customer, allowed, pos.name)
+	return get_customer_for_sale(pos.name, customer)
 
 
 @frappe.whitelist()

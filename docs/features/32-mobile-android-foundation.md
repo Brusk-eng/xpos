@@ -30,7 +30,7 @@ yarn test                 # unit tests (catalog download, schema sync, login flo
 yarn build                # writes android/app/src/main/assets/xpos-schema.json (generated, gitignored) and the web build
 ```
 
-Android build (needs JDK 17+ and the Android SDK; neither was available when this was written):
+Android build (needs JDK 21 and the Android SDK Platform 36; see `mobile/README.md` for the verified toolchain):
 
 ```bash
 cd mobile && yarn cap:sync          # build + copy into the Android project

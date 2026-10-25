@@ -1,18 +1,21 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { Banknote, CreditCard, Plus, Trash2, X } from "@lucide/vue";
+import { Banknote, CreditCard, Gift, Plus, Trash2, X } from "@lucide/vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { settleTenders } from "@mobile/app/checkout";
+import { checkGiftCard, takeIssuedCards, type IssuedCard } from "@mobile/app/giftCards";
 import { formatMinor, toMinor } from "@mobile/domain/money";
 import { describeSale, type SaleEvidence, type TenderEvidence } from "@mobile/domain/sale";
-import { useApp } from "@mobile/composables/useApp";
+import { getContainer, useApp } from "@mobile/composables/useApp";
 import { useCheckout } from "@mobile/composables/useCheckout";
-import { toastOn } from "@mobile/composables/useToast";
+import { useCustomer } from "@mobile/composables/useCustomer";
+import { toast, toastOn } from "@mobile/composables/useToast";
 
 const { state } = useApp();
 const { flow, pay, payRepriced, finish, cancel } = useCheckout();
+const { displayName: customerName } = useCustomer();
 toastOn(() => flow.error, "warning");
 const digits = computed(() => state.cashier?.minorDigits ?? 2);
 const currency = computed(() => state.cashier?.currency ?? "");
@@ -23,9 +26,22 @@ interface Row {
 	amount: string;
 	reference: string;
 	confirmed: boolean;
+	/** A gift card tender: token from the live balance check, the card as shown on receipts, its balance. */
+	giftAuth?: string;
+	masked?: string;
+	balanceMinor?: number;
 }
 const rows = ref<Row[]>([]);
-const modes = computed(() => state.context.paymentModes);
+const giftMode = computed(() => state.context.giftCards?.modeOfPayment ?? null);
+/** Ordinary payment methods; the gift card mode is only reachable through a checked card. */
+const modes = computed(() => state.context.paymentModes.filter((m) => m.mode_of_payment !== giftMode.value));
+const canRedeem = computed(
+	() =>
+		flow.kind === "sale" &&
+		!flow.reprice &&
+		!!giftMode.value &&
+		!!state.context.permissions.redeem_gift_card,
+);
 const typeOf = (mode: string) => modes.value.find((m) => m.mode_of_payment === mode)?.type ?? null;
 
 /** Amount due: the new price after a re-price, otherwise ERPNext's quote. */
@@ -45,14 +61,25 @@ watch(
 
 function tenders(): TenderEvidence[] | null {
 	try {
-		return rows.value.map((r) => ({
-			mode: r.mode,
-			type: typeOf(r.mode),
-			amountMinor: toMinor(r.amount || "0", digits.value),
-			reference: r.reference.trim() || undefined,
-			requiresReference: modes.value.find((m) => m.mode_of_payment === r.mode)?.requires_reference,
-			terminalConfirmed: typeOf(r.mode) === "Cash" ? undefined : r.confirmed,
-		}));
+		return rows.value.map((r) =>
+			r.giftAuth
+				? {
+						mode: r.mode,
+						type: "Gift Card",
+						amountMinor: toMinor(r.amount || "0", digits.value),
+						giftCardAuth: r.giftAuth,
+						maskedCard: r.masked,
+					}
+				: {
+						mode: r.mode,
+						type: typeOf(r.mode),
+						amountMinor: toMinor(r.amount || "0", digits.value),
+						reference: r.reference.trim() || undefined,
+						requiresReference: modes.value.find((m) => m.mode_of_payment === r.mode)
+							?.requires_reference,
+						terminalConfirmed: typeOf(r.mode) === "Cash" ? undefined : r.confirmed,
+					},
+		);
 	} catch {
 		return null;
 	}
@@ -60,8 +87,43 @@ function tenders(): TenderEvidence[] | null {
 const check = computed(() => {
 	const t = tenders();
 	if (!t) return { ok: false as const, reason: "Enter amounts as numbers." };
+	for (const [i, r] of rows.value.entries())
+		if (r.giftAuth && t[i].amountMinor > (r.balanceMinor ?? 0))
+			return {
+				ok: false as const,
+				reason: `${r.masked} only has ${money(r.balanceMinor ?? 0)} on it.`,
+			};
 	return settleTenders(due.value, t);
 });
+
+const giftCode = ref("");
+const giftBusy = ref(false);
+async function addGiftCard() {
+	const e = state.cashier;
+	if (!e || !giftCode.value.trim() || !giftMode.value) return;
+	giftBusy.value = true;
+	try {
+		const api = await getContainer().session(e.site);
+		const c = await checkGiftCard(api, e.profile, giftCode.value, e.minorDigits);
+		if (rows.value.some((r) => r.masked === c.maskedCode))
+			return void toast.warning("That card is already on this sale.");
+		const left = Math.max(0, due.value - paid.value);
+		rows.value.push({
+			mode: giftMode.value,
+			amount: money(Math.min(c.balanceMinor, left)),
+			reference: "",
+			confirmed: false,
+			giftAuth: c.auth,
+			masked: c.maskedCode,
+			balanceMinor: c.balanceMinor,
+		});
+		giftCode.value = "";
+	} catch (err) {
+		toast.warning(err instanceof Error ? err.message : "The gift card could not be checked.");
+	} finally {
+		giftBusy.value = false;
+	}
+}
 const paid = computed(() => {
 	const t = tenders();
 	return t ? t.reduce((s, x) => s + x.amountMinor, 0) : 0;
@@ -84,6 +146,31 @@ async function submit() {
 	if (flow.reprice && flow.sale) await payRepriced(flow.sale, t);
 	else await pay(t);
 }
+
+/** Codes of cards just sold: held in memory only, shown here once. */
+const issued = ref<IssuedCard[]>([]);
+const codesSeen = ref(false);
+watch(
+	() => flow.sale?.txnId,
+	() => {
+		issued.value = [];
+		codesSeen.value = false;
+	},
+);
+watch(
+	() => [flow.sale?.status, flow.sale?.txnId] as const,
+	([status, id]) => {
+		if (id && status === "posted" && !issued.value.length) issued.value = takeIssuedCards(id);
+	},
+	{ immediate: true },
+);
+const redeemed = computed<{ masked_code: string; balance_after: number; amount: number }[]>(() => {
+	try {
+		return flow.sale?.serverJson ? (JSON.parse(flow.sale.serverJson).gift_cards ?? []) : [];
+	} catch {
+		return [];
+	}
+});
 
 const evidence = computed<SaleEvidence | null>(() => (flow.sale ? JSON.parse(flow.sale.evidenceJson) : null));
 const open = computed(() => flow.step !== "idle");
@@ -148,10 +235,22 @@ const problem = computed(
 					v-if="flow.quote && !flow.reprice"
 					class="grid grid-cols-[1fr_auto] gap-x-4 gap-y-0.5 text-sm tabular-nums"
 				>
+					<dt class="text-muted-foreground">Customer</dt>
+					<dd class="truncate">{{ customerName }}</dd>
 					<dt class="text-muted-foreground">Items</dt>
 					<dd>{{ money(flow.quote.netMinor) }}</dd>
-					<dt class="text-muted-foreground">Taxes</dt>
-					<dd>{{ money(flow.quote.taxMinor) }}</dd>
+					<template v-if="flow.quote.discountMinor">
+						<dt class="text-muted-foreground">Discount</dt>
+						<dd>-{{ money(flow.quote.discountMinor) }}</dd>
+					</template>
+					<template v-if="flow.quote.taxMinor">
+						<dt class="text-muted-foreground">Taxes</dt>
+						<dd>{{ money(flow.quote.taxMinor) }}</dd>
+					</template>
+					<template v-if="flow.quote.loyaltyMinor">
+						<dt class="text-muted-foreground">Loyalty points</dt>
+						<dd>-{{ money(flow.quote.loyaltyMinor) }}</dd>
+					</template>
 				</dl>
 				<div class="flex items-baseline justify-between">
 					<span class="text-lg font-bold">Amount due</span>
@@ -166,7 +265,30 @@ const problem = computed(
 						:key="i"
 						class="rounded-xl border border-border bg-surface-raised p-2.5 shadow-raised"
 					>
-						<div class="flex items-center gap-2">
+						<div v-if="r.giftAuth" class="flex items-center gap-2">
+							<Gift class="size-5 shrink-0 text-primary" aria-hidden="true" />
+							<div class="min-w-0 flex-1">
+								<p class="truncate text-sm font-semibold">Gift card {{ r.masked }}</p>
+								<p class="text-xs text-muted-foreground tabular-nums">
+									Balance {{ money(r.balanceMinor ?? 0) }}
+								</p>
+							</div>
+							<Input
+								v-model="r.amount"
+								inputmode="decimal"
+								class="h-11 w-28 text-end text-base tabular-nums"
+								:aria-label="`Amount ${i + 1}`"
+							/>
+							<Button
+								variant="ghost"
+								size="icon"
+								class="size-11"
+								aria-label="Remove gift card"
+								@click="rows.splice(i, 1)"
+								><Trash2
+							/></Button>
+						</div>
+						<div v-else class="flex items-center gap-2">
 							<component
 								:is="typeOf(r.mode) === 'Cash' ? Banknote : CreditCard"
 								class="size-5 shrink-0 text-primary"
@@ -201,7 +323,7 @@ const problem = computed(
 								><Trash2
 							/></Button>
 						</div>
-						<div v-if="typeOf(r.mode) !== 'Cash'" class="mt-2 space-y-2">
+						<div v-if="!r.giftAuth && typeOf(r.mode) !== 'Cash'" class="mt-2 space-y-2">
 							<Input
 								v-model="r.reference"
 								class="h-11 text-base"
@@ -223,6 +345,27 @@ const problem = computed(
 				<Button v-if="modes.length > 1" variant="outline" class="h-11" @click="addRow"
 					><Plus /> Add payment</Button
 				>
+				<form v-if="canRedeem" class="space-y-2" @submit.prevent="addGiftCard">
+					<label class="text-sm font-medium" for="gift-code">Pay with a gift card</label>
+					<div class="flex gap-2">
+						<Input
+							id="gift-code"
+							v-model="giftCode"
+							class="h-11 text-base"
+							autocomplete="off"
+							autocapitalize="characters"
+							placeholder="Gift card code"
+						/>
+						<Button
+							type="submit"
+							variant="outline"
+							class="h-11"
+							:loading="giftBusy"
+							:disabled="!giftCode.trim()"
+							>Check</Button
+						>
+					</div>
+				</form>
 
 				<p v-if="check.ok && check.changeMinor > 0" class="text-sm font-semibold tabular-nums">
 					Change: {{ currency }} {{ money(check.changeMinor) }}

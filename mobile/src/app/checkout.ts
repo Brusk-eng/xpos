@@ -1,6 +1,7 @@
 /**
  * Connected checkout against ERPNext, using the existing authorized XPOS sale API:
- *   quote_sale (xpos.api.mobile)      what ERPNext would charge: prices, taxes, amount to collect (read-only)
+ *   quote_sale (xpos.api.mobile_quote) what ERPNext would charge this customer: prices, promotions, discounts,
+ *                                      taxes, amount to collect (read-only; uses the web POS's own engines)
  *   create_invoice (xpos.api.invoices) creates the invoice; idempotent on local_id, re-prices on save and refuses
  *                                      to continue when rates moved (reply status "reprice_required")
  *
@@ -11,37 +12,56 @@
 import type { ApiTransport, TransactionStore } from "@mobile/ports";
 import { OfflineError, ServerError, SessionExpiredError } from "@mobile/adapters/frappeHttp";
 import { fromRate } from "@mobile/domain/money";
+import { holdIssuedCards, withoutCodes } from "./giftCards";
 import {
 	buildInvoiceBody,
 	OPEN_STATUSES,
 	receiptLines,
 	type CartLineInput,
+	type PricedLine,
 	type SaleContext,
 	type SaleEvidence,
+	type SaleExtras,
 	type SaleRecord,
 	type SaleStatus,
 	type TenderEvidence,
 } from "@mobile/domain/sale";
 
-export interface QuoteLine {
-	rowId: string;
-	itemCode: string;
-	rate: number;
-	itemTaxTemplate: string | null;
+export interface QuoteLine extends PricedLine {
+	manualDiscountPct: number;
+	rateOverridden: boolean;
 }
 
 export interface Quote {
+	/** Identifies the exact inputs this quote priced; a different one means the quote is stale. */
+	quoteId: string;
+	customer: string;
 	payableMinor: number;
 	netMinor: number;
 	taxMinor: number;
 	grandMinor: number;
+	/** Invoice-level discount (customer discount, coupons, manual) in minor units. */
+	discountMinor: number;
+	loyaltyMinor: number;
 	lines: QuoteLine[];
 	priceList: string | null;
+	extras: SaleExtras;
+	couponCodes: string[];
+	/** Offers that match but that mobile does not apply (nothing is charged wrongly because of them). */
+	notices: string[];
 }
+
+export type QuoteErrorCode =
+	| "price_unavailable"
+	| "unsupported"
+	| "refused"
+	| "offline"
+	| "session"
+	| "server";
 
 export class QuoteError extends Error {
 	constructor(
-		readonly code: "price_unavailable" | "offline" | "session" | "refused",
+		readonly code: QuoteErrorCode,
 		message: string,
 		readonly items: string[] = [],
 	) {
@@ -50,25 +70,60 @@ export class QuoteError extends Error {
 	}
 }
 
+interface QuoteReplyLine {
+	row_id: string | number;
+	item_code: string;
+	uom: string;
+	rate: number | null;
+	price_list_rate?: number;
+	send_rate?: number;
+	send_discount_percentage?: number;
+	send_discount_amount?: number;
+	amount?: number;
+	discount_pct?: number;
+	pricing_rules?: string | null;
+	manual_discount_pct?: number;
+	rate_overridden?: number;
+	item_tax_template?: string | null;
+}
+
 interface QuoteReply {
+	quote_id: string;
+	customer: string;
 	price_unavailable?: string[];
 	price_list?: string | null;
 	net_total?: number;
 	total_taxes_and_charges?: number;
 	grand_total?: number;
 	payable?: number;
-	lines: {
-		row_id: string | number;
-		item_code: string;
-		rate: number | null;
-		item_tax_template?: string | null;
-	}[];
+	discount_amount?: number;
+	loyalty_amount?: number;
+	unsupported: { row_id: string | number | null; reason: string }[];
+	refusals: { row_id: string | number | null; reason: string }[];
+	notices: { reason: string }[];
+	free_lines?: Record<string, unknown>[];
+	coupons_detail?: Record<string, unknown>[];
+	offers_detail?: Record<string, unknown>[];
+	lines: QuoteReplyLine[];
 }
 
-export async function quoteCart(api: ApiTransport, ctx: SaleContext, lines: CartLineInput[]): Promise<Quote> {
+export interface QuoteExtrasInput {
+	coupons: string[];
+	loyaltyPoints: number;
+	extraDiscountPct: number;
+}
+
+export const NO_QUOTE_EXTRAS: QuoteExtrasInput = { coupons: [], loyaltyPoints: 0, extraDiscountPct: 0 };
+
+export async function quoteCart(
+	api: ApiTransport,
+	ctx: SaleContext,
+	lines: CartLineInput[],
+	extras: QuoteExtrasInput = NO_QUOTE_EXTRAS,
+): Promise<Quote> {
 	let r: QuoteReply;
 	try {
-		r = await api.call<QuoteReply>("xpos.api.mobile.quote_sale", {
+		r = await api.call<QuoteReply>("xpos.api.mobile_quote.quote_sale", {
 			pos_profile: ctx.profile,
 			customer: ctx.customer,
 			items: lines.map((l, i) => ({
@@ -76,14 +131,19 @@ export async function quoteCart(api: ApiTransport, ctx: SaleContext, lines: Cart
 				item_code: l.itemCode,
 				qty: l.qtyMilli / 1000,
 				uom: l.uom,
+				...(l.discountPct ? { discount_percentage: l.discountPct } : {}),
+				...(l.rateOverride !== undefined ? { rate_override: l.rateOverride } : {}),
 			})),
+			coupons: extras.coupons,
+			loyalty_points: extras.loyaltyPoints,
+			additional_discount_percentage: extras.extraDiscountPct,
 		});
 	} catch (e) {
 		if (e instanceof OfflineError)
 			throw new QuoteError("offline", "The server cannot be reached. Checkout needs a connection.");
 		if (e instanceof SessionExpiredError)
 			throw new QuoteError("session", "Your server session has expired. Sign in again to continue.");
-		if (e instanceof ServerError) throw new QuoteError("refused", e.message);
+		if (e instanceof ServerError) throw new QuoteError("server", e.message);
 		throw e;
 	}
 	if (r.price_unavailable?.length)
@@ -92,19 +152,100 @@ export async function quoteCart(api: ApiTransport, ctx: SaleContext, lines: Cart
 			`No price in the price list for: ${r.price_unavailable.join(", ")}. Remove them or ask a manager to add a price.`,
 			r.price_unavailable,
 		);
+	if (r.unsupported.length)
+		throw new QuoteError(
+			"unsupported",
+			`Mobile cannot price this sale correctly yet, so it will not be charged here: ${r.unsupported.map((u) => u.reason).join(" ")} Use the web POS.`,
+		);
+	if (r.refusals.length) throw new QuoteError("refused", r.refusals.map((x) => x.reason).join(" "));
 	const m = (n: number | undefined) => fromRate(Number(n ?? 0), ctx.minorDigits);
+	const byRow = new Map(r.lines.map((l) => [String(l.row_id), l]));
 	return {
+		quoteId: r.quote_id,
+		customer: r.customer,
 		payableMinor: m(r.payable ?? r.grand_total),
 		netMinor: m(r.net_total),
 		taxMinor: m(r.total_taxes_and_charges),
 		grandMinor: m(r.grand_total),
+		discountMinor: m(r.discount_amount),
+		loyaltyMinor: m(r.loyalty_amount),
 		priceList: r.price_list ?? null,
-		lines: r.lines.map((l) => ({
-			rowId: String(l.row_id),
-			itemCode: l.item_code,
-			rate: Number(l.rate),
-			itemTaxTemplate: l.item_tax_template ?? null,
-		})),
+		couponCodes: extras.coupons,
+		notices: r.notices.map((n) => n.reason),
+		extras: {
+			discountAmount: Number(r.discount_amount ?? 0),
+			coupons: r.coupons_detail ?? [],
+			offers: r.offers_detail ?? [],
+			loyaltyPoints: extras.loyaltyPoints,
+			freeLines: r.free_lines ?? [],
+		},
+		lines: lines.map((l, i) => {
+			const q = byRow.get(String(i));
+			if (!q || q.rate === null) throw new QuoteError("server", `The server did not price ${l.name}.`);
+			return {
+				rowId: String(i),
+				itemCode: l.itemCode,
+				name: l.name,
+				uom: q.uom,
+				qtyMilli: l.qtyMilli,
+				rate: Number(q.rate),
+				priceListRate: Number(q.price_list_rate ?? q.rate),
+				sendRate: Number(q.send_rate ?? q.rate),
+				sendDiscountPct: Number(q.send_discount_percentage ?? 0),
+				sendDiscountAmount: Number(q.send_discount_amount ?? 0),
+				amountMinor: m(q.amount),
+				discountPct: Number(q.discount_pct ?? 0),
+				rules: q.pricing_rules ?? null,
+				itemTaxTemplate: q.item_tax_template ?? null,
+				manualDiscountPct: Number(q.manual_discount_pct ?? 0),
+				rateOverridden: !!q.rate_overridden,
+			};
+		}),
+	};
+}
+
+/** The "quote" of a gift card sale: the card's value is the whole amount, with no tax, discount or price list. */
+export function giftCardQuote(
+	customer: string,
+	itemCode: string,
+	valueMinor: number,
+	minorDigits: number,
+): Quote {
+	const rate = valueMinor / 10 ** minorDigits;
+	return {
+		quoteId: `gift-card:${valueMinor}`,
+		customer,
+		payableMinor: valueMinor,
+		netMinor: valueMinor,
+		taxMinor: 0,
+		grandMinor: valueMinor,
+		discountMinor: 0,
+		loyaltyMinor: 0,
+		priceList: null,
+		couponCodes: [],
+		notices: [],
+		extras: { discountAmount: 0, coupons: [], offers: [], loyaltyPoints: 0, freeLines: [] },
+		lines: [
+			{
+				rowId: "0",
+				itemCode,
+				name: "Gift card",
+				uom: "Nos",
+				qtyMilli: 1000,
+				rate,
+				priceListRate: rate,
+				sendRate: rate,
+				sendDiscountPct: 0,
+				sendDiscountAmount: 0,
+				amountMinor: valueMinor,
+				discountPct: 0,
+				rules: null,
+				itemTaxTemplate: null,
+				giftCardIssue: true,
+				manualDiscountPct: 0,
+				rateOverridden: false,
+			},
+		],
 	};
 }
 
@@ -120,7 +261,10 @@ export function settleTenders(
 	const cash = tenders.filter((t) => t.type === "Cash").reduce((s, t) => s + t.amountMinor, 0);
 	if (over > cash)
 		return { ok: false, reason: "Only cash can be over the amount due (that is the change)." };
+	const gift = tenders.filter((t) => t.giftCardAuth).reduce((s, t) => s + t.amountMinor, 0);
+	if (gift > payableMinor) return { ok: false, reason: "A gift card cannot pay more than the amount due." };
 	for (const t of tenders) {
+		if (t.giftCardAuth) continue;
 		if (t.type !== "Cash" && !t.terminalConfirmed)
 			return { ok: false, reason: `Confirm that you saw ${t.mode} approved on the terminal or slip.` };
 		if (t.requiresReference && !t.reference?.trim())
@@ -133,8 +277,8 @@ export interface CaptureInput {
 	txnId: string;
 	scopeId: string;
 	ctx: SaleContext;
+	customerName: string;
 	currency: string;
-	lines: CartLineInput[];
 	quote: Quote;
 	tenders: TenderEvidence[];
 	now?: number;
@@ -152,30 +296,32 @@ export function fiscalPendingMessage(sale: SaleRecord): string {
 	return `Sale ${sale.invoice ?? sale.txnId} is not fiscally complete. Finish it in the web POS before starting another sale.`;
 }
 
-/** Writes the sale durably. Resolves only after the row (with tender/receipt evidence) is committed. */
+/** Writes the sale durably. Resolves only after the row (with tender and receipt evidence) is committed. */
 export async function captureSale(store: TransactionStore, c: CaptureInput): Promise<SaleRecord> {
 	const blocking = await fiscalPendingSale(store, c.scopeId);
 	if (blocking && blocking.txnId !== c.txnId) throw new Error(fiscalPendingMessage(blocking));
+	if (c.quote.customer !== c.ctx.customer)
+		throw new Error("The prices are for a different customer. Charge again to get fresh prices.");
 	const settled = settleTenders(c.quote.payableMinor, c.tenders);
 	if (!settled.ok) throw new Error(settled.reason);
-	const rates = new Map(c.quote.lines.map((q) => [q.rowId, q]));
-	const lines = c.lines.map((l, i) => {
-		const q = rates.get(String(i));
-		if (!q) throw new Error(`The server did not price ${l.name}.`);
-		return { ...l, rate: q.rate, itemTaxTemplate: q.itemTaxTemplate };
-	});
 	const evidence: SaleEvidence = {
 		tenders: c.tenders,
-		lines: receiptLines(c.lines),
+		lines: receiptLines(c.quote.lines, c.ctx.minorDigits),
 		quotedPayableMinor: c.quote.payableMinor,
 		changeMinor: settled.changeMinor,
 		customer: c.ctx.customer,
+		customerName: c.customerName,
+		netMinor: c.quote.netMinor,
+		taxMinor: c.quote.taxMinor,
+		discountMinor: c.quote.discountMinor,
+		loyaltyMinor: c.quote.loyaltyMinor,
+		couponCodes: c.quote.couponCodes,
 		capturedAt: c.now ?? Date.now(),
 	};
 	const { sale } = await store.saveSale({
 		txnId: c.txnId,
 		scopeId: c.scopeId,
-		body: buildInvoiceBody(c.ctx, c.txnId, lines, c.tenders, settled.changeMinor),
+		body: buildInvoiceBody(c.ctx, c.txnId, c.quote.lines, c.tenders, settled.changeMinor, c.quote.extras),
 		currency: c.currency,
 		minorDigits: c.ctx.minorDigits,
 		payableMinor: c.quote.payableMinor,
@@ -236,7 +382,8 @@ export async function sendSale(
 		}
 		throw e;
 	}
-	const serverJson = JSON.stringify(reply);
+	holdIssuedCards(txnId, reply);
+	const serverJson = JSON.stringify(withoutCodes(reply as unknown as Record<string, unknown>));
 	if (reply.status === "reprice_required")
 		return store.updateSale(txnId, {
 			status: "reprice",
@@ -308,13 +455,17 @@ export async function acceptReprice(
 	const settled = settleTenders(rp.payableMinor, tenders);
 	if (!settled.ok) throw new Error(settled.reason);
 	const body = JSON.parse(sale.bodyJson) as {
-		items: { row_id: string; rate: number }[];
+		items: { row_id: string; rate: number; discount_percentage?: number; discount_amount?: number }[];
 		payments: unknown[];
 		change_amount: number;
 	};
 	for (const l of rp.lines) {
 		const it = body.items.find((i) => i.row_id === l.rowId);
-		if (it && l.rate !== null) it.rate = l.rate;
+		if (it && l.rate !== null) {
+			it.rate = l.rate;
+			delete it.discount_percentage;
+			delete it.discount_amount;
+		}
 	}
 	const dec = (m: number) => m / 10 ** minorDigits;
 	body.payments = tenders.map((t) => ({

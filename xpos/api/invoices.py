@@ -592,6 +592,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	if existing:
 		return existing_sale_response(*existing)
 
+	from xpos.api.auth import user_has_pos_permission
+
 	pos_profile = data.get("pos_profile")
 	customer = data.get("customer")
 	items = data.get("items", [])
@@ -611,6 +613,13 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		frappe.throw(_("At least one item is required"))
 
 	pos = resolve_pos_profile(pos_profile)
+
+	if is_return and not (
+		cint(pos.get("allow_return")) and user_has_pos_permission("sale_return", pos_profile=pos.name)
+	):
+		frappe.throw(
+			_("You are not permitted to process returns on this POS Profile."), frappe.PermissionError
+		)
 
 	doctype = get_invoice_type()
 

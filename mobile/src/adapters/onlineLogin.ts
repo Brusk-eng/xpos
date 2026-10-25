@@ -38,6 +38,11 @@ interface BootstrapReply {
 	profiles?: ProfileChoice[];
 	payment_modes?: PaymentMode[];
 	open_shift?: string | null;
+	full_name?: string | null;
+	customer_name?: string | null;
+	can_create_customer?: boolean;
+	can_edit_customer?: boolean;
+	gift_cards?: { mode_of_payment: string; item: string; min_amount: number; max_amount: number } | null;
 	supported: boolean;
 	lease_ttl_seconds: number;
 	issued_at: number;
@@ -122,6 +127,18 @@ export async function fetchBootstrap(
 			leaseTtlSeconds: Math.min(b.lease_ttl_seconds, 24 * 3600),
 			issuedAt: b.issued_at,
 			permissions: b.permissions,
+			fullName: b.full_name ?? null,
+			customerName: b.customer_name ?? null,
+			canCreateCustomer: !!b.can_create_customer,
+			canEditCustomer: !!b.can_edit_customer,
+			giftCards: b.gift_cards
+				? {
+						modeOfPayment: b.gift_cards.mode_of_payment,
+						item: b.gift_cards.item,
+						minAmount: b.gift_cards.min_amount,
+						maxAmount: b.gift_cards.max_amount,
+					}
+				: null,
 		};
 	}
 }

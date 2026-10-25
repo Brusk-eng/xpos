@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
 	acceptReprice,
+	giftCardQuote,
+	type Quote,
 	captureSale,
 	drainPending,
 	quoteCart,
@@ -18,14 +20,48 @@ import { HostSqlite } from "./support/hostSqlite";
 
 const ctx = { profile: "Main", customer: "Walk-in", shift: "SHIFT-1", minorDigits: 2 };
 const lines = [{ itemCode: "A", name: "Apple", uom: "Nos", priceMinor: 1000, qtyMilli: 2000 }];
-const quote = {
+const priced = (qtyMilli = 2000) => ({
+	rowId: "0",
+	itemCode: "A",
+	name: "Apple",
+	uom: "Nos",
+	qtyMilli,
+	rate: 10,
+	priceListRate: 10,
+	sendRate: 10,
+	sendDiscountPct: 0,
+	sendDiscountAmount: 0,
+	amountMinor: (10 * 100 * qtyMilli) / 1000,
+	discountPct: 0,
+	rules: null,
+	itemTaxTemplate: "VAT 5",
+	manualDiscountPct: 0,
+	rateOverridden: false,
+});
+const quote: Quote = {
+	quoteId: "q1",
+	customer: "Walk-in",
 	payableMinor: 2100,
 	netMinor: 2000,
 	taxMinor: 100,
 	grandMinor: 2100,
+	discountMinor: 0,
+	loyaltyMinor: 0,
 	priceList: "Std",
-	lines: [{ rowId: "0", itemCode: "A", rate: 10, itemTaxTemplate: "VAT 5" }],
+	couponCodes: [],
+	notices: [],
+	extras: { discountAmount: 0, coupons: [], offers: [], loyaltyPoints: 0, freeLines: [] },
+	lines: [priced()],
 };
+const reply = (over: Record<string, unknown> = {}) => ({
+	quote_id: "q1",
+	customer: "Walk-in",
+	unsupported: [],
+	refusals: [],
+	notices: [],
+	lines: [],
+	...over,
+});
 const cash = (amountMinor: number): TenderEvidence => ({ mode: "Cash", type: "Cash", amountMinor });
 const card = (amountMinor: number, ok = true): TenderEvidence => ({
 	mode: "Card",
@@ -52,7 +88,15 @@ function api(
 	};
 }
 const input = (store: HostSqlite, txnId = "mob-1", tenders = [cash(2100)]) =>
-	captureSale(store, { txnId, scopeId: "s", ctx, currency: "KWD", lines, quote, tenders });
+	captureSale(store, {
+		txnId,
+		scopeId: "s",
+		ctx,
+		customerName: "Walk-in",
+		currency: "KWD",
+		quote,
+		tenders,
+	});
 
 describe("tender rules", () => {
 	it("needs full cover, only cash may be over, and card needs the cashier's terminal confirmation", () => {
@@ -86,13 +130,23 @@ describe("quote", () => {
 	it("maps the server quote to exact minor units", async () => {
 		const q = await quoteCart(
 			api({
-				quote_sale: () => ({
-					payable: 21,
-					grand_total: 21,
-					net_total: 20,
-					total_taxes_and_charges: 1,
-					lines: [{ row_id: "0", item_code: "A", rate: 10, item_tax_template: "VAT 5" }],
-				}),
+				quote_sale: () =>
+					reply({
+						payable: 21,
+						grand_total: 21,
+						net_total: 20,
+						total_taxes_and_charges: 1,
+						lines: [
+							{
+								row_id: "0",
+								item_code: "A",
+								uom: "Nos",
+								rate: 10,
+								amount: 20,
+								item_tax_template: "VAT 5",
+							},
+						],
+					}),
 			}),
 			ctx,
 			lines,
@@ -100,12 +154,12 @@ describe("quote", () => {
 		expect(q).toMatchObject({
 			payableMinor: 2100,
 			taxMinor: 100,
-			lines: [{ rate: 10, itemTaxTemplate: "VAT 5" }],
+			lines: [{ rate: 10, sendRate: 10, amountMinor: 2000, itemTaxTemplate: "VAT 5" }],
 		});
 	});
 	it("refuses an unavailable price instead of selling for zero", async () => {
 		await expect(
-			quoteCart(api({ quote_sale: () => ({ price_unavailable: ["A"], lines: [] }) }), ctx, lines),
+			quoteCart(api({ quote_sale: () => reply({ price_unavailable: ["A"] }) }), ctx, lines),
 		).rejects.toMatchObject({ code: "price_unavailable" });
 	});
 	it("reports connection loss and session expiry distinctly", async () => {
@@ -139,6 +193,7 @@ describe("capture and send", () => {
 		const ev = JSON.parse(s.evidenceJson);
 		expect(ev.tenders[0].amountMinor).toBe(2100);
 		expect(ev.lines[0].totalMinor).toBe(2000);
+		expect(ev.customerName).toBe("Walk-in");
 	});
 
 	it("posts, records the invoice, and a repeated send never creates a second invoice request once posted", async () => {
@@ -304,9 +359,9 @@ describe("capture and send", () => {
 				txnId: "mob-1",
 				scopeId: "s",
 				ctx,
+				customerName: "Walk-in",
 				currency: "KWD",
-				lines: [{ ...lines[0], qtyMilli: 3000 }],
-				quote,
+				quote: { ...quote, lines: [priced(3000)] },
 				tenders: [cash(2100)],
 			}),
 		).rejects.toBeInstanceOf(SaleConflictError);
@@ -321,8 +376,8 @@ describe("capture and send", () => {
 			txnId: "other",
 			scopeId: "someone-else",
 			ctx,
+			customerName: "Walk-in",
 			currency: "KWD",
-			lines,
 			quote,
 			tenders: [cash(2100)],
 		});

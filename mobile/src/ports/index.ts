@@ -145,6 +145,19 @@ export interface BootstrapInfo extends AuthSession {
 	leaseTtlSeconds: number;
 	issuedAt: number;
 	permissions: Record<string, boolean>;
+	fullName: string | null;
+	customerName: string | null;
+	canCreateCustomer: boolean;
+	canEditCustomer: boolean;
+	/** Gift cards on this profile (the payment mode that spends a card, the item that sells one); null when off. */
+	giftCards: GiftCardConfig | null;
+}
+
+export interface GiftCardConfig {
+	modeOfPayment: string;
+	item: string;
+	minAmount: number;
+	maxAmount: number;
 }
 
 export interface Enrolled {

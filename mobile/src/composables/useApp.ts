@@ -1,11 +1,20 @@
 import { reactive, readonly } from "vue";
-import type { BootstrapInfo, Enrolled, Lifecycle, PaymentMode, ProfileChoice } from "@mobile/ports";
+import type {
+	BootstrapInfo,
+	Enrolled,
+	GiftCardConfig,
+	Lifecycle,
+	PaymentMode,
+	ProfileChoice,
+} from "@mobile/ports";
 import { createContainer, NotAndroidError, type Container } from "@mobile/app/container";
 import { createLifecycle } from "@mobile/app/lifecycle";
 import { CatalogSyncError, syncCatalog, type SyncMeta } from "@mobile/app/catalogSync";
 import { drainPending } from "@mobile/app/checkout";
 import { OfflineError, SessionExpiredError } from "@mobile/adapters/frappeHttp";
 import { fetchBootstrap } from "@mobile/adapters/onlineLogin";
+import { useCart } from "./useCart";
+import { resetSaleCustomer } from "./saleCustomer";
 
 export type Phase =
 	| "booting"
@@ -16,7 +25,7 @@ export type Phase =
 	| "enroll"
 	| "locked"
 	| "unlocked";
-export type Tab = "sell" | "sales" | "diagnostics";
+export type Tab = "sell" | "sales" | "account" | "diagnostics";
 
 const ORIGIN_KEY = "xpos-mobile-origin";
 /** The origin is not a secret; it is the one thing remembered about the server (never the WebView host). */
@@ -52,6 +61,11 @@ export interface SellContext {
 	erpnextVersion: string | null;
 	frappeVersion: string;
 	permissions: Record<string, boolean>;
+	fullName: string | null;
+	customerName: string | null;
+	canCreateCustomer: boolean;
+	canEditCustomer: boolean;
+	giftCards: GiftCardConfig | null;
 }
 
 const emptyContext = (): SellContext => ({
@@ -65,6 +79,11 @@ const emptyContext = (): SellContext => ({
 	erpnextVersion: null,
 	frappeVersion: "",
 	permissions: {},
+	fullName: null,
+	customerName: null,
+	canCreateCustomer: false,
+	canEditCustomer: false,
+	giftCards: null,
 });
 
 const ctxKey = (scopeId: string) => `xpos-mobile-ctx:${scopeId}`;
@@ -238,6 +257,11 @@ function applyBootstrap(scopeId: string, b: BootstrapInfo): void {
 		erpnextVersion: b.erpnextVersion,
 		frappeVersion: b.frappeVersion,
 		permissions: b.permissions,
+		fullName: b.fullName,
+		customerName: b.customerName,
+		canCreateCustomer: b.canCreateCustomer,
+		canEditCustomer: b.canEditCustomer,
+		giftCards: b.giftCards,
 	};
 	lsSet(ctxKey(scopeId), JSON.stringify(state.context));
 }
@@ -383,7 +407,23 @@ export async function chooseProfile(name: string): Promise<void> {
 	}
 	state.phase = "enroll";
 }
+/** A new user or profile starts with an empty sale: nothing of the previous one's cart, customer or choices carries over. */
+function clearSale(): void {
+	useCart().clear();
+	resetSaleCustomer();
+}
+
+/** Asks for the same user's other POS Profile; the cashier then sets the unlock PIN for it. Sales waiting under the old one stay on the device. */
+export async function switchProfile(name: string): Promise<void> {
+	const e = state.cashier;
+	if (!e || name === e.profile) return;
+	const t = await getContainer().session(e.site);
+	state.pending = await fetchBootstrap(t, e.site, name);
+	state.phase = "enroll";
+}
+
 export async function enrolled(): Promise<void> {
+	clearSale();
 	state.cashier = await getContainer().auth.enrolled();
 	if (state.cashier && state.pending) applyBootstrap(scopeIdFor(state.cashier), state.pending);
 	state.pending = null;
@@ -397,6 +437,7 @@ export async function unlocked(): Promise<void> {
 }
 export async function signOut(): Promise<void> {
 	await getContainer().auth.signOut();
+	clearSale();
 	state.cashier = null;
 	state.catalog = emptyCatalog();
 	state.context = emptyContext();

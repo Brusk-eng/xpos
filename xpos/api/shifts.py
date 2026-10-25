@@ -279,6 +279,23 @@ def open_shift(pos_profile: str, company: str, balance_details: str | list[dict]
 
 	balance_details = json.loads(balance_details) if isinstance(balance_details, str) else balance_details
 
+	if not user_may_use_profile(pos_profile):
+		frappe.throw(
+			_("You are not permitted to open a shift on POS Profile {0}.").format(pos_profile),
+			frappe.PermissionError,
+		)
+
+	# A retry (or a second device) gets the shift that is already open instead of a second one.
+	for open_row in get_open_shift_rows(frappe.session.user):
+		if row_value(open_row, "pos_profile") == pos_profile:
+			data = {
+				"pos_opening_shift": frappe.get_doc(
+					"POS Opening Shift", row_value(open_row, "name")
+				).as_dict()
+			}
+			enrich_shift_data(data, pos_profile)
+			return data
+
 	new_shift = frappe.get_doc(
 		{
 			"doctype": "POS Opening Shift",

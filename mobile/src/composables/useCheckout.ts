@@ -3,6 +3,7 @@ import { OfflineError, SessionExpiredError } from "@mobile/adapters/frappeHttp";
 import {
 	acceptReprice,
 	captureSale,
+	giftCardQuote,
 	fiscalPendingMessage,
 	fiscalPendingSale,
 	quoteCart,
@@ -16,6 +17,8 @@ import {
 import { newSaleId, type SaleRecord, type TenderEvidence } from "@mobile/domain/sale";
 import { bumpSales, getContainer, markSessionExpired, scopeIdFor, settlePending, useApp } from "./useApp";
 import { useCart } from "./useCart";
+import { resetSaleCustomer, saleCustomer } from "./saleCustomer";
+import { currentCustomer, toInput } from "./useQuote";
 
 /**
  * Checkout flow state shared by the cart panel and the payment sheet.
@@ -31,6 +34,8 @@ const flow = reactive({
 	/** Set once the sale is captured: the id never changes for this sale, including retries. */
 	txnId: "",
 	sale: null as SaleRecord | null,
+	/** What this payment is for: a normal sale, or the sale of a gift card. */
+	kind: "sale" as "sale" | "giftcard",
 	reprice: null as Reprice | null,
 	error: "",
 });
@@ -43,19 +48,19 @@ export function useCheckout() {
 		const e = state.cashier!;
 		return {
 			profile: e.profile,
-			customer: state.context.customer ?? "",
+			customer: currentCustomer(),
 			shift: state.context.openShift,
 			minorDigits: e.minorDigits,
 		};
 	}
 
 	/** What blocks charging right now, in plain words (null = can charge). */
-	function blocker(): string | null {
-		if (!cart.lines.length) return "The cart is empty.";
+	function blocker(opts: { ignoreCart?: boolean } = {}): string | null {
+		if (!opts.ignoreCart && !cart.lines.length) return "The cart is empty.";
 		if (state.sessionExpired) return "Sign in again to continue.";
 		if (!state.online)
 			return "Offline: selling is switched off until the device is online, because stock, serial, batch and receipt checks need the server. Saved sales are kept and sent later.";
-		if (!state.context.customer)
+		if (!currentCustomer())
 			return "This POS Profile has no default customer. Set one in ERPNext, then reconnect.";
 		if (!state.context.openShift) return "Open a shift first.";
 		if (!state.context.paymentModes.length) return "This POS Profile has no payment methods.";
@@ -69,6 +74,7 @@ export function useCheckout() {
 			return;
 		}
 		flow.error = "";
+		flow.kind = "sale";
 		flow.step = "quoting";
 		try {
 			const c = getContainer();
@@ -79,7 +85,11 @@ export function useCheckout() {
 				return;
 			}
 			const api = await c.session(state.cashier!.site);
-			flow.quote = await quoteCart(api, context(), cart.lines.map(toInput));
+			flow.quote = await quoteCart(api, context(), cart.lines.map(toInput), {
+				coupons: [...cart.coupons],
+				loyaltyPoints: cart.loyaltyPoints,
+				extraDiscountPct: cart.extraDiscountPct,
+			});
 			flow.step = "paying";
 		} catch (e) {
 			flow.step = "idle";
@@ -96,6 +106,22 @@ export function useCheckout() {
 								? e.message
 								: String(e);
 		}
+	}
+
+	/** Sells a gift card: the whole sale is the card's value, paid by an ordinary payment method. */
+	function beginGiftCard(valueMinor: number) {
+		const e = state.cashier!;
+		const cfg = state.context.giftCards;
+		const why = blocker({ ignoreCart: true });
+		if (why || !cfg) {
+			flow.error = why ?? "Gift cards are not set up on this POS Profile.";
+			return;
+		}
+		flow.error = "";
+		flow.kind = "giftcard";
+		flow.txnId = "";
+		flow.quote = giftCardQuote(currentCustomer(), cfg.item, valueMinor, e.minorDigits);
+		flow.step = "paying";
 	}
 
 	/** Captures the sale durably, then sends it. Resolves when ERPNext answered or the problem is recorded. */
@@ -117,13 +143,20 @@ export function useCheckout() {
 				txnId: flow.txnId,
 				scopeId: scopeIdFor(e),
 				ctx: context(),
+				customerName:
+					saleCustomer.customer?.customerName ?? state.context.customerName ?? currentCustomer(),
 				currency: e.currency,
-				lines: cart.lines.map(toInput),
 				quote: q,
 				tenders,
 			});
 			// The sale is safe on the device from here on: release the cart, then talk to the server.
-			cart.lines = [];
+			if (flow.kind === "sale") {
+				cart.lines = [];
+				cart.coupons = [];
+				cart.loyaltyPoints = 0;
+				cart.extraDiscountPct = 0;
+				resetSaleCustomer();
+			}
 			bumpSales();
 			const api = await c.session(e.site);
 			flow.sale = await sendSale(c.transactions, api, sale.txnId);
@@ -171,6 +204,7 @@ export function useCheckout() {
 	}
 
 	function finish() {
+		flow.kind = "sale";
 		flow.step = "idle";
 		flow.quote = null;
 		flow.txnId = "";
@@ -189,9 +223,5 @@ export function useCheckout() {
 		} else if (flow.sale) finish();
 	}
 
-	return { flow, blocker, begin, pay, payRepriced, reviewReprice, finish, cancel };
-}
-
-function toInput(l: ReturnType<typeof useCart>["cart"]["lines"][number]) {
-	return { itemCode: l.itemCode, name: l.name, uom: l.uom, priceMinor: l.priceMinor, qtyMilli: l.qtyMilli };
+	return { flow, blocker, begin, beginGiftCard, pay, payRepriced, reviewReprice, finish, cancel };
 }

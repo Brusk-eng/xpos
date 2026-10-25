@@ -4,7 +4,7 @@
  * evidence until a manager has reconciled anything the server refused.
  */
 import { canonicalJson, sha256Hex } from "./txn";
-import { formatMinor, lineTotalMinor } from "./money";
+import { formatMinor, fromRate } from "./money";
 
 export type SaleStatus =
 	/** Saved on the device, not yet sent. */
@@ -44,6 +44,8 @@ export interface TenderEvidence {
 	terminalConfirmed?: boolean;
 	/** The mode needs a reference (company setting); ERPNext enforces the same rule when posting. */
 	requiresReference?: boolean;
+	giftCardAuth?: string;
+	maskedCard?: string;
 }
 
 export interface ReceiptLine {
@@ -53,6 +55,7 @@ export interface ReceiptLine {
 	priceMinor: number;
 	qtyMilli: number;
 	totalMinor: number;
+	discountPct: number;
 }
 
 export interface SaleEvidence {
@@ -62,6 +65,12 @@ export interface SaleEvidence {
 	quotedPayableMinor: number;
 	changeMinor: number;
 	customer: string;
+	customerName: string;
+	netMinor: number;
+	taxMinor: number;
+	discountMinor: number;
+	loyaltyMinor: number;
+	couponCodes: string[];
 	capturedAt: number;
 }
 
@@ -153,7 +162,48 @@ export interface CartLineInput {
 	uom: string;
 	priceMinor: number;
 	qtyMilli: number;
+	discountPct?: number;
+	rateOverride?: number;
 }
+
+/** A cart line as the server priced it. The server also says exactly what the sale must carry for it. */
+export interface PricedLine {
+	rowId: string;
+	itemCode: string;
+	name: string;
+	uom: string;
+	qtyMilli: number;
+	/** Net unit rate after promotions and manual discounts (decimal). */
+	rate: number;
+	priceListRate: number;
+	sendRate: number;
+	sendDiscountPct: number;
+	sendDiscountAmount: number;
+	amountMinor: number;
+	discountPct: number;
+	rules: string | null;
+	itemTaxTemplate: string | null;
+	/** This line sells a gift card of `sendRate`: the server issues the card; it is never priced from a price list. */
+	giftCardIssue?: boolean;
+}
+
+export interface SaleExtras {
+	/** Invoice-level discount in currency units (customer discount, coupons, manual). */
+	discountAmount: number;
+	coupons: Record<string, unknown>[];
+	offers: Record<string, unknown>[];
+	loyaltyPoints: number;
+	/** Free items a pricing rule gave, passed back exactly as the server returned them. */
+	freeLines: Record<string, unknown>[];
+}
+
+export const NO_EXTRAS: SaleExtras = {
+	discountAmount: 0,
+	coupons: [],
+	offers: [],
+	loyaltyPoints: 0,
+	freeLines: [],
+};
 
 export interface SaleContext {
 	profile: string;
@@ -162,46 +212,62 @@ export interface SaleContext {
 	minorDigits: number;
 }
 
-/** The create_invoice payload. `rate` is what the cashier was quoted; ERPNext re-prices and refuses to guess. */
+/** The create_invoice payload. ERPNext re-prices on save and refuses to continue when a rate moved. */
 export function buildInvoiceBody(
 	ctx: SaleContext,
 	txnId: string,
-	lines: (CartLineInput & { rate: number; itemTaxTemplate?: string | null })[],
+	lines: PricedLine[],
 	tenders: TenderEvidence[],
 	changeMinor: number,
+	extras: SaleExtras = NO_EXTRAS,
 ): Record<string, unknown> {
 	const dec = (m: number) => Number(formatMinor(m, ctx.minorDigits));
+	const items: Record<string, unknown>[] = lines.map((l, i) => ({
+		row_id: String(i),
+		item_code: l.itemCode,
+		item_name: l.name,
+		qty: l.qtyMilli / 1000,
+		uom: l.uom,
+		rate: l.sendRate,
+		...(l.giftCardIssue ? { gift_card_issue: 1 } : {}),
+		...(l.sendDiscountPct ? { discount_percentage: l.sendDiscountPct } : {}),
+		...(l.sendDiscountAmount ? { discount_amount: l.sendDiscountAmount } : {}),
+		...(l.itemTaxTemplate ? { item_tax_template: l.itemTaxTemplate } : {}),
+	}));
+	extras.freeLines.forEach((f, i) =>
+		items.push({ ...f, row_id: `free-${i}`, is_free_item: 1, uom: f.uom ?? f.stock_uom }),
+	);
 	return {
 		local_id: txnId,
 		pos_profile: ctx.profile,
 		customer: ctx.customer,
 		pos_opening_shift: ctx.shift,
-		items: lines.map((l, i) => ({
-			row_id: String(i),
-			item_code: l.itemCode,
-			item_name: l.name,
-			qty: l.qtyMilli / 1000,
-			uom: l.uom,
-			rate: l.rate,
-			...(l.itemTaxTemplate ? { item_tax_template: l.itemTaxTemplate } : {}),
-		})),
+		items,
 		payments: tenders.map((t) => ({
 			mode_of_payment: t.mode,
 			amount: dec(t.amountMinor),
 			...(t.reference ? { reference_no: t.reference } : {}),
+			...(t.giftCardAuth ? { gift_card_auth: t.giftCardAuth } : {}),
 		})),
 		change_amount: dec(changeMinor),
+		...(extras.discountAmount
+			? { discount_amount: extras.discountAmount, apply_discount_on: "Grand Total" }
+			: {}),
+		...(extras.coupons.length ? { coupons_detail: extras.coupons } : {}),
+		...(extras.offers.length ? { offers_detail: extras.offers } : {}),
+		...(extras.loyaltyPoints ? { redeem_loyalty_points: 1, loyalty_points: extras.loyaltyPoints } : {}),
 	};
 }
 
-export function receiptLines(lines: CartLineInput[]): ReceiptLine[] {
+export function receiptLines(lines: PricedLine[], minorDigits: number): ReceiptLine[] {
 	return lines.map((l) => ({
 		itemCode: l.itemCode,
 		name: l.name,
 		uom: l.uom,
-		priceMinor: l.priceMinor,
+		priceMinor: fromRate(l.rate, minorDigits),
 		qtyMilli: l.qtyMilli,
-		totalMinor: lineTotalMinor(l.priceMinor, l.qtyMilli),
+		totalMinor: l.amountMinor,
+		discountPct: l.discountPct,
 	}));
 }
 

@@ -14,16 +14,13 @@ from decimal import Decimal
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, nowdate
 
 from xpos.api.auth import get_my_pos_permissions
-from xpos.api.customers import require_customer_access
-from xpos.api.profile_rules import check_zero_payable, get_line_rate, resolve_selling_price_list
+from xpos.api.customers import can_manage_customers
 from xpos.api.profiles import resolve_pos_profile
 from xpos.api.shifts import get_open_shift_rows
-from xpos.api.taxes import get_item_tax_template
-from xpos.api.utilities import get_invoice_type
 from xpos.x_pos.doctype.pos_closing_shift.closing_processing.reclass import reference_required_modes
+from xpos.x_pos.gift_cards import gift_card_config
 
 SUPPORTED_MAJOR = 16
 # Longest the app may accept offline unlock before it must reach the server again.
@@ -127,131 +124,21 @@ def bootstrap(pos_profile: str | None = None) -> dict:
 		"price_list": profile.get("selling_price_list")
 		or frappe.db.get_single_value("Selling Settings", "selling_price_list"),
 		"customer": profile.get("customer"),
+		"customer_name": frappe.get_cached_value("Customer", profile.get("customer"), "customer_name")
+		if profile.get("customer")
+		else None,
+		"can_create_customer": can_manage_customers("create"),
+		"can_edit_customer": can_manage_customers("write"),
 		"profiles": profile_choices(user),
 		"payment_modes": payment_modes_for(profile.name),
 		"open_shift": open_shift_for(user, profile.name),
 		"minor_digits": minor_digits_for(currency),
 		"permissions": get_my_pos_permissions(profile.name),
+		"gift_cards": gift_card_config(profile),
 		"frappe_version": frappe_version,
 		"erpnext_version": erp_version,
 		"supported": major_version(erp_version) == SUPPORTED_MAJOR
 		and major_version(frappe_version) == SUPPORTED_MAJOR,
 		"lease_ttl_seconds": LEASE_TTL_SECONDS,
 		"issued_at": int(time.time() * 1000),
-	}
-
-
-MAX_QUOTE_LINES = 200
-
-
-@frappe.whitelist(methods=["POST"])
-def quote_sale(pos_profile: str, items: str | list, customer: str | None = None) -> dict:
-	"""What ERPNext would charge for these lines: prices, item tax templates, taxes and the amount to collect.
-
-	Computed in memory on an unsaved document, so nothing is written, no stock is touched and no fiscal
-	service is called. ``create_invoice`` stays authoritative: it re-prices on save and refuses a sale
-	whose rates moved. Quantities are decimals, so the client converts from its integer thousandths.
-	"""
-	if frappe.session.user == "Guest":
-		frappe.throw(_("Login required"), frappe.PermissionError)
-	pos = resolve_pos_profile(pos_profile)
-	lines = frappe.parse_json(items) if isinstance(items, str) else items
-	if not isinstance(lines, list) or not lines or len(lines) > MAX_QUOTE_LINES:
-		frappe.throw(_("A quote needs between 1 and {0} lines.").format(MAX_QUOTE_LINES))
-
-	customer = customer or pos.get("customer")
-	if not customer:
-		frappe.throw(_("Customer is required"))
-	require_customer_access(customer, "read", pos.name)
-
-	currency = pos.get("currency") or frappe.get_cached_value("Company", pos.company, "default_currency")
-	price_list = resolve_selling_price_list(pos, customer)
-	doc = frappe.new_doc(get_invoice_type())
-	doc.update(
-		{
-			"is_pos": 1,
-			"customer": customer,
-			"company": pos.company,
-			"pos_profile": pos.name,
-			"currency": currency,
-			"selling_price_list": price_list,
-			"posting_date": nowdate(),
-			"set_warehouse": pos.warehouse,
-		}
-	)
-
-	result_lines = []
-	for index, line in enumerate(lines):
-		item_code = line.get("item_code")
-		if not item_code or not frappe.db.exists("Item", item_code):
-			frappe.throw(_("Item {0} not found").format(item_code))
-		qty = flt(line.get("qty"), 3)
-		stock_uom, has_serial, has_batch = frappe.get_cached_value(
-			"Item", item_code, ["stock_uom", "has_serial_no", "has_batch_no"]
-		)
-		uom = line.get("uom") or stock_uom
-		if uom != stock_uom:
-			frappe.throw(_("{0}: selling in {1} is not supported on mobile yet.").format(item_code, uom))
-		if cint(has_serial) or cint(has_batch) or line.get("serial_no") or line.get("batch_no"):
-			frappe.throw(_("{0}: serial and batch items are not supported on mobile yet.").format(item_code))
-		rate = get_line_rate(price_list, item_code, uom, customer, qty, doc.posting_date)
-		row_id = line.get("row_id") or index
-		if rate is None:
-			result_lines.append(
-				{"row_id": row_id, "item_code": item_code, "rate": None, "price_unavailable": 1}
-			)
-			continue
-		tax = get_item_tax_template(item_code, pos.company)
-		doc.append(
-			"items",
-			{
-				"item_code": item_code,
-				"qty": qty,
-				"uom": uom,
-				"rate": rate,
-				"price_list_rate": rate,
-				"warehouse": pos.warehouse,
-				"item_tax_template": tax.get("item_tax_template"),
-				"item_tax_rate": frappe.as_json(tax.get("item_tax_map") or {}),
-			},
-		)
-		result_lines.append(
-			{
-				"row_id": row_id,
-				"item_code": item_code,
-				"rate": rate,
-				"item_tax_template": tax.get("item_tax_template"),
-			}
-		)
-
-	unpriced = [row["item_code"] for row in result_lines if row.get("price_unavailable")]
-	if unpriced:
-		return {"price_unavailable": unpriced, "lines": result_lines}
-
-	if pos.taxes_and_charges:
-		doc.taxes_and_charges = pos.taxes_and_charges
-		for tax in frappe.get_cached_doc("Sales Taxes and Charges Template", pos.taxes_and_charges).taxes:
-			doc.append(
-				"taxes",
-				{
-					"charge_type": tax.charge_type,
-					"account_head": tax.account_head,
-					"description": tax.description,
-					"rate": tax.rate,
-					"cost_center": tax.cost_center,
-					"included_in_print_rate": tax.included_in_print_rate,
-				},
-			)
-	doc.calculate_taxes_and_totals()
-	check_zero_payable(pos, doc, doc.items)
-
-	rounded = cint(not cint(doc.get("disable_rounded_total"))) and flt(doc.get("rounded_total"))
-	return {
-		"price_list": price_list,
-		"currency": currency,
-		"net_total": flt(doc.net_total),
-		"total_taxes_and_charges": flt(doc.total_taxes_and_charges),
-		"grand_total": flt(doc.grand_total),
-		"payable": rounded or flt(doc.grand_total),
-		"lines": result_lines,
 	}

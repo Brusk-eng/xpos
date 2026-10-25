@@ -2,7 +2,8 @@
 import { ref, watch } from "vue";
 import type { CatalogItem } from "@mobile/ports";
 import { formatMinor } from "@mobile/domain/money";
-import { getContainer } from "@mobile/composables/useApp";
+import { getContainer, useApp } from "@mobile/composables/useApp";
+import { asScanned, lookupRemoteBarcode } from "@mobile/app/scan";
 import SearchField from "./SearchField.vue";
 import { toast } from "@mobile/composables/useToast";
 
@@ -23,6 +24,7 @@ const props = defineProps<{
 const query = defineModel<string>({ default: "" });
 const emit = defineEmits<{ pick: [item: CatalogItem]; scanned: [item: CatalogItem] }>();
 
+const { state } = useApp();
 const message = ref("");
 const tone = ref<"info" | "warning">("info");
 watch(message, (text) => text && toast[tone.value](text));
@@ -48,12 +50,40 @@ async function submit() {
 		tone.value = "warning";
 		message.value = `Barcode ${code} is assigned to ${r.matches.length} items. Choose one (and tell a manager: this is a data error).`;
 		choices.value = r.matches;
+	} else if (state.online && state.cashier && (await scanOnServer(code))) {
+		query.value = "";
+		message.value = "";
 	} else if (props.strict) {
 		tone.value = "warning";
-		message.value = `No item with barcode ${code}.`;
+		message.value ||= `No item with barcode ${code}.`;
 		query.value = "";
 	}
 	focus(); // handheld scanners keep typing into the same field
+}
+/** A barcode the local catalog does not hold (for example a box barcode): the server resolves it with its unit. */
+async function scanOnServer(code: string): Promise<boolean> {
+	const e = state.cashier!;
+	try {
+		const c = getContainer();
+		const api = await c.session(e.site);
+		const found = await lookupRemoteBarcode(api, e.profile, code, props.minorDigits);
+		if (found.kind === "unsupported") {
+			tone.value = "warning";
+			message.value = found.reason;
+			return false;
+		}
+		if (found.kind !== "found") return false;
+		const item = await c.catalog.getItem(props.scopeId, found.itemCode);
+		if (!item) return false;
+		const sold = asScanned(item, found);
+		emit("scanned", sold);
+		emit("pick", sold);
+		return true;
+	} catch (err) {
+		tone.value = "warning";
+		message.value = err instanceof Error ? err.message : "";
+		return false;
+	}
 }
 function choose(it: CatalogItem) {
 	choices.value = [];

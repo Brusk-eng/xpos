@@ -336,8 +336,11 @@ class TestCreateInvoicePricing(unittest.TestCase):
 		self.assertEqual(self.rows[0].rate, 0)
 
 	def test_return_keeps_original_rate(self):
+		self.can_change_price.return_value = (
+			True  # the stub answers every POS permission, including sale_return
+		)
 		self.run_invoice(
-			profile(force_price_from_customer_price_list=1),
+			profile(force_price_from_customer_price_list=1, allow_return=1),
 			[{"item_code": "A", "qty": -1, "rate": 40}],
 			prices={"A": 80},
 			is_return=1,
