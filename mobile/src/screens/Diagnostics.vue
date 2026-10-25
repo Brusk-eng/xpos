@@ -126,6 +126,13 @@ const hours = (ms: number) => `${(ms / 3_600_000).toFixed(1)} h`;
 
 		<section class="rounded-2xl border border-border bg-card p-4 shadow-raised" aria-labelledby="d-cat">
 			<h2 id="d-cat" class="mb-2 font-semibold">Catalog</h2>
+			<p class="mb-1 text-sm font-medium tabular-nums">
+				{{ state.catalog.items.toLocaleString() }}
+				<template v-if="state.catalog.total > state.catalog.items"
+					>of {{ state.catalog.total.toLocaleString() }}</template
+				>
+				items on this device
+			</p>
 			<p class="mb-2 text-sm" role="status">
 				<template v-if="state.catalog.syncing"
 					>Downloading: {{ state.catalog.downloaded.toLocaleString() }} of
@@ -144,9 +151,6 @@ const hours = (ms: number) => `${(ms / 3_600_000).toFixed(1)} h`;
 					· {{ state.catalog.skippedBarcodes }} barcodes skipped (sold in a unit the app cannot
 					price yet; scanning them reports "not found")</template
 				>
-			</p>
-			<p v-if="state.catalog.message" class="mb-2 text-sm text-warning-soft-foreground">
-				{{ state.catalog.message }}
 			</p>
 			<Button
 				variant="outline"

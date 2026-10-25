@@ -9,9 +9,11 @@ import { formatMinor, toMinor } from "@mobile/domain/money";
 import { describeSale, type SaleEvidence, type TenderEvidence } from "@mobile/domain/sale";
 import { useApp } from "@mobile/composables/useApp";
 import { useCheckout } from "@mobile/composables/useCheckout";
+import { toastOn } from "@mobile/composables/useToast";
 
 const { state } = useApp();
 const { flow, pay, payRepriced, finish, cancel } = useCheckout();
+toastOn(() => flow.error, "warning");
 const digits = computed(() => state.cashier?.minorDigits ?? 2);
 const currency = computed(() => state.cashier?.currency ?? "");
 const money = (m: number) => formatMinor(m, digits.value);
@@ -227,13 +229,6 @@ const problem = computed(
 				</p>
 				<p v-else-if="!check.ok" class="text-xs text-muted-foreground" role="status">
 					{{ check.reason }}
-				</p>
-				<p
-					v-if="flow.error"
-					class="rounded-xl border border-destructive/30 bg-destructive-soft px-3 py-2 text-xs text-destructive-soft-foreground"
-					role="alert"
-				>
-					{{ flow.error }}
 				</p>
 			</div>
 

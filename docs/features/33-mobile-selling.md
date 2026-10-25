@@ -7,6 +7,7 @@ For cashiers using the XPOS Mobile app (Android). Needs ERPNext 16 with XPOS, an
 1. Open the app, enter your server address, sign in with your ERPNext user. If you are assigned to more than one POS Profile, choose the one this device sells for.
 2. Set a 6-digit PIN (first time only). It unlocks this device; it is not your ERPNext password.
 3. Wait for the catalog the first time (a large catalog takes a short while). Later it only fetches changes. **Device** shows when it was last refreshed.
+   A catalog of tens of thousands of items downloads in pages of 500 with a progress count; a dropped connection retries that page instead of starting over. **Device > Catalog** shows how many items are on this device. The Sell list loads 40 items at a time (**load more**); search always looks at the whole catalog.
 4. If the cart shows **Open shift to start selling**, tap it and enter the opening amount for each payment method.
 
 ## Making a sale
@@ -17,6 +18,8 @@ For cashiers using the XPOS Mobile app (Android). Needs ERPNext 16 with XPOS, an
 4. Tap **Take payment**. The sale is saved on the device first, then sent to ERPNext. The receipt shows **Posted to ERPNext as <invoice>** when ERPNext has created it. Printing is not available yet.
 
 ## When something goes wrong
+
+Errors and warnings (wrong PIN, a failed sign-in, a refused payment, a catalog refresh problem, a barcode that is not found) appear as a short message at the top of the screen. Tap **x** to dismiss it, or wait a few seconds. The **Device** screen scrolls to the bottom (Sign out, Lock now).
 
 Nothing you have charged is ever lost or deleted. The **Sales** tab lists every sale with its status:
 

@@ -16,6 +16,21 @@ import { fromRate } from "@mobile/domain/money";
 const API = "xpos.api.catalog_sync";
 export const PAGE = 500;
 const MAX_ATTEMPTS = 3;
+const PAGE_TRIES = 4;
+export const retryDelay = (n: number) => 400 * 2 ** (n - 1);
+
+async function retried<T>(run: () => Promise<T>, wait: (ms: number) => Promise<void>): Promise<T> {
+	for (let n = 1; ; n++) {
+		try {
+			return await run();
+		} catch (e) {
+			const name = e instanceof Error ? e.name : "";
+			if (n >= PAGE_TRIES || (name !== "OfflineError" && name !== "ServerError")) throw e;
+			await wait(retryDelay(n));
+		}
+	}
+}
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class CatalogSyncError extends Error {
 	constructor(
@@ -179,7 +194,7 @@ async function deltaRefresh(
 	let removed = 0;
 	let skipped = 0;
 	for (;;) {
-		const page = await call<DeltaPage>("catalog_delta", { cursor, limit: PAGE });
+		const page = await retried(() => call<DeltaPage>("catalog_delta", { cursor, limit: PAGE }), sleep);
 		if (page.resync) return null; // expired, scope changed or reset: a full download is required
 		const mapped = page.upserts.map((r) => toCatalogItem(r, minorDigits));
 		await repo.applyDelta(
@@ -253,7 +268,10 @@ export async function downloadCatalog(input: SyncOptions): Promise<SyncResult> {
 			let sum = 0;
 			opts.onProgress?.({ downloaded, total: begin.total });
 			while (cursor) {
-				const page: Page = await call<Page>("catalog_page", { cursor, limit: PAGE });
+				const page: Page = await retried(
+					() => call<Page>("catalog_page", { cursor, limit: PAGE }),
+					sleep,
+				);
 				if (page.resync)
 					throw new CatalogSyncError(
 						"resync",

@@ -3,6 +3,7 @@ import { CatalogSyncError, downloadCatalog, toCatalogItem } from "../src/app/cat
 import { crc32 } from "../src/domain/crc32";
 import { fromRate } from "../src/domain/money";
 import type { ApiTransport } from "../src/ports";
+import { ServerError } from "../src/adapters/frappeHttp";
 import { HostSqlite } from "./support/hostSqlite";
 
 interface Row {
@@ -241,5 +242,30 @@ describe("catalog helpers", () => {
 		// an older server that does not send price_missing: 0 means no price, a positive rate is a price
 		expect(toCatalogItem({ ...base, rate: 0 }, 2).item.priced).toBe(false);
 		expect(toCatalogItem({ ...base, rate: 3 }, 2).item.priced).toBe(true);
+	});
+
+	it("downloads a 50,000 item catalog in 100 pages and verifies it", async () => {
+		const server = new FakeServer(many(50_000));
+		const repo = new HostSqlite();
+		const r = await downloadCatalog(opts(server, repo));
+		expect(r).toMatchObject({ items: 50_000, mode: "full" });
+		expect(server.calls.filter((c) => c === "catalog_page")).toHaveLength(100);
+		expect((await repo.stats("real:c|Main@shop")).items).toBe(50_000);
+	}, 60_000);
+
+	it("retries one failed page instead of restarting the whole download", async () => {
+		const server = new FakeServer(many(1200));
+		const real = server.call.bind(server);
+		let failed = false;
+		server.call = async <T>(method: string, args: Record<string, unknown> = {}) => {
+			if (method.endsWith("catalog_page") && String(args.cursor) !== "after:" && !failed) {
+				failed = true;
+				throw new ServerError(502, "bad gateway");
+			}
+			return real<T>(method, args);
+		};
+		const r = await downloadCatalog(opts(server, new HostSqlite()));
+		expect(r.items).toBe(1200);
+		expect(server.calls.filter((c) => c === "catalog_begin")).toHaveLength(1);
 	});
 });

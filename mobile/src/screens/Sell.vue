@@ -11,6 +11,7 @@ import CartPanel from "@mobile/ui/CartPanel.vue";
 import CatalogLayout from "@mobile/layouts/CatalogLayout.vue";
 import ScanCounter from "@mobile/layouts/ScanCounter.vue";
 import FashionAssist from "@mobile/layouts/FashionAssist.vue";
+import { toastOn } from "@mobile/composables/useToast";
 
 const layout = useLayoutChoice();
 const { state } = useApp();
@@ -18,6 +19,7 @@ const { state } = useApp();
 const CURRENCY = state.cashier!.currency;
 const DIGITS = state.cashier!.minorDigits;
 const { cart, total, count, add } = useCart({ code: CURRENCY, minorDigits: DIGITS });
+toastOn(() => cart.error, "warning");
 const sheet = ref(false);
 const closeBtn = ref<HTMLButtonElement>();
 const wide = ref(false);
@@ -73,13 +75,6 @@ async function openSheet() {
 			<p class="mt-1 text-xs text-muted-foreground">
 				{{ hint }} · {{ state.catalog.items.toLocaleString() }} items · same cart in every layout
 			</p>
-			<p
-				v-if="cart.error"
-				class="mt-1 rounded-lg border border-warning/30 bg-warning-soft px-2 py-1 text-xs text-warning-soft-foreground"
-				role="alert"
-			>
-				{{ cart.error }}
-			</p>
 		</div>
 
 		<div class="flex min-h-0 flex-1">
@@ -103,21 +98,11 @@ async function openSheet() {
 					<template v-else>
 						<p class="text-base font-semibold">No catalog on this device</p>
 						<p class="text-sm text-muted-foreground">
-							{{
-								state.catalog.message ||
-								"Connect to the server to download the items you can sell."
-							}}
+							Connect to the server to download the items you can sell.
 						</p>
 						<Button class="mx-auto h-11" @click="refreshCatalog">Download the catalog</Button>
 					</template>
 				</div>
-				<p
-					v-if="state.catalog.ready && state.catalog.message"
-					class="pad-safe-x pb-3 text-xs text-warning-soft-foreground"
-					role="status"
-				>
-					{{ state.catalog.message }}
-				</p>
 			</div>
 			<aside
 				v-if="wide"

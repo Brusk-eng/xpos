@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { XposLogo } from "@/components/ui/brand";
 import PinPad from "@mobile/ui/PinPad.vue";
 import { enrolled, getContainer, useApp } from "@mobile/composables/useApp";
+import { toastOn } from "@mobile/composables/useToast";
 
 const { state } = useApp();
 const first = ref("");
 const second = ref("");
 const step = ref<1 | 2>(1);
 const error = ref("");
+toastOn(error);
 const busy = ref(false);
 
 function onFirst() {
@@ -44,13 +46,6 @@ async function onSecond(pin: string) {
 				only. It is not your ERPNext password.
 			</p>
 		</div>
-		<p
-			v-if="error"
-			class="rounded-xl border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm text-destructive-soft-foreground"
-			role="alert"
-		>
-			{{ error }}
-		</p>
 		<p class="text-center text-sm font-medium" aria-live="polite">
 			{{ step === 1 ? "Choose a 6-digit PIN" : "Repeat the PIN" }}
 		</p>

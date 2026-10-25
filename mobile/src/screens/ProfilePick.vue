@@ -3,10 +3,12 @@ import { ref } from "vue";
 import { Button } from "@/components/ui/button";
 import { XposLogo } from "@/components/ui/brand";
 import { chooseProfile, useApp } from "@mobile/composables/useApp";
+import { toastOn } from "@mobile/composables/useToast";
 
 const { state } = useApp();
 const busy = ref("");
 const error = ref("");
+toastOn(error);
 async function pick(name: string) {
 	busy.value = name;
 	error.value = "";
@@ -30,13 +32,6 @@ async function pick(name: string) {
 				see the profiles you are assigned to.
 			</p>
 		</div>
-		<p
-			v-if="error"
-			class="rounded-xl border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm text-destructive-soft-foreground"
-			role="alert"
-		>
-			{{ error }}
-		</p>
 		<ul class="flex flex-col gap-2">
 			<li v-for="p in state.pending?.profiles ?? []" :key="p.name">
 				<Button

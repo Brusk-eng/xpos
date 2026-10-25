@@ -14,9 +14,12 @@ import PaymentSheet from "@mobile/ui/PaymentSheet.vue";
 import ReSignIn from "@mobile/ui/ReSignIn.vue";
 import Sell from "@mobile/screens/Sell.vue";
 import Diagnostics from "@mobile/screens/Diagnostics.vue";
+import Toaster from "@mobile/ui/Toaster.vue";
+import { toastOn } from "@mobile/composables/useToast";
 import { boot, selectTab, useApp, type Tab } from "@mobile/composables/useApp";
 
 const { state } = useApp();
+toastOn(() => state.catalog.message, "warning");
 onMounted(async () => {
 	document.documentElement.classList.toggle("dark", matchMedia("(prefers-color-scheme: dark)").matches);
 	await boot();
@@ -91,4 +94,5 @@ const screen = computed(
 			</ul>
 		</template>
 	</MobileShell>
+	<Toaster />
 </template>

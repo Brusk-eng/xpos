@@ -4,11 +4,13 @@ import { Button } from "@/components/ui/button";
 import { XposLogo } from "@/components/ui/brand";
 import PinPad from "@mobile/ui/PinPad.vue";
 import { getContainer, signOut, unlocked, useApp } from "@mobile/composables/useApp";
+import { toastOn } from "@mobile/composables/useToast";
 
 const { state } = useApp();
 const pin = ref("");
 const busy = ref(false);
 const error = ref("");
+toastOn(error);
 const retryAt = ref(0);
 const now = ref(Date.now());
 const tick = setInterval(() => (now.value = Date.now()), 500);
@@ -39,8 +41,8 @@ async function attempt(p: string) {
 			</p>
 			<p v-if="state.lockReason" class="mt-1 text-xs text-muted-foreground">{{ state.lockReason }}</p>
 		</div>
-		<p v-if="error" class="text-center text-sm font-medium text-destructive" role="alert">
-			{{ error }} <span v-if="waitSec">Try again in {{ waitSec }}s.</span>
+		<p v-if="waitSec" class="text-center text-sm font-medium" role="status">
+			Try again in {{ waitSec }}s.
 		</p>
 		<PinPad v-model="pin" label="PIN" :disabled="busy || waitSec > 0" @complete="attempt" />
 		<p class="text-center text-xs text-muted-foreground">

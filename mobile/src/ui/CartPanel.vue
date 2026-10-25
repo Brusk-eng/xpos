@@ -7,6 +7,7 @@ import { useCheckout } from "@mobile/composables/useCheckout";
 import { useApp } from "@mobile/composables/useApp";
 import { ref, watch } from "vue";
 import ShiftSheet from "./ShiftSheet.vue";
+import { toastOn } from "@mobile/composables/useToast";
 
 const props = defineProps<{ compact?: boolean; scopeId: string; currency: string; minorDigits: number }>();
 const { cart, total, count, change, remove, clear } = useCart({
@@ -15,6 +16,8 @@ const { cart, total, count, change, remove, clear } = useCart({
 });
 const { state } = useApp();
 const { flow, blocker, begin } = useCheckout();
+toastOn(() => cart.error);
+toastOn(() => flow.error, "warning");
 const shiftOpen = ref(false);
 
 watch(
@@ -138,13 +141,6 @@ const money = (m: number) => formatMinor(m, props.minorDigits);
 		</p>
 
 		<div class="shrink-0 space-y-2.5 border-t border-border px-4 pt-2.5 pb-3">
-			<p
-				v-if="cart.error"
-				class="rounded-xl border border-destructive/30 bg-destructive-soft px-3 py-2 text-xs text-destructive-soft-foreground"
-				role="alert"
-			>
-				{{ cart.error }}
-			</p>
 			<dl class="px-1 text-sm">
 				<div class="flex items-baseline justify-between">
 					<dt class="text-lg font-bold text-foreground">Total</dt>
@@ -153,13 +149,6 @@ const money = (m: number) => formatMinor(m, props.minorDigits);
 					</dd>
 				</div>
 			</dl>
-			<p
-				v-if="flow.error"
-				class="rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-xs text-warning-soft-foreground"
-				role="status"
-			>
-				{{ flow.error }}
-			</p>
 			<Button
 				v-if="cart.lines.length && !state.context.openShift && state.online"
 				variant="outline"

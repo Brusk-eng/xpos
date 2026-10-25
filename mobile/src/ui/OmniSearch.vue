@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import type { CatalogItem } from "@mobile/ports";
 import { formatMinor } from "@mobile/domain/money";
 import { getContainer } from "@mobile/composables/useApp";
 import SearchField from "./SearchField.vue";
+import { toast } from "@mobile/composables/useToast";
 
 /**
  * ONE bar for typing, handheld scanners (they type the code then Enter) and the camera button.
@@ -24,6 +25,7 @@ const emit = defineEmits<{ pick: [item: CatalogItem]; scanned: [item: CatalogIte
 
 const message = ref("");
 const tone = ref<"info" | "warning">("info");
+watch(message, (text) => text && toast[tone.value](text));
 const choices = ref<CatalogItem[]>([]);
 const root = ref<HTMLElement>();
 
@@ -83,18 +85,6 @@ const cameraNote = ref(false);
 		>
 			Camera scanning is not implemented in this milestone. A handheld scanner that types into this bar
 			works (no model tested yet).
-		</p>
-		<p
-			v-if="message"
-			class="mt-2 rounded-xl border px-3 py-2 text-sm"
-			:class="
-				tone === 'warning'
-					? 'border-warning/30 bg-warning-soft text-warning-soft-foreground'
-					: 'border-info/30 bg-info-soft text-info-soft-foreground'
-			"
-			role="alert"
-		>
-			{{ message }}
 		</p>
 		<ul v-if="choices.length" class="mt-2 flex flex-col gap-2" aria-label="Items sharing this barcode">
 			<li v-for="c in choices" :key="c.itemCode">

@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { LoginError } from "@mobile/adapters/onlineLogin";
 import { OfflineError } from "@mobile/adapters/frappeHttp";
 import { reSignIn, useApp } from "@mobile/composables/useApp";
+import { toastOn } from "@mobile/composables/useToast";
 
 const { state } = useApp();
 const password = ref("");
 const error = ref("");
+toastOn(error);
 const busy = ref(false);
 async function submit() {
 	busy.value = true;
@@ -54,7 +56,6 @@ async function submit() {
 				placeholder="ERPNext password"
 				aria-label="ERPNext password"
 			/>
-			<p v-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>
 			<Button
 				type="submit"
 				class="h-12 w-full text-base font-semibold"

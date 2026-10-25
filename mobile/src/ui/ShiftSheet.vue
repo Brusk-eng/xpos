@@ -5,12 +5,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toMinor } from "@mobile/domain/money";
 import { openShift, useApp } from "@mobile/composables/useApp";
+import { toastOn } from "@mobile/composables/useToast";
 
 const open = defineModel<boolean>({ default: false });
 const { state } = useApp();
 const amounts = ref<Record<string, string>>({});
 const busy = ref(false);
 const error = ref("");
+toastOn(error);
 const modes = computed(() => state.context.paymentModes);
 
 async function submit() {
@@ -71,7 +73,6 @@ async function submit() {
 					class="h-11 w-32 text-end text-base tabular-nums"
 				/>
 			</label>
-			<p v-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>
 			<Button type="submit" class="h-12 w-full text-base font-semibold" :loading="busy"
 				>Open shift</Button
 			>
