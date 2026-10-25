@@ -22,6 +22,7 @@ const props = withDefaults(
 		showNow?: boolean;
 		clearable?: boolean;
 		label?: string;
+		ariaLabel?: string;
 		class?: HTMLAttributes["class"];
 	}>(),
 	{
@@ -312,7 +313,7 @@ function openPicker() {
 				inputmode="numeric"
 				:disabled="disabled"
 				:placeholder="placeholder"
-				:aria-label="label || placeholder"
+				:aria-label="ariaLabel || label || placeholder"
 				:aria-invalid="invalid || undefined"
 				:class="
 					cn(
