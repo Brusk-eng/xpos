@@ -93,6 +93,7 @@ def setup_gift_cards(company=COMPANY, profile=PROFILE):
 	pos = make_pos_profile(name=profile, do_not_insert=1)
 	pos.append("payments", {"mode_of_payment": GIFT_MODE})
 	pos.xpos_enable_gift_cards = 1
+	pos.allow_return = 1
 	pos.append("applicable_for_users", {"user": "Administrator", "default": 1})
 	pos.insert(ignore_permissions=True)
 	return pos
