@@ -78,15 +78,7 @@
 			/>
 		</template>
 
-		<Toaster
-			:theme="isDark ? 'dark' : 'light'"
-			:position="isRtl ? 'bottom-left' : 'bottom-right'"
-			:duration="4000"
-			:expand="true"
-			rich-colors
-			close-button
-			:dir="isRtl ? 'rtl' : 'ltr'"
-		/>
+		<ToastHost />
 		<ErrorInspector v-if="errorInspectorSeen" v-model:open="showErrorInspector" />
 		<Transition name="fade">
 			<button
@@ -106,7 +98,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, provide, ref, watch } from "vue";
 import { useRoute } from "vue-router";
-import { Toaster } from "vue-sonner";
+import { ToastHost } from "@/components/ui/toast";
 import { usePosStore } from "@/stores/posStore";
 import { useCartStore } from "@/stores/cartStore";
 import { useCartSessionStore } from "@/stores/cartSessionStore";

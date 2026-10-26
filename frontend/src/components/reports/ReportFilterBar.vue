@@ -33,7 +33,7 @@ const emit = defineEmits<{
 			<div class="relative w-44 min-w-0 flex-none">
 				<span
 					v-if="filter.required"
-					class="pointer-events-none absolute -top-1 -end-0.5 z-10 text-base font-bold leading-none text-destructive"
+					class="pointer-events-none absolute -top-1 -inset-e-0.5 z-10 text-base font-bold leading-none text-destructive"
 					aria-hidden="true"
 					>*</span
 				>

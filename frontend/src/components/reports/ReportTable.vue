@@ -298,7 +298,7 @@ function keyResize(event: KeyboardEvent, column: ReportColumn, index: number) {
 						tabindex="0"
 						:aria-label="__('Resize column {0}', [column.label])"
 						:aria-valuenow="sizes[index]"
-						class="absolute inset-y-0 end-0 w-2 cursor-col-resize touch-none hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none"
+						class="absolute inset-y-0 inset-e-0 w-2 cursor-col-resize touch-none hover:bg-primary/30 focus-visible:bg-primary/40 focus-visible:outline-none"
 						@pointerdown="startResize($event, column, index)"
 						@pointermove="moveResize"
 						@pointerup="endResize"
@@ -314,7 +314,7 @@ function keyResize(event: KeyboardEvent, column: ReportColumn, index: number) {
 					:key="String(item.key)"
 					role="row"
 					:aria-rowindex="item.index + 2"
-					class="group absolute start-0 top-0 flex border-b border-border/60"
+					class="group absolute inset-s-0 top-0 flex border-b border-border/60"
 					:style="{
 						height: `${ROW_HEIGHT}px`,
 						transform: `translateY(${item.start}px)`,
