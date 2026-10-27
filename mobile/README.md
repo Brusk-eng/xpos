@@ -1,6 +1,6 @@
 # XPOS Mobile
 
-Vue + Capacitor app (Android) that sells against a real ERPNext 16 site with XPOS installed. The same UI also runs in a browser (`yarn dev`) for development. Design notes: [docs/features/32-mobile-android-foundation.md](../docs/features/32-mobile-android-foundation.md). Cashier guide: [docs/features/33-mobile-selling.md](../docs/features/33-mobile-selling.md).
+Vue + Capacitor app (Android) that sells against a real ERPNext 16 site with XPOS installed. The same UI also runs in a browser (`yarn dev`) for development. Cashier guide: [docs/features/33-mobile-selling.md](../docs/features/33-mobile-selling.md). Overview and rollout: [docs/features/35-xpos-mobile-overview.md](../docs/features/35-xpos-mobile-overview.md). Building and publishing: [docs/release.md](docs/release.md).
 
 ## What works
 
@@ -11,7 +11,7 @@ Vue + Capacitor app (Android) that sells against a real ERPNext 16 site with XPO
 
 ## Not implemented yet (be aware)
 
-Offline selling (charging is switched off offline: stock, serial/batch and receipt checks need the server), background sending while the app is closed, returns, shift closing, printing, camera scanning, customer selection (the profile's default customer is used), serial/batch items, MFA/SSO accounts, barcodes sold in another unit (reported "not found"), Urdu Nastaliq font. Card/transfer payments are labelled "cashier-confirmed": XPOS records what the cashier entered and does not check it with the terminal or bank (a reference is required where the company marks the mode as reference-required). Fiscal (FBR) sales that need a local step are shown as "fiscal pending", are kept on the device with their invoice and sale id, block any new sale until finished in the web POS, and are never shown as completed. A sale re-priced by the server stays on the device as one held sale (not put back in the live cart, so it cannot be sold twice). Offline checkout is switched off; the agreed 24-hour offline requirement is NOT implemented.
+Offline selling (charging is switched off offline: stock, serial/batch and receipt checks need the server), background sending while the app is closed, returns, shift closing, printing, camera scanning, serial/batch items, MFA/SSO accounts, weighed-item barcodes, Urdu Nastaliq font. Card/transfer payments are labelled "cashier-confirmed": XPOS records what the cashier entered and does not check it with the terminal or bank (a reference is required where the company marks the mode as reference-required). Fiscal (FBR) sales that need a local step are shown as "fiscal pending", are kept on the device with their invoice and sale id, block any new sale until finished in the web POS, and are never shown as completed. A sale re-priced by the server stays on the device as one held sale (not put back in the live cart, so it cannot be sold twice). Offline checkout is switched off; the agreed 24-hour offline requirement is NOT implemented.
 
 ## Verification status (2026-10-24)
 

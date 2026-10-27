@@ -1,6 +1,6 @@
 # Selling on XPOS Mobile
 
-For cashiers using the XPOS Mobile app (Android). Needs ERPNext 16 with XPOS, and a user assigned to a POS Profile.
+For cashiers using the XPOS Mobile app (Android). Needs ERPNext 16 with XPOS, and a user assigned to a POS Profile. For requirements and what the app cannot do yet, see the [XPOS Mobile overview](35-xpos-mobile-overview.md).
 
 ## Start of day
 
