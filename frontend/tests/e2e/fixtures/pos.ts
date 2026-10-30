@@ -131,6 +131,9 @@ export const PERMISSIONS = {
 	bank_drop: true,
 	current_stock_by_brand: true,
 	gift_card_liability_report: true,
+	receive_stock_draft: true,
+	receive_stock_submit: true,
+	receive_stock_rates: true,
 	current_stock_report: true,
 };
 

@@ -134,16 +134,6 @@ export function useKeyboardShortcuts() {
 			},
 		},
 		{
-			id: "error-inspector",
-			keys: ["ctrl", "shift", "e"],
-			description: "Toggle Error Inspector",
-			category: "General",
-			global: true,
-			action: () => {
-				window.dispatchEvent(new CustomEvent("xpos:toggle-error-inspector"));
-			},
-		},
-		{
 			id: "fullscreen",
 			keys: ["f11"],
 			description: "Toggle Full Screen",

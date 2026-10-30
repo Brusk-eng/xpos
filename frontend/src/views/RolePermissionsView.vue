@@ -142,6 +142,14 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 		],
 	},
 	{
+		title: "Stock Receiving",
+		items: [
+			{ key: "receive_stock_draft", label: "Save Stock Receipt Draft" },
+			{ key: "receive_stock_submit", label: "Submit Stock Receipt" },
+			{ key: "receive_stock_rates", label: "View and Edit Receiving Rates" },
+		],
+	},
+	{
 		title: "Administration",
 		items: [{ key: "manage_role_permissions", label: "Manage Role Permissions" }],
 	},

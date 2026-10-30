@@ -20,3 +20,4 @@ xpos.patches.v2.add_resolve_fiscal_check_permission
 xpos.patches.v3.add_catalog_change_log
 xpos.patches.v3.add_catalog_query_indexes
 xpos.patches.v3.add_gift_card_liability_report_permission
+xpos.patches.v3.add_stock_receiving_permissions

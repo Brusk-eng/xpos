@@ -79,19 +79,6 @@
 		</template>
 
 		<ToastHost />
-		<ErrorInspector v-if="errorInspectorSeen" v-model:open="showErrorInspector" />
-		<Transition name="fade">
-			<button
-				v-if="!isAuthPage && errorCount > 0 && !showErrorInspector"
-				type="button"
-				class="fixed bottom-3 inset-e-3 z-50 flex items-center gap-1.5 rounded-full bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground shadow-md select-none cursor-pointer"
-				:title="__('Open Error Inspector')"
-				@click="showErrorInspector = true"
-			>
-				<AlertTriangle class="w-3.5 h-3.5" />
-				<span>{{ errorCount }}</span>
-			</button>
-		</Transition>
 	</div>
 </template>
 
@@ -111,12 +98,11 @@ import OpeningDialog from "@/components/dialogs/OpeningDialog.vue";
 import ConfirmDialog from "@/components/dialogs/ConfirmDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";
 import AppStatusBanner from "@/components/offline/AppStatusBanner.vue";
-import { AlertTriangle, Trash2 } from "lucide-vue-next";
+import { Trash2 } from "lucide-vue-next";
 import { useOfflineStore } from "@/stores/offlineStore";
 import { showError } from "@/services/api";
 import __ from "@/lib/translate";
 import { useKeyboardShortcuts } from "@/composables/useKeyboardShortcuts";
-import { unseenCount as errorUnseenCount } from "@/services/errorLog";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { getCustomer } from "./utils";
 import { onIdle } from "@/utils/idle";
@@ -132,8 +118,6 @@ const itemStore = useItemStore();
 const paymentStore = usePaymentStore();
 const authStore = useAuthStore();
 const offlineStore = useOfflineStore();
-const showErrorInspector = ref(false);
-const errorCount = errorUnseenCount;
 const isRtl = computed(() => document.documentElement.dir === "rtl");
 
 const keyboardShortcuts = useKeyboardShortcuts();
@@ -161,11 +145,9 @@ const KeyboardShortcutsDialog = defineAsyncComponent(
 	() => import("@/components/dialogs/KeyboardShortcutsDialog.vue"),
 );
 const AboutDialog = defineAsyncComponent(() => import("@/components/dialogs/AboutDialog.vue"));
-const ErrorInspector = defineAsyncComponent(() => import("@/components/errors/ErrorInspector.vue"));
 
 const shortcutsSeen = useEverTrue(showShortcutsDialog);
 const aboutSeen = useEverTrue(showAboutDialog);
-const errorInspectorSeen = useEverTrue(showErrorInspector);
 
 const isAuthPage = computed(() => route.meta.isAuthPage === true);
 const isFullScreen = computed(() => route.meta.fullScreen === true);
@@ -281,10 +263,6 @@ function handleShowAboutDialog() {
 	showAboutDialog.value = true;
 }
 
-function handleToggleErrorInspector() {
-	showErrorInspector.value = !showErrorInspector.value;
-}
-
 const theme = ref<"light" | "dark" | "system">("system");
 const systemPrefersDark = ref(window.matchMedia("(prefers-color-scheme: dark)").matches);
 
@@ -394,7 +372,6 @@ onMounted(() => {
 	window.addEventListener("xpos:print-last", handlePrintLast as EventListener);
 	window.addEventListener("xpos:show-shortcuts-dialog", handleShowShortcutsDialog as EventListener);
 	window.addEventListener("xpos:show-about-dialog", handleShowAboutDialog as EventListener);
-	window.addEventListener("xpos:toggle-error-inspector", handleToggleErrorInspector as EventListener);
 });
 
 watch(isAuthPage, (isAuth, wasAuth) => {
@@ -448,6 +425,5 @@ onUnmounted(() => {
 	window.removeEventListener("xpos:print-last", handlePrintLast as EventListener);
 	window.removeEventListener("xpos:show-shortcuts-dialog", handleShowShortcutsDialog as EventListener);
 	window.removeEventListener("xpos:show-about-dialog", handleShowAboutDialog as EventListener);
-	window.removeEventListener("xpos:toggle-error-inspector", handleToggleErrorInspector as EventListener);
 });
 </script>
