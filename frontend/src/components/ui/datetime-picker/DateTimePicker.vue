@@ -24,6 +24,7 @@ const props = withDefaults(
 		label?: string;
 		ariaLabel?: string;
 		class?: HTMLAttributes["class"];
+		compact?: boolean;
 	}>(),
 	{
 		mode: "datetime",
@@ -317,7 +318,7 @@ function openPicker() {
 				:aria-invalid="invalid || undefined"
 				:class="
 					cn(
-						inputVariants(),
+						inputVariants({ size: compact ? 'compact' : 'default' }),
 						'w-full ps-9',
 						clearable && hasValue ? 'pe-9' : '',
 						invalid && 'border-destructive',
